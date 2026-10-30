@@ -346,12 +346,36 @@ class Banner:
         self.bans: dict = read_json(self.path, {}) or {}
 
     def backend(self) -> str:
+        """Motor de bloqueo: CrowdSec si está activo; si no firewalld, ufw o iptables (en ese orden)."""
         b = self.cfg.get("ban", "backend", fallback="auto")
         if b != "auto":
             return b
-        if shutil.which("cscli") and run(["systemctl", "is-active", "crowdsec"], 5)[1].strip() == "active":
+        active = lambda u: run(["systemctl", "is-active", u], 5)[1].strip().split("\n")[-1] == "active"
+        if shutil.which("cscli") and active("crowdsec"):
             return "crowdsec"
-        return "ufw" if shutil.which("ufw") else "none"
+        if shutil.which("firewall-cmd") and active("firewalld"):
+            return "firewalld"
+        try:
+            ufw_on = "ENABLED=yes" in open("/etc/ufw/ufw.conf", encoding="utf-8").read()
+        except OSError:
+            ufw_on = False
+        if shutil.which("ufw") and ufw_on:
+            return "ufw"
+        return "iptables" if shutil.which("iptables") else "none"
+
+    @staticmethod
+    def _cmds(be: str, ip: str, ttl: int) -> tuple[list[str], list[str] | None]:
+        """(comando para bloquear, comando para desbloquear) de cada motor."""
+        v6 = ":" in ip
+        if be == "crowdsec":
+            return ["cscli", "decisions", "add", "--ip", ip, "--duration", f"{ttl}s", "--type", "ban"], ["cscli", "decisions", "delete", "--ip", ip]
+        if be == "firewalld":
+            rule = f'rule family="{"ipv6" if v6 else "ipv4"}" source address="{ip}" drop'
+            return ["firewall-cmd", f"--add-rich-rule={rule}", f"--timeout={ttl}"], ["firewall-cmd", f"--remove-rich-rule={rule}"]
+        if be == "iptables":
+            t = "ip6tables" if v6 else "iptables"
+            return [t, "-I", "INPUT", "1", "-s", ip, "-m", "comment", "--comment", "sentinel", "-j", "DROP"], [t, "-D", "INPUT", "-s", ip, "-m", "comment", "--comment", "sentinel", "-j", "DROP"]
+        return ["ufw", "insert", "1", "deny", "from", ip, "to", "any", "comment", "sentinel"], ["ufw", "delete", "deny", "from", ip, "to", "any"]
 
     def ban(self, ip: str, reason: str, ttl: int | None = None) -> bool:
         ttl = ttl or self.cfg.getint("ban", "ttl_seconds", fallback=86400)
@@ -365,10 +389,10 @@ class Banner:
         if not is_root() or be == "none":
             self.alerter.emit("medium", "ban", "simulado", f"Se habría bloqueado {ip} por {ttl // 3600} h ({reason}); falta permiso de administrador o motor de bloqueo", key=f"sim:{ip}")
             return False
+        cmd, _ = self._cmds(be, ip, ttl)
         if be == "crowdsec":
-            rc, out = run(["cscli", "decisions", "add", "--ip", ip, "--duration", f"{ttl}s", "--type", "ban", "--reason", f"sentinel: {reason}"[:180]], 20)
-        else:
-            rc, out = run(["ufw", "insert", "1", "deny", "from", ip, "to", "any", "comment", "sentinel"], 20)
+            cmd += ["--reason", f"sentinel: {reason}"[:180]]
+        rc, out = run(cmd, 20)
         if rc != 0:
             self.alerter.emit("high", "ban", "fallo", f"No se pudo bloquear {ip}: {out.strip()[:160]}", key=f"banfail:{ip}")
             return False
@@ -377,12 +401,18 @@ class Banner:
         self.alerter.emit("high", "ban", "bloqueada", f"IP {ip} bloqueada por {ttl // 3600} h con {be}: {reason}", key=f"ban:{ip}:{int(now() // 60)}", ip=ip, ttl=ttl)
         return True
 
+    def _release(self, ip: str, be: str) -> None:
+        if not is_root() or be in ("crowdsec", "firewalld", "none"):
+            return  # CrowdSec y firewalld caducan solos (--duration / --timeout)
+        _, undo = self._cmds(be, ip, 0)
+        if undo:
+            run(undo, 20)
+
     def expire(self) -> list[str]:
         gone = []
         for ip, b in list(self.bans.items()):
             if b["until"] <= now():
-                if b.get("backend") == "ufw" and is_root():
-                    run(["ufw", "delete", "deny", "from", ip, "to", "any"], 20)
+                self._release(ip, b.get("backend", ""))
                 gone.append(ip)
                 del self.bans[ip]
         if gone:
@@ -392,8 +422,11 @@ class Banner:
     def unban(self, ip: str) -> bool:
         b = self.bans.pop(ip, None)
         if is_root():
-            if shutil.which("cscli"):
-                run(["cscli", "decisions", "delete", "--ip", ip], 20)
-            run(["ufw", "delete", "deny", "from", ip, "to", "any"], 20)
+            for be in ("crowdsec", "firewalld", "ufw", "iptables"):
+                if be == "crowdsec" and not shutil.which("cscli"):
+                    continue
+                _, undo = self._cmds(be, ip, 0)
+                if undo and shutil.which(undo[0]):
+                    run(undo, 20)
         atomic_write_json(self.path, self.bans, share=True)
         return b is not None

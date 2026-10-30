@@ -116,7 +116,7 @@ class Data:
         return {"version": core.VERSION, "now": now, "level": level, "why": why, "alive": alive, "heartbeat_age": age, "services": svc,
                 "baseline": meta, "counts24": c24, "counts7": count(ev7), "hours": hours, "top_ips": [{"ip": ip, "n": n, "banned": ip in active} for ip, n in ips.most_common(8)],
                 "bans": [{"ip": ip, "reason": b["reason"], "backend": b["backend"], "left": int(b["until"] - now)} for ip, b in sorted(active.items(), key=lambda kv: kv[1]["until"])],
-                "events": ev7[-60:][::-1], "root": core.is_root(), "installed": os.path.exists("/usr/local/bin/sentinel")}
+                "events": ev7[-60:][::-1], "root": core.is_root(), "installed": sentinel_bin() is not None}
 
     def events(self, hours: int, min_sev: str, q: str, limit: int) -> list[dict]:
         ev = core.read_events(core.now() - hours * 3600, min_sev)
@@ -127,8 +127,10 @@ class Data:
 
 
 def sentinel_bin() -> str | None:
-    p = "/usr/local/bin/sentinel"
-    return p if os.path.exists(p) else shutil.which("sentinel")
+    for p in ("/usr/bin/sentinel", "/usr/local/bin/sentinel"):
+        if os.path.exists(p):
+            return p
+    return shutil.which("sentinel")
 
 
 def build_action(body: dict) -> list[str]:

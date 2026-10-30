@@ -34,7 +34,7 @@ def c_firewall(cfg):
 
 
 def c_ids(cfg):
-    act = [n for n in ("crowdsec", "crowdsec-firewall-bouncer", "fail2ban") if _svc(n) == "active"]
+    act = [n for n in ("crowdsec", "crowdsec-firewall-bouncer", "fail2ban", "firewalld") if _svc(n) == "active"]
     if "crowdsec" in act and "crowdsec-firewall-bouncer" not in act:
         return WARN, "CrowdSec detecta pero su bouncer no bloquea (inactivo)", "sudo systemctl enable --now crowdsec-firewall-bouncer"
     if not act:

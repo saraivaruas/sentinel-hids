@@ -32,18 +32,46 @@ Se abre desde el menú de aplicaciones («Sentinel») o con `sentinel ui`, como 
 
 Seguridad del panel: valida `Host` y `Origin` (contra DNS-rebinding y CSRF), CSP estricta, y todo texto de los eventos —que puede venir de un atacante— se muestra como texto, nunca como HTML. Las acciones son una lista cerrada con valores validados. Para verlo con datos de ejemplo sin instalar nada: `python3 tools/demo_datos.py /tmp/demo` y luego `SENTINEL_STATE=/tmp/demo/state SENTINEL_LOG=/tmp/demo/log python3 -m sentinel ui`.
 
-## Instalar
+## Instalar (baja e instala todo lo necesario)
+
+Sentinel no usa librerías de Python externas. Lo que sí necesita del sistema (inotify, notificaciones, polkit, un motor de bloqueo…) **se instala solo**. Hay tres formas:
+
+**1. Paquete .deb (Ubuntu, Debian, Mint…) — la más simple.** `apt` resuelve y baja las dependencias:
+
+```bash
+sudo apt install ./sentinel_2.0.0_all.deb
+```
+
+**2. Instalador (Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE).** Detecta la distribución, calcula qué falta, lo instala con `apt`, `dnf`, `pacman` o `zypper`, y después instala Sentinel:
 
 ```bash
 sudo ./install.sh --dry-run      # primero mira qué haría, sin cambiar nada
-sudo ./install.sh                # instala, retira la v1 (con copia en /root/sentinel-v1-respaldo) y arranca
-sentinel status
-sentinel test                    # comprueba que las alertas llegan (debería salir una notificación)
-sentinel audit                   # revisión de postura con el arreglo de cada hallazgo
+sudo ./install.sh                # instala dependencias + Sentinel, retira la v1 (copia en /root/sentinel-v1-respaldo) y arranca
 ```
 
-Opciones: `--sin-limpiar` (no toca la v1), `--exponer-senuelos` (abre los puertos señuelo hacia Internet; por defecto quedan cerrados y el escaneo externo se detecta igual con el cortafuegos).
-Desinstalar: `sudo ./uninstall.sh` (`--todo` borra también registros y referencias).
+**3. Descarga e instalación en un paso**, desde cualquier servidor donde publiques el `.tar.gz` (verifica la huella antes de instalar; sin huella no instala):
+
+```bash
+sudo SENTINEL_URL=https://tu-servidor/sentinel-2.0.0.tar.gz SENTINEL_SHA256=<huella> bash get-sentinel.sh
+```
+
+Después de instalar: `sentinel status`, `sentinel test` (debería salir una notificación) y `sentinel audit`.
+
+| Paquete | Se instala si falta | Para qué |
+|---|---|---|
+| python3 (≥ 3.8), systemd, procps, iproute2, util-linux | siempre | base |
+| inotify-tools | sí | vigilancia de archivos en vivo |
+| libnotify, polkit | sí | avisos de escritorio y acciones del panel con clave |
+| logrotate | sí | rotación de registros |
+| ufw / firewalld / iptables | solo si no hay ningún motor de bloqueo | bloquear atacantes (se instala, **no** se activa) |
+| lynis | sí (donde existe) | informe semanal |
+| CrowdSec | no (opcional, [instrucciones oficiales](https://docs.crowdsec.net/)) | bloqueo colaborativo; si está activo, Sentinel lo prefiere |
+
+Motor de bloqueo (`[ban] backend = auto`): CrowdSec → firewalld → ufw (activo) → iptables. Todos con caducidad (24 h).
+
+Opciones del instalador: `--sin-dependencias`, `--sin-limpiar` (no toca la v1), `--exponer-senuelos` (abre los puertos señuelo hacia Internet; por defecto quedan cerrados y el escaneo externo se detecta igual con el cortafuegos).
+Desinstalar: `sudo apt purge sentinel` o `sudo ./uninstall.sh` (`--todo` borra también registros y referencias).
+Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` → `dist/`.
 
 ## Uso diario
 
@@ -73,7 +101,7 @@ sentinel-report.timer    ── informe y Lynis cada lunes
 ## Pruebas
 
 ```bash
-cd tests && python3 -m unittest discover -s .     # 49 pruebas, ~6 s, sin permisos de administrador
+cd tests && python3 -m unittest discover -s .     # 61 pruebas, ~4 s, sin permisos de administrador
 ```
 
 Incluyen los dos fallos de la v1: el reemplazo de archivos por renombre y la extracción de la IP del atacante.

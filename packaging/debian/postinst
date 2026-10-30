@@ -1,0 +1,25 @@
+#!/bin/sh
+# Se ejecuta al instalar o actualizar el paquete (como root).
+set -e
+if [ "$1" = "configure" ]; then
+  id sentinel >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin sentinel
+  install -d -m 750 -o root -g adm /var/lib/sentinel /var/log/sentinel 2>/dev/null || install -d -m 750 /var/lib/sentinel /var/log/sentinel
+  install -d -m 770 -o root -g sentinel /var/log/sentinel/decoy
+  chown root:adm /etc/sentinel/sentinel.conf 2>/dev/null || true; chmod 640 /etc/sentinel/sentinel.conf
+  # retirar la versión 1 (con copia de respaldo)
+  if [ -f /etc/rc.local ] && grep -q sentinel-core.sh /etc/rc.local 2>/dev/null; then
+    mkdir -p /root/sentinel-v1-respaldo; cp -a /etc/rc.local /root/sentinel-v1-respaldo/rc.local; sed -i '/sentinel-core.sh/d' /etc/rc.local
+  fi
+  for f in /usr/local/bin/sentinel-app /usr/local/bin/sentinel-fim /usr/local/bin/sentinel-honeypot /usr/share/applications/sentinel-jsr.desktop /opt/sentinel-jsr; do
+    [ -e "$f" ] && { mkdir -p /root/sentinel-v1-respaldo; mv "$f" /root/sentinel-v1-respaldo/; } || true
+  done
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q /usr/share/applications || true
+  command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+    [ -f /var/lib/sentinel/fim_baseline.json ] || /usr/bin/sentinel baseline init || true
+    systemctl enable --now sentinel-honeypot.service sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || true
+    systemctl try-restart sentinel-monitor.service sentinel-honeypot.service || true
+  fi
+fi
+exit 0
