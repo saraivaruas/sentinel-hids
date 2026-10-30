@@ -64,7 +64,8 @@
   }
 
   // ---------- navegación
-  const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"] };
+  const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
+    atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
     st.view = v;
@@ -74,6 +75,8 @@
     if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
     if (v === "eventos") loadEvents();
     if (v === "postura") loadAudit();
+    if (v === "atacantes") loadAttackers();
+    if (v === "paquetes") loadPackets();
     window.scrollTo(0, 0);
   }
 
@@ -264,6 +267,97 @@
     if (a.running) setTimeout(() => st.view === "postura" && loadAudit(), 3500);
   }
 
+
+  // ---------- Atacantes
+  const NIV = { bajo: ["🟢", "Poco peligroso", "low"], medio: ["🟡", "Para vigilar", "medium"], alto: ["🔴", "Peligroso", "critical"] };
+  const KIND_ES = { ssh_clave: "Adivinar contraseñas", ssh_usuario_invalido: "Probar usuarios", ssh_llave: "Probar llaves", escaneo_puertos: "Revisar puertas", escaneo_syn: "Escaneo de puertos", escaneo_sigiloso: "Escaneo sigiloso", escaneo_udp: "Escaneo UDP", inundacion_syn: "Inundación de timbres", ping_masivo: "Ping masivo", senuelo: "Cayó en el señuelo" };
+  const flag = (cc) => (cc && cc.length === 2 && /^[A-Za-z]+$/.test(cc)) ? String.fromCodePoint(...cc.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0))) : "🌐";
+  let attSel = null, attTimer = 0, glossCache = null;
+  async function glossary() { if (!glossCache) glossCache = await api("/api/glossary"); return glossCache; }
+
+  function nivelBadge(n) { const x = NIV[n] || NIV.medio; return el("span", "badge sev-" + x[2], x[0] + " " + x[1]); }
+  async function loadAttackers() {
+    const q = new URLSearchParams({ q: $("#att-q").value, estado: $("#att-estado").value });
+    const r = await api("/api/attackers?" + q);
+    const st = $("#att-stats"); clear(st);
+    if (r.stats) [["IPs registradas", r.stats.ips], ["Intentos", r.stats.attempts], ["Bloqueadas ahora", r.stats.blocked], ["Paquetes sospechosos", r.stats.packets]].forEach(([l, v]) => { const c = el("div", "chip-stat"); c.appendChild(el("b", null, nf.format(v || 0))); c.appendChild(el("span", null, l)); st.appendChild(c); });
+    const ul = $("#att-list"); clear(ul);
+    $("#att-empty").hidden = r.items.length > 0;
+    const nb = $("#nav-att"); const bl = r.items.filter((x) => x.estado === "bloqueada").length; nb.hidden = !bl; nb.textContent = bl;
+    r.items.forEach((x) => {
+      const li = el("li", "att" + (x.ip === attSel ? " sel" : ""), null, { tabindex: "0", role: "button" });
+      li.appendChild(el("span", "att-flag", flag(x.codigo)));
+      const m = el("div", "att-m"); m.appendChild(el("b", "mono", x.ip)); m.appendChild(el("small", null, x.lugar));
+      m.appendChild(el("small", null, nf.format(x.intentos) + " intentos · " + ago(r.stats ? core_now() - x.ultima : 0)));
+      li.appendChild(m);
+      const rt = el("div", "att-r"); rt.appendChild(nivelBadge(x.nivel)); rt.appendChild(el("small", x.estado === "bloqueada" ? "bl" : "", x.estado === "bloqueada" ? "bloqueada" : x.estado));
+      li.appendChild(rt);
+      const open = () => { attSel = x.ip; loadAttackers(); showAttacker(x.ip); };
+      li.addEventListener("click", open); li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+      ul.appendChild(li);
+    });
+    if (attSel) showAttacker(attSel, true);
+  }
+  const core_now = () => Date.now() / 1000;
+
+  function infoBox(items) {
+    const box = el("div", "info");
+    items.forEach(([k, v]) => { const r = el("p"); r.appendChild(el("b", null, k.endsWith("?") ? k + " " : k + ": ")); r.appendChild(document.createTextNode(v)); box.appendChild(r); });
+    return box;
+  }
+  async function showAttacker(ip, silent) {
+    const r = await api("/api/attacker?ip=" + encodeURIComponent(ip)).catch(() => null);
+    const box = $("#att-det");
+    if (!r || r.error) { if (!silent) { clear(box); box.appendChild(el("p", "empty", "Sin expediente para esa IP.")); } return; }
+    const d = r.dossier, e = r.explicacion, g = d.ip;
+    clear(box);
+    const head = el("div", "det-h");
+    head.appendChild(el("span", "det-flag", flag(g.country_code)));
+    const t = el("div", "det-t"); t.appendChild(el("h2", "mono", g.ip)); t.appendChild(el("p", null, e.donde)); head.appendChild(t);
+    const sc = el("div", "det-score"); const sv = svg("svg", {}); ring(sv, e.puntaje, e.nivel === "alto" ? "var(--s-critical)" : e.nivel === "medio" ? "var(--s-medium)" : "var(--ok)"); sc.appendChild(sv); sc.appendChild(el("b", null, String(e.puntaje))); head.appendChild(sc);
+    box.appendChild(head);
+    const acts = el("div", "det-a"); acts.appendChild(nivelBadge(e.nivel));
+    const blocked = d.bans.some((b) => !b.released_at && b.until > core_now());
+    if (blocked) { const b = el("button", "btn sm", "Liberar esta IP"); b.addEventListener("click", async () => { if (await confirmDlg("Liberar IP", "¿Quitar el bloqueo a " + g.ip + "? Podrá volver a conectarse. Pedirá tu clave de administrador.", "Liberar")) runAction("unban", { ip: g.ip }, b).then(() => setTimeout(() => showAttacker(g.ip), 800)); }); acts.appendChild(b); }
+    else { const b = el("button", "btn sm primary", "Bloquear 24 horas"); b.addEventListener("click", async () => { if (await confirmDlg("Bloquear IP", "¿Bloquear " + g.ip + " durante 24 horas? Pedirá tu clave de administrador.", "Bloquear")) runAction("ban", { ip: g.ip, horas: 24, motivo: "bloqueo manual desde el panel" }, b).then(() => setTimeout(() => showAttacker(g.ip), 800)); }); acts.appendChild(b); }
+    const cp = el("button", "btn sm", "Copiar IP"); cp.addEventListener("click", () => navigator.clipboard.writeText(g.ip).then(() => toast("IP copiada")).catch(() => toast("No se pudo copiar", true))); acts.appendChild(cp);
+    box.appendChild(acts);
+    e.bloques.forEach((b) => {
+      const sec = el("section", "blk"); sec.appendChild(el("h3", null, b.titulo));
+      if (b.texto) sec.appendChild(el("p", null, b.texto));
+      (b.items || []).forEach((i) => {
+        const c = el("div", "kid"); const h = el("div", "kid-h"); h.appendChild(el("b", null, i.nombre)); h.appendChild(el("em", null, "×" + nf.format(i.veces))); h.appendChild(nivelBadge(i.nivel)); c.appendChild(h);
+        c.appendChild(infoBox([["Qué es", i.nino], ["Para qué sirve", i.sirve], ["¿Es peligroso?", i.peligro]] ));
+        if (i.puertos && i.puertos.length) c.appendChild(el("small", "mu", "Puertas: " + i.puertos.join(", ")));
+        sec.appendChild(c);
+      });
+      box.appendChild(sec);
+    });
+    const rec = el("section", "blk rec"); rec.appendChild(el("h3", null, "¿Qué puedes hacer?")); const ul = el("ul"); e.recomendaciones.forEach((x) => ul.appendChild(el("li", null, x))); rec.appendChild(ul); box.appendChild(rec);
+    const det = el("details", "tech"); det.appendChild(el("summary", null, "Ver los datos técnicos (para quien sabe del tema)"));
+    const tl = el("table", "tbl"); const th = el("thead"); const tr = el("tr"); ["Hora", "Tipo", "Usuario", "Puerto", "Veces", "Detalle"].forEach((x) => tr.appendChild(el("th", null, x))); th.appendChild(tr); tl.appendChild(th);
+    const tb = el("tbody"); d.timeline.forEach((x) => { const r2 = el("tr"); [when(x.ts), KIND_ES[x.kind] || x.kind, x.user || "—", x.port ? x.port + "/" + (x.proto || "tcp") : "—", x.n, x.detail || ""].forEach((v, i) => r2.appendChild(el("td", i === 5 ? "msg" : i === 0 ? "mono" : "", String(v)))); tb.appendChild(r2); }); tl.appendChild(tb);
+    det.appendChild(el("h4", null, "Línea de tiempo")); det.appendChild(tl);
+    if (d.bans.length) { det.appendChild(el("h4", null, "Historial de bloqueos")); const bt = el("table", "tbl"); const bh = el("thead"); const br = el("tr"); ["Desde", "Hasta", "Liberada", "Por", "Motivo", "Motor"].forEach((x) => br.appendChild(el("th", null, x))); bh.appendChild(br); bt.appendChild(bh); const bb = el("tbody"); d.bans.forEach((x) => { const r3 = el("tr"); [when(x.ts), when(x.until), x.released_at ? when(x.released_at) : "—", x.released_by || (x.manual ? "manual" : "automático"), x.reason || "", x.backend || ""].forEach((v) => r3.appendChild(el("td", null, v))); bb.appendChild(r3); }); bt.appendChild(bb); det.appendChild(bt); }
+    box.appendChild(det);
+  }
+
+  // ---------- Paquetes
+  async function loadPackets() {
+    const gl = await glossary();
+    const cards = $("#pk-cards"); if (!cards.firstChild) {
+      Object.keys(gl.paquetes).filter((k) => k !== "otro").forEach((k) => { const t = gl.paquetes[k]; const c = el("div", "kid"); const h = el("div", "kid-h"); h.appendChild(el("b", null, t.nombre)); h.appendChild(nivelBadge(t.nivel)); c.appendChild(h); c.appendChild(infoBox([["Qué es", t.nino], ["Para qué sirve", t.sirve], ["¿Es peligroso?", t.peligro]])); cards.appendChild(c); });
+      const tp = $("#pk-tipos"); Object.keys(gl.tipos).forEach((k) => { const t = gl.tipos[k]; const c = el("div", "kid"); const h = el("div", "kid-h"); h.appendChild(el("b", null, t.nombre)); h.appendChild(nivelBadge(t.nivel)); c.appendChild(h); c.appendChild(infoBox([["Qué es", t.nino], ["Para qué sirve", t.sirve], ["¿Es peligroso?", t.peligro]])); tp.appendChild(c); });
+      const dl = $("#gloss"); gl.glosario.forEach(([k, v]) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); });
+    }
+    const r = await api("/api/packets");
+    const lv = $("#pk-live"); lv.classList.toggle("off", !r.captura_viva);
+    $("#pk-live-t").textContent = r.captura_viva ? "capturando · " + nf.format(r.captura.vistos) + " paquetes vistos" : "captura apagada (se usan los registros del cortafuegos)";
+    const body = $("#pk-body"); clear(body); $("#pk-empty").hidden = r.recientes.length > 0;
+    r.recientes.forEach((p) => { const tr = el("tr"); tr.appendChild(el("td", "mono", hhmmss(p.ts))); tr.appendChild(el("td", "mono", p.ip)); tr.appendChild(el("td", null, p.dport ? String(p.dport) : "—"));
+      const td = el("td"); td.appendChild(nivelBadge(p.info.nivel)); td.appendChild(document.createTextNode(" " + p.info.nombre)); td.setAttribute("title", p.info.nino); tr.appendChild(td); body.appendChild(tr); });
+  }
+
   // ---------- ciclo
   async function refresh() {
     try { render(await api("/api/overview")); } catch (e) { $("#mini").className = "mini bad"; $("#mini-t").textContent = "Sin conexión con el panel"; $("#live").classList.add("off"); }
@@ -272,6 +366,8 @@
   document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => go(b.dataset.goto)));
   document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => runAction(b.dataset.action, null, b)));
   $("#f-hours").addEventListener("change", loadEvents);
+  $("#att-q").addEventListener("input", () => { clearTimeout(attTimer); attTimer = setTimeout(loadAttackers, 300); });
+  $("#att-estado").addEventListener("change", loadAttackers);
   $("#f-q").addEventListener("input", () => { clearTimeout(evTimer); evTimer = setTimeout(loadEvents, 300); });
   $("#re-audit").addEventListener("click", async () => { await api("/api/audit/refresh", {}); loadAudit(); });
   $("#allow-form").addEventListener("submit", async (e) => { e.preventDefault(); const r = await runAction("allow", { tipo: $("#al-tipo").value, valor: $("#al-valor").value.trim() }); if (r && r.ok) $("#al-valor").value = ""; });
@@ -280,6 +376,6 @@
   chips();
   go(location.hash.slice(1) || "resumen");
   refresh();
-  setInterval(() => { if (!document.hidden) { refresh(); if (st.view === "eventos" && !$("#f-q").value) loadEvents(); } }, 3000);
+  setInterval(() => { if (!document.hidden) { refresh(); if (st.view === "eventos" && !$("#f-q").value) loadEvents(); if (st.view === "atacantes" && !$("#att-q").value) loadAttackers(); if (st.view === "paquetes") loadPackets(); } }, 3000);
   setInterval(() => ($("#clock").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false })), 15000);
 })();

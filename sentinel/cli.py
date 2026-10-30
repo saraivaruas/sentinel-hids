@@ -10,7 +10,7 @@ import shutil
 import sys
 import time
 
-from . import audit, core, fim, honeypot, hostcheck, report
+from . import audit, core, explain, fim, geoip, honeypot, hostcheck, incidents, report
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -98,14 +98,83 @@ def cmd_events(a) -> int:
 
 def cmd_bans(a) -> int:
     cfg, al, allow, banner = build()
+    if core.is_root():
+        from . import intel as intel_mod
+        banner.intel = intel_mod.Intel(cfg)
     if a.action == "unban":
-        print("Desbloqueada" if banner.unban(a.ip) else "No estaba en la lista de Sentinel (se intentó quitar igual)")
+        print("Liberada" if banner.unban(a.ip, "usuario") else "No estaba en la lista de Sentinel (se intentó quitar igual)")
         return 0
+    if a.action == "ban":
+        if not a.ip:
+            print("Indica la IP: sentinel bans ban 203.0.113.9 --horas 24", file=sys.stderr); return 1
+        ok = banner.ban(a.ip, a.motivo or "bloqueo manual", a.horas * 3600, manual=True)
+        print("Bloqueada por %d h" % a.horas if ok else "No se bloqueó (IP protegida, ya bloqueada, o falta permiso de administrador)")
+        return 0 if ok else 1
     for ip, b in banner.bans.items():
         left = int(b["until"] - core.now())
         print(f"{ip:<40} {b['backend']:<9} {'caducado' if left <= 0 else f'{left // 3600} h {left % 3600 // 60} min'}  {b['reason']}")
     if not banner.bans:
         print("Sin bloqueos activos")
+    return 0
+
+
+def _ro_store():
+    try:
+        return incidents.Store(readonly=True)
+    except Exception:
+        print("Todavía no hay expedientes (el monitor los crea al detectar algo) o no tienes permiso para leerlos.", file=sys.stderr)
+        return None
+
+
+def cmd_attackers(a) -> int:
+    st = _ro_store()
+    if not st:
+        return 1
+    kinds = st.kinds_by_ip()
+    rows = st.list_ips(a.n, a.q)
+    if not rows:
+        print("Sin atacantes registrados.")
+    for r in rows:
+        pts, nivel = explain.puntaje(kinds.get(r["ip"], {}), 0, 0)
+        e = explain.NIVELES[nivel][0]
+        print(f"{e} {r['ip']:<40} riesgo {pts:>3}  {r['attempts']:>5} intentos  {r['status']:<10} {geoip.place_text(r)[:60]}")
+    return 0
+
+
+def cmd_attacker(a) -> int:
+    st = _ro_store()
+    if not st:
+        return 1
+    d = st.dossier(a.ip)
+    if not d:
+        print("No hay expediente de esa IP."); return 1
+    info = explain.explicar(d)
+    print(f"\n{info['resumen']}\n" + "=" * 70)
+    for b in info["bloques"]:
+        print(f"\n▸ {b['titulo']}")
+        if b.get("texto"):
+            print("  " + b["texto"])
+        for i in b.get("items", []):
+            print(f"   • {i['nombre']} ×{i['veces']}  [{explain.nivel_str(i['nivel'])}]")
+            if not a.tecnico:
+                print(f"       Qué es: {i['nino']}\n       Para qué sirve: {i['sirve']}\n       ¿Es peligroso?: {i['peligro']}")
+    print("\n▸ Qué puedes hacer")
+    for r in info["recomendaciones"]:
+        print("   - " + r)
+    return 0
+
+
+def cmd_packets(a) -> int:
+    print("¿QUÉ ES UN PAQUETE?\n" + explain.GLOSARIO[0][1] + "\n")
+    for k, t in explain.PAQUETES.items():
+        if k != "otro":
+            print(f"{explain.NIVELES[t['nivel']][0]} {t['nombre']}\n   {t['nino']}\n   Sirve para: {t['sirve']}\n   Peligro: {t['peligro']}\n")
+    st = _ro_store()
+    if st:
+        rec = st.recent_packets(15)
+        print("ÚLTIMOS PAQUETES SOSPECHOSOS" + ("" if rec else ": ninguno todavía"))
+        for r in rec:
+            print(f"  {time.strftime('%H:%M:%S', time.localtime(r['ts']))}  {r['ip']:<40} → puerto {r['dport']}  {r['label']}")
     return 0
 
 
@@ -203,7 +272,10 @@ def main(argv=None) -> int:
     s.add_argument("--json", action="store_true"); s.add_argument("--quiet", action="store_true", help="sin notificaciones"); s.add_argument("--watchdog", action="store_true", help="avisa si el monitor dejó de latir"); s.set_defaults(fn=cmd_scan)
     s = sub.add_parser("baseline", help="crea o actualiza la referencia de integridad"); s.add_argument("action", choices=["init", "accept"]); s.add_argument("paths", nargs="*"); s.set_defaults(fn=cmd_baseline)
     s = sub.add_parser("events", help="muestra eventos"); s.add_argument("-n", type=int, default=30); s.add_argument("--horas", type=int, default=24); s.add_argument("--min", default="info", choices=list(core.SEV)); s.set_defaults(fn=cmd_events)
-    s = sub.add_parser("bans", help="lista o quita bloqueos"); s.add_argument("action", nargs="?", default="list", choices=["list", "unban"]); s.add_argument("ip", nargs="?"); s.set_defaults(fn=cmd_bans)
+    s = sub.add_parser("bans", help="lista, agrega o quita bloqueos"); s.add_argument("action", nargs="?", default="list", choices=["list", "ban", "unban"]); s.add_argument("ip", nargs="?"); s.add_argument("--horas", type=int, default=24); s.add_argument("--motivo", default=""); s.set_defaults(fn=cmd_bans)
+    s = sub.add_parser("attackers", help="lista los atacantes registrados con su riesgo"); s.add_argument("--q", default=""); s.add_argument("-n", type=int, default=30); s.set_defaults(fn=cmd_attackers)
+    s = sub.add_parser("attacker", help="expediente de una IP, explicado de forma sencilla"); s.add_argument("ip"); s.add_argument("--tecnico", action="store_true", help="datos sin explicaciones"); s.set_defaults(fn=cmd_attacker)
+    sub.add_parser("packets", help="qué es un paquete y los últimos paquetes sospechosos").set_defaults(fn=cmd_packets)
     s = sub.add_parser("audit", help="revisa la postura de seguridad del equipo"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_audit)
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
