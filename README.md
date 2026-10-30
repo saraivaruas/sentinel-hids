@@ -28,6 +28,28 @@
 
 **Ventanas de alerta.** Desde la gravedad alta (`popup_min`, configurable) salta una ventana en tu pantalla con el detalle y el botón **Abrir panel**; las críticas no se cierran solas, las demás a los 2 minutos. Máximo 3 por minuto para no inundarte. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
 
+## Expedientes de atacantes y paquetes
+
+Cuando alguien ataca, Sentinel no solo lo bloquea: **abre un expediente** de esa IP y lo explica como si se lo contaras a un niño.
+
+- **De dónde viene:** país, ciudad, empresa y red (archivo local DB-IP o servicios públicos RIPEstat/RDAP; `geo_mode` en `[intel]`; offline = no sale nada de tu equipo).
+- **Cuántos intentos hizo y de qué tipo:** adivinar contraseñas, probar usuarios o llaves, escaneo de puertos, escaneo sigiloso, inundación de timbres (SYN flood), ping masivo, caer en un señuelo. Con los usuarios y los puertos que probó.
+- **Paquetes:** captura de red propia (sin `tcpdump`, necesita root) que mira solo lo no solicitado —intentos de conexión, paquetes raros, pings— y los clasifica («toc-toc», «portazo», «árbol de Navidad»…). No guarda el contenido, solo quién, a qué puerta y de qué clase.
+- **Qué hizo Sentinel:** bloqueo de 24 horas, historial de bloqueos y liberaciones (quién y cuándo). Puedes **liberar** o **bloquear** una IP desde el panel o con `sentinel bans unban|ban IP`.
+- **Explicado fácil:** para cada cosa, «qué es», «para qué sirve» y «¿es peligroso?» con semáforo (🟢 🟡 🔴), más una página «Paquetes» con un glosario.
+
+```bash
+sentinel attackers                 # lista con riesgo, lugar e intentos
+sentinel attacker 203.0.113.9      # expediente completo, explicado fácil (--tecnico: sin explicaciones)
+sentinel packets                   # qué es un paquete y los últimos sospechosos
+sentinel bans ban 203.0.113.9 --horas 24
+```
+
+![Expediente de un atacante](docs/panel-atacantes.png)
+![Qué es un paquete](docs/panel-paquetes.png)
+
+La captura de paquetes se verificó con tráfico real en un contenedor (`tools/prueba_captura_real.py`). Se desactiva con `[packets] enabled = no`. Privacidad: en modo en línea la IP del atacante se consulta a RIPEstat/RDAP; los expedientes se guardan 90 días.
+
 ## Panel gráfico
 
 Se abre desde el menú de aplicaciones («Sentinel») o con `sentinel ui`, como una ventana de aplicación. Funciona sin internet: es una página local que solo escucha en `127.0.0.1` y exige una llave que se guarda en `~/.config/sentinel/ui_token`.
@@ -112,7 +134,7 @@ sentinel-report.timer    ── informe y Lynis cada lunes
 ## Pruebas
 
 ```bash
-cd tests && python3 -m unittest discover -s .     # 71 pruebas, ~10 s, sin permisos de administrador
+cd tests && python3 -m unittest discover -s .     # 100 pruebas, ~12 s, sin permisos de administrador
 ```
 
 Incluyen los dos fallos de la v1: el reemplazo de archivos por renombre y la extracción de la IP del atacante.

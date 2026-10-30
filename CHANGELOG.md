@@ -2,6 +2,18 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.1.0] - 2026-10-30
+
+### Agregado
+- **Expedientes de atacantes** (SQLite): por cada IP, de dónde viene (país, ciudad, red, empresa), cuántos intentos hizo y de qué tipo, usuarios y puertos probados, paquetes enviados y su historial de bloqueos y liberaciones.
+- **Ubicación geográfica** con lector MMDB en Python puro (DB-IP / GeoLite2, offline) y consulta opcional a RIPEstat/RDAP, con caché de 30 días.
+- **Captura y análisis de paquetes** propia (AF_PACKET, sin dependencias): escaneos de puertos SYN y UDP, escaneos sigilosos (NULL/FIN/XMAS), inundación SYN y ping masivo, con bloqueo automático.
+- **Explicaciones en lenguaje sencillo** («como para un niño») de cada tipo de ataque y de cada tipo de paquete, con semáforo de peligro y recomendaciones.
+- Panel: páginas **Atacantes** (con liberar y bloquear) y **Paquetes** (qué es un paquete, glosario, últimos sospechosos). Comandos `sentinel attackers`, `attacker`, `packets` y `bans ban`.
+
+### Corregido
+- Los paquetes de la interfaz local (tipo de enlace 772) no se interpretaban.
+
 ## [2.0.0] - 2026-10-30
 
 Reescritura completa de Sentinel-JSR (v1).
