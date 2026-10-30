@@ -84,6 +84,11 @@ scan_window = 60
 ban_on_failures = yes
 ban_on_scan = yes
 
+[update]
+; buscar versiones nuevas en GitHub (solo consulta; instalar siempre lo decides tú). check = no para no consultar nada
+check = yes
+repo = saraivaruas/sentinel-hids
+
 [intel]
 ; de dónde sale la ubicación del atacante: auto (archivo local si existe, si no RIPEstat/RDAP), offline (solo archivo local), online, off
 geo_mode = auto

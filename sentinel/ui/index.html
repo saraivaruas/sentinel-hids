@@ -21,6 +21,7 @@
     </nav>
     <div class="side-foot">
       <div class="mini" id="mini"><span class="dot"></span><span id="mini-t">Conectando…</span></div>
+      <button class="ghost" id="upd-check" title="Buscar actualizaciones"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.400-5.700M20 4v5h-5"/></svg><span id="upd-ver">v2</span></button>
       <button class="ghost" id="theme" title="Cambiar tema"><svg viewBox="0 0 24 24"><path d="M21 12.800A9 9 0 1 1 11.200 3a7 7 0 0 0 9.800 9.800z"/></svg><span>Tema</span></button>
     </div>
   </aside>
@@ -30,6 +31,12 @@
       <div><h1 id="title">Resumen</h1><p id="subtitle">Estado de la protección de este equipo</p></div>
       <div class="top-r"><span class="live" id="live"><i></i>en vivo</span><time id="clock"></time></div>
     </header>
+
+    <div class="upd" id="upd" hidden role="status">
+      <div class="upd-i"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M5 19h14"/></svg></div>
+      <div class="upd-t"><b id="upd-t">Hay una versión nueva de Sentinel</b><span id="upd-s"></span><details id="upd-n" hidden><summary>Ver las novedades</summary><pre id="upd-pre"></pre></details></div>
+      <div class="upd-a"><button class="btn primary" id="upd-go">Actualizar ahora</button><button class="btn" id="upd-later">Más tarde</button></div>
+    </div>
 
     <section class="view" id="view-resumen">
       <div class="hero" id="hero">
@@ -139,6 +146,7 @@
     </section>
   </main>
 </div>
+<div class="overlay" id="busy" hidden><div class="spin"></div><b id="busy-t">Actualizando…</b><span id="busy-s">No cierres esta ventana: el panel se reiniciará solo.</span></div>
 <div id="toasts" aria-live="polite"></div>
 <dialog id="dlg"><form method="dialog"><h3 id="dlg-t"></h3><p id="dlg-p"></p><div class="dlg-a"><button class="btn" value="no">Cancelar</button><button class="btn primary" value="si" id="dlg-ok">Confirmar</button></div></form></dialog>
 <script src="/static/app.js"></script>

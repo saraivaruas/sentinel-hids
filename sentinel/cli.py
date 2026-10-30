@@ -10,7 +10,7 @@ import shutil
 import sys
 import time
 
-from . import audit, core, explain, fim, geoip, honeypot, hostcheck, incidents, report
+from . import audit, core, explain, fim, geoip, honeypot, hostcheck, incidents, report, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -178,6 +178,27 @@ def cmd_packets(a) -> int:
     return 0
 
 
+def cmd_update(a) -> int:
+    cfg = core.load_config()
+    if a.instalar:
+        ok, msg = update.install(cfg)
+        print(("✔ " if ok else "✖ ") + msg)
+        return 0 if ok else 1
+    i = update.check(cfg, force=True)
+    if not i["enabled"]:
+        print("La búsqueda de actualizaciones está desactivada ([update] check = no)."); return 0
+    if i.get("error") and not i["available"]:
+        print(f"No se pudo buscar actualizaciones: {update.error_text(i['error'])}. Estás en la versión {i['current']}."); return 1
+    if i["available"]:
+        print(f"Hay una versión nueva: {i['latest']} (tienes la {i['current']}).\n")
+        if i.get("notes"):
+            print(i["notes"][:900] + "\n")
+        print("Para instalarla:  sudo sentinel update --instalar   (o el botón «Actualizar» del panel)")
+        return 2
+    print(f"Estás al día: versión {i['current']}.")
+    return 0
+
+
 def cmd_audit(a) -> int:
     r = audit.run_audit()
     if a.json:
@@ -275,6 +296,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("bans", help="lista, agrega o quita bloqueos"); s.add_argument("action", nargs="?", default="list", choices=["list", "ban", "unban"]); s.add_argument("ip", nargs="?"); s.add_argument("--horas", type=int, default=24); s.add_argument("--motivo", default=""); s.set_defaults(fn=cmd_bans)
     s = sub.add_parser("attackers", help="lista los atacantes registrados con su riesgo"); s.add_argument("--q", default=""); s.add_argument("-n", type=int, default=30); s.set_defaults(fn=cmd_attackers)
     s = sub.add_parser("attacker", help="expediente de una IP, explicado de forma sencilla"); s.add_argument("ip"); s.add_argument("--tecnico", action="store_true", help="datos sin explicaciones"); s.set_defaults(fn=cmd_attacker)
+    s = sub.add_parser("update", help="busca una versión nueva y, si quieres, la instala"); s.add_argument("--instalar", action="store_true", help="descargar, verificar e instalar (necesita sudo)"); s.set_defaults(fn=cmd_update)
     sub.add_parser("packets", help="qué es un paquete y los últimos paquetes sospechosos").set_defaults(fn=cmd_packets)
     s = sub.add_parser("audit", help="revisa la postura de seguridad del equipo"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_audit)
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
