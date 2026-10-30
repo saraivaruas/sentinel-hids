@@ -20,6 +20,8 @@ if [ "$1" = "configure" ]; then
     systemctl daemon-reload
     [ -f /var/lib/sentinel/fim_baseline.json ] || /usr/bin/sentinel baseline init || true
     systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || true
+    # la actualización de Sentinel mismo no es un cambio sospechoso: se acepta como nueva referencia
+    [ -f /var/lib/sentinel/fim_baseline.json ] && /usr/bin/sentinel baseline accept /opt/sentinel /etc/sentinel >/dev/null 2>&1 || true
     # los señuelos abren puertos: NO se activan solos (actívalos con «sudo systemctl enable --now sentinel-honeypot»)
     systemctl try-restart sentinel-monitor.service sentinel-honeypot.service || true
     # alerta de prueba en pantalla (si hay una sesión gráfica abierta)
