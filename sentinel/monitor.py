@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, fim, honeypot, hostcheck
+from . import authwatch, core, fim, honeypot, hostcheck, intel as intel_mod, packets
 
 
 class Monitor:
@@ -18,10 +18,12 @@ class Monitor:
         self.cfg = cfg or core.load_config()
         self.alerter = core.Alerter(self.cfg)
         self.allow = core.Allow(self.cfg)
-        self.banner = core.Banner(self.cfg, self.alerter, self.allow)
+        self.intel = intel_mod.Intel(self.cfg)
+        self.banner = core.Banner(self.cfg, self.alerter, self.allow, self.intel)
         self.fim = fim.Fim(self.cfg, self.alerter, self.allow)
         self.host = hostcheck.HostCheck(self.cfg, self.alerter, self.allow)
-        self.auth = authwatch.AuthWatch(self.cfg, self.alerter, self.allow, self.banner)
+        self.auth = authwatch.AuthWatch(self.cfg, self.alerter, self.allow, self.banner, self.intel)
+        self.pkts = packets.PacketWatcher(self.cfg, self.alerter, self.allow, self.banner, self.intel)
         self.stop = threading.Event()
         self.q: queue.Queue = queue.Queue()
         self.threads: list[threading.Thread] = []
@@ -38,6 +40,7 @@ class Monitor:
             self.alerter.emit("low", "decoy", "toque_red_local", f"Conexión al señuelo {port} desde la red local {ip}", key=f"decoy:{ip}:{port}:{int(core.now() // 3600)}", ip=ip, port=port)
             return
         self.alerter.emit("high", "decoy", "toque", f"{ip} se conectó al puerto señuelo {port} (nadie legítimo lo usa)" + (f"; envió: {rec['preview']!r}" if rec.get("preview") else ""), key=f"decoy:{ip}:{port}:{int(core.now() // 600)}", ip=ip, port=port)
+        self.intel.attempt(ip, "senuelo", port=port, proto="tcp", detail=rec.get("preview", ""))
         self.banner.ban(ip, f"tocó el señuelo {port}")
 
     # ---------- vigilante en vivo
@@ -103,7 +106,10 @@ class Monitor:
         if self.fim.load() is None:
             self.alerter.emit("info", "monitor", "primera_vez", f"Creando referencias de integridad ({self.fim.init()} elementos)", key="mon:init")
         live = self.live_fim()
-        for name, fn in (("autenticacion", lambda: self.auth.follow(self.stop.is_set)), ("senuelos", lambda: honeypot.follow_log(self.on_decoy, stop=self.stop.is_set))):
+        jobs = [("autenticacion", lambda: self.auth.follow(self.stop.is_set)), ("senuelos", lambda: honeypot.follow_log(self.on_decoy, stop=self.stop.is_set))]
+        if self.cfg.getboolean("packets", "enabled", fallback=True) and core.is_root():
+            jobs.append(("paquetes", lambda: self.pkts.run(self.stop.is_set)))
+        for name, fn in jobs:
             t = threading.Thread(target=self._guard, args=(name, fn), daemon=True)
             t.start(); self.threads.append(t)
         self.alerter.emit("info", "monitor", "inicio", f"Sentinel {core.VERSION} iniciado (vigilancia en vivo de archivos: {'sí' if live else 'no, revisión periódica'})", key=f"mon:start:{int(core.now())}")
@@ -114,6 +120,12 @@ class Monitor:
             t = core.now()
             self.heartbeat()
             self.banner.expire()
+            if t - getattr(self, "_pruned", 0) > 86400:
+                self._pruned = t
+                try:
+                    self.intel.store.prune(self.cfg.getint("intel", "retention_days", fallback=90))
+                except Exception:
+                    pass
             if t - last_host >= every:
                 last_host = t
                 try:

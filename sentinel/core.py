@@ -18,7 +18,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -83,6 +83,27 @@ scan_ports = 12
 scan_window = 60
 ban_on_failures = yes
 ban_on_scan = yes
+
+[intel]
+; de dónde sale la ubicación del atacante: auto (archivo local si existe, si no RIPEstat/RDAP), offline (solo archivo local), online, off
+geo_mode = auto
+; archivo MMDB local, p. ej. DB-IP City Lite (gratis): https://db-ip.com/db/download/ip-to-city-lite
+geoip_db =
+retention_days = 90
+
+[packets]
+; captura de paquetes (necesita root): detecta escaneos de puertos, escaneos sigilosos, inundaciones y pings masivos
+enabled = yes
+interface =
+ban = yes
+syn_scan_ports = 15
+window = 60
+stealth_count = 3
+flood_syn = 300
+flood_ping = 100
+udp_scan_ports = 20
+cooldown = 600
+max_pps = 30000
 
 [honeypot]
 ports = 2222,2323,3390,5900,60009
@@ -419,8 +440,8 @@ def read_events(since: float = 0, min_sev: str = "info", limit: int = 0, path: s
 class Banner:
     """Bloquea IPs de forma temporal, nunca las protegidas (red local, loopback, Tailscale, lista blanca)."""
 
-    def __init__(self, cfg: configparser.ConfigParser, alerter: Alerter, allow: Allow):
-        self.cfg, self.alerter, self.allow = cfg, alerter, allow
+    def __init__(self, cfg: configparser.ConfigParser, alerter: Alerter, allow: Allow, intel=None):
+        self.cfg, self.alerter, self.allow, self.intel = cfg, alerter, allow, intel
         self.path = os.path.join(state_dir(), "bans.json")
         self.bans: dict = read_json(self.path, {}) or {}
 
@@ -456,7 +477,7 @@ class Banner:
             return [t, "-I", "INPUT", "1", "-s", ip, "-m", "comment", "--comment", "sentinel", "-j", "DROP"], [t, "-D", "INPUT", "-s", ip, "-m", "comment", "--comment", "sentinel", "-j", "DROP"]
         return ["ufw", "insert", "1", "deny", "from", ip, "to", "any", "comment", "sentinel"], ["ufw", "delete", "deny", "from", ip, "to", "any"]
 
-    def ban(self, ip: str, reason: str, ttl: int | None = None) -> bool:
+    def ban(self, ip: str, reason: str, ttl: int | None = None, manual: bool = False) -> bool:
         ttl = ttl or self.cfg.getint("ban", "ttl_seconds", fallback=86400)
         if self.allow.ip_protected(ip):
             self.alerter.emit("info", "ban", "protegida", f"{ip} no se bloquea (red protegida o en lista blanca): {reason}", key=f"protegida:{ip}")
@@ -477,7 +498,10 @@ class Banner:
             return False
         self.bans[ip] = {"until": now() + ttl, "reason": reason, "backend": be, "since": iso()}
         atomic_write_json(self.path, self.bans, share=True)
-        self.alerter.emit("high", "ban", "bloqueada", f"IP {ip} bloqueada por {ttl // 3600} h con {be}: {reason}", key=f"ban:{ip}:{int(now() // 60)}", ip=ip, ttl=ttl)
+        where = self.intel.geo_text(ip) if self.intel else ""
+        if self.intel:
+            self.intel.ban_started(ip, now() + ttl, reason, be, manual)
+        self.alerter.emit("high", "ban", "bloqueada", f"IP {ip}{f' ({where})' if where else ''} bloqueada por {ttl // 3600} h con {be}: {reason}", key=f"ban:{ip}:{int(now() // 60)}", ip=ip, ttl=ttl)
         return True
 
     def _release(self, ip: str, be: str) -> None:
@@ -492,14 +516,18 @@ class Banner:
         for ip, b in list(self.bans.items()):
             if b["until"] <= now():
                 self._release(ip, b.get("backend", ""))
+                if self.intel:
+                    self.intel.ban_released(ip, "caducó", expired=True)
                 gone.append(ip)
                 del self.bans[ip]
         if gone:
             atomic_write_json(self.path, self.bans, share=True)
         return gone
 
-    def unban(self, ip: str) -> bool:
+    def unban(self, ip: str, by: str = "usuario") -> bool:
         b = self.bans.pop(ip, None)
+        if self.intel:
+            self.intel.ban_released(ip, by)
         if is_root():
             for be in ("crowdsec", "firewalld", "ufw", "iptables"):
                 if be == "crowdsec" and not shutil.which("cscli"):

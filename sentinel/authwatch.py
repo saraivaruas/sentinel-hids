@@ -19,8 +19,8 @@ RE_SU_FAIL = re.compile(r"FAILED SU \(to (\S+)\) (\S+) on")
 
 
 class AuthWatch:
-    def __init__(self, cfg, alerter: core.Alerter, allow: core.Allow, banner: core.Banner):
-        self.cfg, self.alerter, self.allow, self.banner = cfg, alerter, allow, banner
+    def __init__(self, cfg, alerter: core.Alerter, allow: core.Allow, banner: core.Banner, intel=None):
+        self.cfg, self.alerter, self.allow, self.banner, self.intel = cfg, alerter, allow, banner, intel
         self.thr = cfg.getint("auth", "fail_threshold", fallback=5)
         self.win = cfg.getint("auth", "fail_window", fallback=600)
         self.scan_ports = cfg.getint("auth", "scan_ports", fallback=12)
@@ -28,7 +28,9 @@ class AuthWatch:
         self.fails: dict[str, collections.deque] = collections.defaultdict(collections.deque)
         self.ports: dict[str, dict[int, float]] = collections.defaultdict(dict)
 
-    def _fail(self, ip: str, user: str, t: float) -> None:
+    def _fail(self, ip: str, user: str, t: float, kind: str = "ssh_clave", detail: str = "") -> None:
+        if self.intel and not self.allow.ip_protected(ip):
+            self.intel.attempt(ip, kind, user=user, port=22, proto="tcp", detail=detail)
         q = self.fails[ip]
         q.append(t)
         while q and t - q[0] > self.win:
@@ -49,7 +51,8 @@ class AuthWatch:
         m = RE_FAIL.search(msg) or RE_INVALID.search(msg)
         if m:
             user, ip = m.group(1), m.group(2)
-            self._fail(ip, user, t)
+            kind = "ssh_usuario_invalido" if ("invalid user" in msg.lower() or RE_INVALID.search(msg)) else "ssh_llave" if "publickey" in msg else "ssh_clave"
+            self._fail(ip, user, t, kind, msg[:120])
             return
         m = RE_ACCEPT.search(msg)
         if m:
@@ -73,12 +76,17 @@ class AuthWatch:
     def _portscan(self, ip: str, port: int, t: float) -> None:
         d = self.ports[ip]
         d[port] = t
+        if self.intel and not self.allow.ip_protected(ip):
+            self.intel.store.add_packets({(ip, "tcp", port, "SYN"): (t, t, 1, 0)}, []) if self.intel.store.get_ip(ip) else None
         for p, ts in list(d.items()):
             if t - ts > self.scan_win:
                 del d[p]
         if len(d) >= self.scan_ports:
             prot = self.allow.ip_protected(ip)
             self.alerter.emit("low" if prot else "high", "auth", "escaneo_de_puertos", f"Escaneo de puertos desde {ip}: {len(d)} puertos distintos en {self.scan_win}s" + (" (red local; no se bloquea)" if prot else ""), key=f"auth:scan:{ip}:{int(t // 600)}", ip=ip, ports=sorted(d)[:30])
+            if not prot and self.intel:
+                for pt in sorted(d)[:40]:
+                    self.intel.attempt(ip, "escaneo_puertos", port=pt, proto="tcp", detail="bloqueado por el cortafuegos")
             if not prot and self.cfg.getboolean("auth", "ban_on_scan", fallback=True):
                 self.banner.ban(ip, f"escaneo de {len(d)} puertos")
             d.clear()
