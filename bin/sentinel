@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Lanzador: usa el código instalado en /opt/sentinel (o el de esta carpeta al desarrollar).
+D="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+exec env PYTHONPATH="$D" python3 -m sentinel "$@"

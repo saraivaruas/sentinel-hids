@@ -1,0 +1,37 @@
+# Configuración de Sentinel. Copia a /etc/sentinel/sentinel.conf y edita solo lo que quieras cambiar:
+# lo que no pongas aquí usa los valores por defecto. Después de cambiar algo: sudo systemctl restart sentinel-monitor
+
+[general]
+; Usuario que verá las notificaciones de escritorio (vacío = el primero con sesión abierta)
+desktop_user =
+; Gravedad mínima por canal: info, low, medium, high, critical
+notify_min = medium
+; Correo para alertas graves (requiere el comando «mail» configurado)
+email_to =
+; Aviso al celular con ntfy (https://ntfy.sh/tu-tema-secreto): gratis y sin cuenta
+ntfy_url =
+
+[allow]
+; Nunca se bloquean (la red local, Tailscale y loopback ya están protegidos). Ejemplo: ips = 203.0.113.7,198.51.100.0/24
+ips =
+; Procesos que no deben generar alerta de teclado/puerto. Ejemplo: procs = mi-herramienta
+procs =
+; Puertos que aceptas como normales aunque aparezcan nuevos. Ejemplo: ports = 3000,8081
+ports =
+; Rutas que el vigilante de archivos ignora (admite comodines)
+paths =
+
+[ban]
+; auto = CrowdSec si está activo, si no ufw. Opciones: auto, crowdsec, ufw, none (solo avisar)
+backend = auto
+; Duración de cada bloqueo en segundos (86400 = 24 horas)
+ttl_seconds = 86400
+
+[fim]
+; Carpetas web a vigilar con búsqueda de puertas traseras
+www = /var/www/html
+; Rutas extra a vigilar (se suman a las de sistema por defecto). Para cambiar la lista completa, define «paths = ...» aquí.
+excludes = */node_modules/*,*/.git/*,*/cache/*,*/storage/logs/*,*/storage/framework/*,*.log,*/uploads/*,*/vendor/*
+
+[honeypot]
+ports = 2222,2323,3390,5900,60009

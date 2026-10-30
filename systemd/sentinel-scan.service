@@ -1,0 +1,9 @@
+[Unit]
+Description=Sentinel: revisión de integridad y estado del equipo
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/opt/sentinel
+ExecStart=/usr/bin/python3 -m sentinel scan --watchdog
+SuccessExitStatus=0 1 2
+Nice=10

@@ -1,0 +1,10 @@
+[Unit]
+Description=Sentinel: revisión periódica (red de seguridad del monitor en vivo)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,21 @@
+[Unit]
+Description=Sentinel: monitor de intrusiones y cambios
+Documentation=file:///opt/sentinel/README.md
+After=network.target systemd-journald.service
+Wants=sentinel-honeypot.service
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/sentinel PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m sentinel monitor
+Restart=always
+RestartSec=5
+Nice=5
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

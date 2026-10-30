@@ -1,0 +1,8 @@
+[Unit]
+Description=Sentinel: informe semanal y auditoría Lynis
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/opt/sentinel
+ExecStart=/usr/bin/python3 -m sentinel report --lynis
+Nice=15
