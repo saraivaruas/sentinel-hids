@@ -155,6 +155,12 @@ def cmd_test(a) -> int:
         time.sleep(1)
         print("Llegó al journal:", ok("Prueba de Sentinel" in core.run(["journalctl", "-t", "sentinel", "-n", "5", "--no-pager"], 8)[1]))
     print("Escritorio disponible:", ok(al.desktop_target() is not None and shutil.which("notify-send") is not None), "(deberías ver una notificación)")
+    if ev is not None:
+        ev.msg = "Esta es una alerta de PRUEBA: Sentinel puede avisarte con una ventana. No requiere ninguna acción."
+        shown = al.popup(ev, force=True)
+        print("Ventana de alerta:", ok(shown), "(debería aparecer una ventana con el botón «Abrir panel»; ciérrala o púlsalo)")
+        if shown and al.last_popup:
+            al.last_popup.join(timeout=cfg.getint("general", "popup_seconds", fallback=120) + 5)     # espera para poder abrir el panel desde la ventana
     print("Motor de bloqueo:", core.Banner(cfg, al, allow).backend())
     print("Vigilancia en vivo (inotifywait):", ok(shutil.which("inotifywait")))
     return 0

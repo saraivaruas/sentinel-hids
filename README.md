@@ -15,7 +15,9 @@ Escrito en Python con la biblioteca estándar: no instala dependencias nuevas. S
 | **Postura** | `sentinel audit`: 16 revisiones de configuración con su arreglo (cortafuegos, SSH, permisos web, parámetros del kernel, actualizaciones, credenciales con permisos abiertos…). | — |
 
 **Respuesta.** Los atacantes se bloquean de forma **temporal** (24 h) con CrowdSec o ufw; nunca la red local, Tailscale ni la lista blanca. A diferencia de la v1, **no detiene procesos ni modifica tus archivos**.
-**Avisos.** Registro JSONL privado, journal, notificación de escritorio y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
+**Avisos.** Registro JSONL privado, journal, notificación de escritorio, **ventana emergente de alerta** y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
+
+**Ventanas de alerta.** Desde la gravedad alta (`popup_min`, configurable) salta una ventana en tu pantalla con el detalle y el botón **Abrir panel**; las críticas no se cierran solas, las demás a los 2 minutos. Máximo 3 por minuto para no inundarte. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
 
 ## Panel gráfico
 
@@ -34,7 +36,9 @@ Seguridad del panel: valida `Host` y `Origin` (contra DNS-rebinding y CSRF), CSP
 
 ## Instalar (baja e instala todo lo necesario)
 
-Sentinel no usa librerías de Python externas. Lo que sí necesita del sistema (inotify, notificaciones, polkit, un motor de bloqueo…) **se instala solo**. Hay tres formas:
+Sentinel no usa librerías de Python externas. Lo que sí necesita del sistema (inotify, notificaciones, polkit, un motor de bloqueo…) **se instala solo**. Hay cuatro formas:
+
+**0. Instalador con ventanas (la más cómoda en un escritorio).** Doble clic en `install-gui.sh` (o en «Instalar Sentinel») o `./install-gui.sh`. Salta una ventana de bienvenida, otra para elegir opciones, la **ventana de autorización del sistema** (donde escribes tu clave de administrador), una barra de avance y, al terminar, una ventana de alerta de prueba y la pregunta de si abrir el panel. Si algo falla muestra el detalle; si cancelas la autorización no cambia nada.
 
 **1. Paquete .deb (Ubuntu, Debian, Mint…) — la más simple.** `apt` resuelve y baja las dependencias:
 
@@ -101,7 +105,7 @@ sentinel-report.timer    ── informe y Lynis cada lunes
 ## Pruebas
 
 ```bash
-cd tests && python3 -m unittest discover -s .     # 61 pruebas, ~4 s, sin permisos de administrador
+cd tests && python3 -m unittest discover -s .     # 71 pruebas, ~10 s, sin permisos de administrador
 ```
 
 Incluyen los dos fallos de la v1: el reemplazo de archivos por renombre y la extracción de la IP del atacante.

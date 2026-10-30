@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Instalar Sentinel
+Comment=Instala Sentinel con ventanas guiadas
+Exec=bash -c 'cd "$(dirname "%k")" && ./install-gui.sh'
+Icon=security-high
+Terminal=false
+Categories=System;Security;

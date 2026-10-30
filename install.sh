@@ -12,7 +12,9 @@ for a in "$@"; do case "$a" in --dry-run) DRY=1;; --sin-dependencias) DEPS=0;; -
 
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 DEST=/opt/sentinel
-USUARIO="${SUDO_USER:-root}"
+USUARIO="${SUDO_USER:-}"
+[ -z "$USUARIO" ] && [ -n "${PKEXEC_UID:-}" ] && USUARIO="$(id -nu "$PKEXEC_UID" 2>/dev/null || true)"
+[ -z "$USUARIO" ] && USUARIO=root
 do_() { if [ "$DRY" = 1 ]; then echo "  [simulación] $*"; else "$@"; fi; }
 paso() { echo; echo "== $*"; }
 
@@ -137,5 +139,6 @@ if [ "$EXPONER" = 1 ]; then
     do_ ufw allow "$p/tcp" comment sentinel-senuelo; done
 else echo "  Los puertos señuelo quedan cerrados hacia afuera (detectan escaneos locales). El escaneo de puertos externo se detecta igual con los registros del cortafuegos."; echo "  Para exponerlos: sudo ./install.sh --exponer-senuelos"; fi
 
+[ "$DRY" = 0 ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || true
 echo; echo "Listo. Comprueba con:  sentinel status   y   sentinel test"
 echo "Panel gráfico: busca «Sentinel» en el menú de aplicaciones, o ejecuta:  sentinel ui"

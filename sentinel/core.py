@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import asdict, dataclass, field
 
 VERSION = "2.0.0"
@@ -25,6 +26,10 @@ DEFAULTS = """
 [general]
 desktop_user =
 notify_min = medium
+; ventana emergente (con botón «Abrir panel») desde esta gravedad; ventanas máximas por minuto; segundos que dura abierta (0 = hasta cerrarla; las críticas nunca se cierran solas)
+popup_min = high
+popup_max_per_min = 3
+popup_seconds = 120
 journal_min = low
 email_to =
 email_min = high
@@ -219,6 +224,8 @@ class Alerter:
         self.cfg = cfg or load_config()
         self.quiet = quiet
         self.lock = threading.RLock()
+        self._pop: deque = deque()
+        self.last_popup: threading.Thread | None = None
         self.dedupe: dict[str, list] = {}
         self.path = os.path.join(log_dir(), "events.jsonl")
         self._dedupe_path = os.path.join(state_dir(), "dedupe.json")
@@ -278,6 +285,8 @@ class Alerter:
             run(["logger", "-t", "sentinel", "-p", f"auth.{prio}", ev.line()], 5)
         if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("notify_min"):
             self.desktop(ev)
+        if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("popup_min"):
+            self.popup(ev)
         if n >= self._min("email_min") and self.cfg.get("general", "email_to", fallback="") and shutil.which("mail"):
             try:
                 subprocess.run(["mail", "-s", f"[Sentinel {SEV_ES[ev.sev]}] {ev.kind}", self.cfg.get("general", "email_to")], input=ev.line() + "\n" + json.dumps(ev.data, ensure_ascii=False, indent=1), text=True, timeout=15, check=False)
@@ -300,6 +309,76 @@ class Alerter:
         except (OSError, KeyError):
             pass
         return None
+
+    @staticmethod
+    def desktop_env(uid: int) -> dict:
+        """Variables que necesita una ventana gráfica lanzada desde un servicio para aparecer en la sesión del usuario (X11 o Wayland)."""
+        env = {"XDG_RUNTIME_DIR": f"/run/user/{uid}", "DBUS_SESSION_BUS_ADDRESS": f"unix:path=/run/user/{uid}/bus"}
+        try:
+            w = sorted(f for f in os.listdir(f"/run/user/{uid}") if f.startswith("wayland-") and not f.endswith(".lock"))
+            if w:
+                env["WAYLAND_DISPLAY"] = w[0]
+        except OSError:
+            pass
+        try:
+            x = sorted((int(f[1:]) for f in os.listdir("/tmp/.X11-unix") if f.startswith("X") and f[1:].isdigit()))
+            if x:
+                env["DISPLAY"] = f":{x[0]}"
+        except OSError:
+            pass
+        try:
+            home = pwd.getpwuid(uid).pw_dir
+        except KeyError:
+            home = ""
+        for xa in (f"/run/user/{uid}/gdm/Xauthority", os.path.join(home, ".Xauthority")):
+            if os.path.exists(xa):
+                env["XAUTHORITY"] = xa
+                break
+        return env
+
+    def popup_cmd(self, ev: Event, user: str, uid: int, root: bool) -> list[str]:
+        """Comando de la ventana emergente. --no-markup: el texto (que puede venir de un atacante) no se interpreta como formato."""
+        crit = ev.sev == "critical"
+        secs = self.cfg.getint("general", "popup_seconds", fallback=120)
+        text = f"{ev.msg}\n\nMódulo: {ev.source}/{ev.kind}\nHora: {ev.ts[:19].replace('T', ' ')}"
+        z = ["zenity", "--question", "--no-markup", "--title", f"Sentinel · ALERTA {SEV_ES[ev.sev]}", "--text", text[:900], "--width=540",
+             "--icon-name=" + ("dialog-error" if crit else "dialog-warning"), "--ok-label=Abrir panel", "--cancel-label=Cerrar"]
+        if secs > 0 and not crit:
+            z.append(f"--timeout={secs}")
+        env = [f"{k}={v}" for k, v in self.desktop_env(uid).items()]
+        return ["runuser", "-u", user, "--", "env", *env, *z] if root else ["env", *env, *z]
+
+    def popup(self, ev: Event, force: bool = False) -> bool:
+        """Muestra una ventana emergente de alerta con botón para abrir el panel. Limita cuántas aparecen por minuto."""
+        if not shutil.which("zenity"):
+            return False
+        tgt = self.desktop_target()
+        if not tgt:
+            return False
+        t = now()
+        while self._pop and t - self._pop[0] > 60:
+            self._pop.popleft()
+        if not force and len(self._pop) >= self.cfg.getint("general", "popup_max_per_min", fallback=3):
+            return False
+        self._pop.append(t)
+        user, uid = tgt
+        cmd = self.popup_cmd(ev, user, uid, is_root())
+        self.last_popup = threading.Thread(target=self._spawn_popup, args=(cmd, user, uid), daemon=True)
+        self.last_popup.start()
+        return True
+
+    def _spawn_popup(self, cmd: list[str], user: str, uid: int) -> None:
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=3600, check=False)
+        except (OSError, subprocess.SubprocessError):
+            return
+        if r.returncode == 0:      # pulsó «Abrir panel»
+            env = [f"{k}={v}" for k, v in self.desktop_env(uid).items()]
+            opener = ["runuser", "-u", user, "--", "env", *env, "sentinel", "ui"] if is_root() else ["env", *env, "sentinel", "ui"]
+            try:
+                subprocess.Popen(opener, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            except OSError:
+                pass
 
     def desktop(self, ev: Event) -> None:
         if not shutil.which("notify-send"):
