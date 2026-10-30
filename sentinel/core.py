@@ -128,12 +128,25 @@ def ensure_dir(path: str, mode: int = 0o750) -> None:
     os.makedirs(path, mode=mode, exist_ok=True)
 
 
-def atomic_write_json(path: str, obj, mode: int = 0o600) -> None:
+def share_with_adm(path: str) -> None:
+    """Si corre como administrador, deja el archivo legible por el grupo «adm» (así el panel gráfico, que corre con tu usuario, puede leerlo)."""
+    if not is_root():
+        return
+    try:
+        import grp
+        os.chown(path, -1, grp.getgrnam("adm").gr_gid)
+    except (OSError, KeyError, ImportError):
+        pass
+
+
+def atomic_write_json(path: str, obj, mode: int = 0o600, share: bool = False) -> None:
     ensure_dir(os.path.dirname(path), 0o750)
     tmp = f"{path}.{os.getpid()}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
-    os.chmod(tmp, mode)
+    os.chmod(tmp, 0o640 if share and mode == 0o600 else mode)
+    if share:
+        share_with_adm(tmp)
     os.replace(tmp, path)
 
 
@@ -254,6 +267,7 @@ class Alerter:
                 f.write(json.dumps(asdict(ev), ensure_ascii=False) + "\n")
             if new:
                 os.chmod(self.path, 0o640)
+                share_with_adm(self.path)
         except OSError:
             pass
 
@@ -359,7 +373,7 @@ class Banner:
             self.alerter.emit("high", "ban", "fallo", f"No se pudo bloquear {ip}: {out.strip()[:160]}", key=f"banfail:{ip}")
             return False
         self.bans[ip] = {"until": now() + ttl, "reason": reason, "backend": be, "since": iso()}
-        atomic_write_json(self.path, self.bans)
+        atomic_write_json(self.path, self.bans, share=True)
         self.alerter.emit("high", "ban", "bloqueada", f"IP {ip} bloqueada por {ttl // 3600} h con {be}: {reason}", key=f"ban:{ip}:{int(now() // 60)}", ip=ip, ttl=ttl)
         return True
 
@@ -372,7 +386,7 @@ class Banner:
                 gone.append(ip)
                 del self.bans[ip]
         if gone:
-            atomic_write_json(self.path, self.bans)
+            atomic_write_json(self.path, self.bans, share=True)
         return gone
 
     def unban(self, ip: str) -> bool:
@@ -381,5 +395,5 @@ class Banner:
             if shutil.which("cscli"):
                 run(["cscli", "decisions", "delete", "--ip", ip], 20)
             run(["ufw", "delete", "deny", "from", ip, "to", "any"], 20)
-        atomic_write_json(self.path, self.bans)
+        atomic_write_json(self.path, self.bans, share=True)
         return b is not None

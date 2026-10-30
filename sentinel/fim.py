@@ -193,7 +193,12 @@ class Fim:
     def init(self) -> int:
         snap = snapshot(self.roots(), self.excludes, self.hash_max, max_files=self.max_files, rehash=True)
         core.atomic_write_json(self.path, {"created": core.iso(), "epoch": core.now(), "files": snap})
+        self._meta(core.iso(), len(snap))
         return len(snap)
+
+    def _meta(self, created: str, count: int) -> None:
+        """Resumen público de la referencia (la referencia completa es solo de root): lo lee el panel gráfico."""
+        core.atomic_write_json(os.path.join(core.state_dir(), "fim_meta.json"), {"created": created, "count": count, "updated": core.iso()}, 0o644)
 
     def scan(self, paths: list[str] | None = None, deep: bool = False) -> list[dict]:
         """Compara con la referencia y registra los hallazgos. Con `paths` solo mira esas rutas (para el modo en vivo)."""
@@ -244,4 +249,5 @@ class Fim:
                 del files[p]
         files.update(snapshot([p for p in paths if os.path.lexists(p)], self.excludes, self.hash_max, rehash=True, max_files=self.max_files))
         core.atomic_write_json(self.path, {"created": base.get("created", core.iso()), "epoch": core.now(), "files": files, "updated": core.iso()})
+        self._meta(base.get("created", core.iso()), len(files))
         return len(files)

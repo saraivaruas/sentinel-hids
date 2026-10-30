@@ -160,6 +160,11 @@ def cmd_test(a) -> int:
     return 0
 
 
+def cmd_ui(a) -> int:
+    from . import ui
+    return ui.run_ui(a.port, not a.sin_abrir)
+
+
 def cmd_monitor(a) -> int:
     Monitor().run()
     return 0
@@ -197,6 +202,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
+    s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)
     sub.add_parser("honeypot", help="servicio de señuelos (lo lanza systemd)").set_defaults(fn=cmd_honeypot)
     a = p.parse_args(argv)

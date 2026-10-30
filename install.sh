@@ -56,7 +56,11 @@ if [ "$LIMPIAR" = 1 ]; then
     [ -e "$f" ] && do_ mv "$f" /root/sentinel-v1-respaldo/ || true; done
 else echo "  omitido (--sin-limpiar)"; fi
 
-paso "5/8 Servicios de systemd"
+paso "5/8 Servicios de systemd y acceso directo al panel"
+do_ install -D -m 644 "$AQUI/sentinel/ui/icon.svg" /usr/share/icons/hicolor/scalable/apps/sentinel.svg
+do_ install -D -m 644 "$AQUI/desktop/sentinel.desktop" /usr/share/applications/sentinel.desktop
+command -v update-desktop-database >/dev/null && do_ update-desktop-database /usr/share/applications || true
+command -v gtk-update-icon-cache >/dev/null && do_ gtk-update-icon-cache -q /usr/share/icons/hicolor || true
 do_ cp "$AQUI"/systemd/*.service "$AQUI"/systemd/*.timer /etc/systemd/system/
 do_ systemctl daemon-reload
 
@@ -73,3 +77,4 @@ if [ "$EXPONER" = 1 ]; then
 else echo "  Los puertos señuelo quedan cerrados hacia afuera (detectan escaneos locales). El escaneo de puertos externo se detecta igual con los registros del cortafuegos."; echo "  Para exponerlos: sudo ./install.sh --exponer-senuelos"; fi
 
 echo; echo "Listo. Comprueba con:  sentinel status   y   sentinel test"
+echo "Panel gráfico: busca «Sentinel» en el menú de aplicaciones, o ejecuta:  sentinel ui"

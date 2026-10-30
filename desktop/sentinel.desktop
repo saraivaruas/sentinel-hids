@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Sentinel
+GenericName=Panel de seguridad
+Comment=Detector de intrusiones y cambios de este equipo
+Exec=sentinel ui
+Icon=sentinel
+Terminal=false
+Categories=System;Security;Monitor;
+Keywords=seguridad;firewall;intrusiones;sentinel;
+StartupWMClass=Sentinel

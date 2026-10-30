@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel</title>
+<link rel="icon" href="/static/icon.svg">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Navegación">
+    <div class="brand"><img src="/static/icon.svg" alt="" width="34" height="34"><div><b>Sentinel</b><small id="ver">v2</small></div></div>
+    <nav>
+      <button class="nav" data-view="resumen" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8M5 10v10h5v-6h4v6h5V10"/></svg><span>Resumen</span></button>
+      <button class="nav" data-view="eventos"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Eventos</span><i class="count" id="nav-ev" hidden></i></button>
+      <button class="nav" data-view="bloqueos"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.600 5.600l12.800 12.800"/></svg><span>Bloqueos</span><i class="count" id="nav-bans" hidden></i></button>
+      <button class="nav" data-view="postura"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.400 8 8 9 4.600-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>Postura</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="mini" id="mini"><span class="dot"></span><span id="mini-t">Conectando…</span></div>
+      <button class="ghost" id="theme" title="Cambiar tema"><svg viewBox="0 0 24 24"><path d="M21 12.800A9 9 0 1 1 11.200 3a7 7 0 0 0 9.800 9.800z"/></svg><span>Tema</span></button>
+    </div>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div><h1 id="title">Resumen</h1><p id="subtitle">Estado de la protección de este equipo</p></div>
+      <div class="top-r"><span class="live" id="live"><i></i>en vivo</span><time id="clock"></time></div>
+    </header>
+
+    <section class="view" id="view-resumen">
+      <div class="hero" id="hero">
+        <div class="shield"><svg viewBox="0 0 120 120" id="hero-ring"></svg><svg class="shield-i" viewBox="0 0 24 24" id="hero-icon"></svg></div>
+        <div class="hero-t"><span class="eyebrow" id="hero-eyebrow">ESTADO</span><h2 id="hero-h">Comprobando…</h2><p id="hero-p"></p></div>
+        <div class="hero-a"><button class="btn primary" data-action="scan"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Escanear ahora</button><button class="btn" data-action="scan_deep">Revisión profunda</button></div>
+      </div>
+
+      <div class="kpis">
+        <article class="card kpi k-crit"><span>Críticas · 24 h</span><b id="k-crit">0</b><small>requieren acción inmediata</small></article>
+        <article class="card kpi k-high"><span>Altas · 24 h</span><b id="k-high">0</b><small>ataques o cambios importantes</small></article>
+        <article class="card kpi k-med"><span>Medias · 24 h</span><b id="k-med">0</b><small>para revisar con calma</small></article>
+        <article class="card kpi k-ban"><span>IPs bloqueadas</span><b id="k-ban">0</b><small>temporales (24 h)</small></article>
+        <article class="card kpi k-fim"><span>Archivos vigilados</span><b id="k-fim">—</b><small id="k-fim-s">referencia sin crear</small></article>
+      </div>
+
+      <div class="grid2">
+        <article class="card">
+          <div class="card-h"><h3>Actividad de las últimas 24 horas</h3><div class="legend" id="legend"></div></div>
+          <div class="chart" id="chart"></div><div class="tip" id="tip" hidden></div>
+        </article>
+        <article class="card">
+          <div class="card-h"><h3>Servicios</h3></div>
+          <ul class="svc" id="svc"></ul>
+          <div class="card-h sub"><h3>IPs más activas (7 días)</h3></div>
+          <ul class="ips" id="ips"></ul>
+        </article>
+      </div>
+
+      <article class="card">
+        <div class="card-h"><h3>Eventos recientes</h3><button class="link" data-goto="eventos">Ver todos →</button></div>
+        <ul class="feed" id="feed"></ul>
+      </article>
+    </section>
+
+    <section class="view" id="view-eventos" hidden>
+      <article class="card">
+        <div class="filters">
+          <div class="chips" id="sev-chips" role="group" aria-label="Gravedad mínima"></div>
+          <select id="f-hours" aria-label="Período"><option value="1">Última hora</option><option value="24" selected>Últimas 24 horas</option><option value="168">Últimos 7 días</option><option value="720">Últimos 30 días</option></select>
+          <input id="f-q" type="search" placeholder="Buscar: IP, ruta, usuario…" aria-label="Buscar">
+        </div>
+        <div class="tbl-wrap"><table class="tbl" id="ev-tbl"><thead><tr><th>Hora</th><th>Gravedad</th><th>Módulo</th><th>Detalle</th></tr></thead><tbody id="ev-body"></tbody></table></div>
+        <p class="empty" id="ev-empty" hidden>No hay eventos con estos filtros.</p>
+      </article>
+    </section>
+
+    <section class="view" id="view-bloqueos" hidden>
+      <div class="grid2">
+        <article class="card">
+          <div class="card-h"><h3>Bloqueos activos</h3></div>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>IP</th><th>Motivo</th><th>Motor</th><th>Termina en</th><th></th></tr></thead><tbody id="ban-body"></tbody></table></div>
+          <p class="empty" id="ban-empty" hidden>No hay IPs bloqueadas. Los bloqueos son temporales y nunca afectan a tu red local.</p>
+        </article>
+        <article class="card">
+          <div class="card-h"><h3>Lista blanca</h3></div>
+          <p class="hint">Lo que agregues aquí nunca se bloquea ni genera alertas. Pide tu clave de administrador.</p>
+          <form id="allow-form" class="form">
+            <label>Tipo<select id="al-tipo"><option value="ip">IP o red</option><option value="port">Puerto</option><option value="proc">Proceso</option><option value="path">Ruta</option></select></label>
+            <label>Valor<input id="al-valor" required placeholder="203.0.113.7 · 3000 · mi-programa · /ruta/*" autocomplete="off"></label>
+            <button class="btn primary" type="submit">Agregar</button>
+          </form>
+        </article>
+      </div>
+    </section>
+
+    <section class="view" id="view-postura" hidden>
+      <div class="grid2 post">
+        <article class="card score-c"><div class="score" id="score"></div><h3>Postura de seguridad</h3><p class="hint" id="score-p">Revisión de 16 configuraciones del equipo.</p><button class="btn" id="re-audit">Volver a revisar</button></article>
+        <article class="card"><div class="card-h"><h3>Revisiones</h3><div class="chips" id="au-filter"></div></div><ul class="audit" id="audit"></ul></article>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toasts" aria-live="polite"></div>
+<dialog id="dlg"><form method="dialog"><h3 id="dlg-t"></h3><p id="dlg-p"></p><div class="dlg-a"><button class="btn" value="no">Cancelar</button><button class="btn primary" value="si" id="dlg-ok">Confirmar</button></div></form></dialog>
+<script src="/static/app.js"></script>
+</body>
+</html>

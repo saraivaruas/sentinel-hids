@@ -17,6 +17,21 @@ Escrito en Python con la biblioteca estándar: no instala dependencias nuevas. S
 **Respuesta.** Los atacantes se bloquean de forma **temporal** (24 h) con CrowdSec o ufw; nunca la red local, Tailscale ni la lista blanca. A diferencia de la v1, **no detiene procesos ni modifica tus archivos**.
 **Avisos.** Registro JSONL privado, journal, notificación de escritorio y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
 
+## Panel gráfico
+
+![Panel de Sentinel](docs/panel-resumen-oscuro.png)
+
+Se abre desde el menú de aplicaciones («Sentinel») o con `sentinel ui`, como una ventana de aplicación. Funciona sin internet: es una página local que solo escucha en `127.0.0.1` y exige una llave que se guarda en `~/.config/sentinel/ui_token`.
+
+- **Resumen:** estado de la protección (Protegido, Para revisar, Requiere atención, Posible intrusión), eventos por gravedad, actividad de 24 horas, servicios, IPs más activas y eventos recientes en vivo.
+- **Eventos:** historial con filtros por gravedad, período y búsqueda; cada fila se abre para ver sus datos.
+- **Bloqueos:** IPs bloqueadas con su tiempo restante y botón para desbloquear; lista blanca.
+- **Postura:** puntaje de seguridad del equipo y cada hallazgo con su comando de arreglo (con botón «Copiar»).
+- **Acciones:** escanear ahora, revisión profunda, desbloquear y lista blanca. Las que necesitan administrador piden tu clave con la ventana normal del sistema (`pkexec`); el panel nunca corre como root.
+- Tema oscuro y claro, y adaptado a celular/ventanas angostas.
+
+Seguridad del panel: valida `Host` y `Origin` (contra DNS-rebinding y CSRF), CSP estricta, y todo texto de los eventos —que puede venir de un atacante— se muestra como texto, nunca como HTML. Las acciones son una lista cerrada con valores validados. Para verlo con datos de ejemplo sin instalar nada: `python3 tools/demo_datos.py /tmp/demo` y luego `SENTINEL_STATE=/tmp/demo/state SENTINEL_LOG=/tmp/demo/log python3 -m sentinel ui`.
+
 ## Instalar
 
 ```bash
@@ -41,6 +56,7 @@ Desinstalar: `sudo ./uninstall.sh` (`--todo` borra también registros y referenc
 | `sentinel bans` / `sentinel bans unban IP` | ver o quitar bloqueos |
 | `sentinel allow ip 203.0.113.7` | lista blanca (`ip`, `proc`, `port`, `path`) |
 | `sentinel audit` | postura de seguridad |
+| `sentinel ui` | abre el panel gráfico |
 | `sentinel report --lynis` | informe HTML (semanal, automático) con el índice de Lynis |
 
 Configuración: `/etc/sentinel/sentinel.conf` (parte de `etc/sentinel.conf.example`). Registros: `/var/log/sentinel/`.
@@ -57,7 +73,7 @@ sentinel-report.timer    ── informe y Lynis cada lunes
 ## Pruebas
 
 ```bash
-cd tests && python3 -m unittest discover -s .     # 38 pruebas, ~5 s, sin permisos de administrador
+cd tests && python3 -m unittest discover -s .     # 49 pruebas, ~6 s, sin permisos de administrador
 ```
 
 Incluyen los dos fallos de la v1: el reemplazo de archivos por renombre y la extracción de la IP del atacante.

@@ -16,6 +16,9 @@ class CliTests(unittest.TestCase):
         return rc, out.getvalue()
 
     def test_flujo_completo(self):
+        from sentinel import hostcheck
+        quiet = [unittest.mock.patch.object(hostcheck, n, return_value=v) for n, v in (("proc_scan", []), ("input_readers", []), ("suspicious_connections", []))]
+        for q in quiet: q.start(); self.addCleanup(q.stop)
         e = Env()
         try:
             e.write("etc/passwd", "root:x:0:0\n")
