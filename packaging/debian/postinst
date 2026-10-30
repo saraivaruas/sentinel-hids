@@ -5,6 +5,7 @@ if [ "$1" = "configure" ]; then
   id sentinel >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin sentinel
   install -d -m 750 -o root -g adm /var/lib/sentinel /var/log/sentinel 2>/dev/null || install -d -m 750 /var/lib/sentinel /var/log/sentinel
   install -d -m 770 -o root -g sentinel /var/log/sentinel/decoy
+  chgrp adm /var/log/sentinel/events.jsonl 2>/dev/null || true; chmod 640 /var/log/sentinel/events.jsonl 2>/dev/null || true
   chown root:adm /etc/sentinel/sentinel.conf 2>/dev/null || true; chmod 640 /etc/sentinel/sentinel.conf
   # retirar la versión 1 (con copia de respaldo)
   if [ -f /etc/rc.local ] && grep -q sentinel-core.sh /etc/rc.local 2>/dev/null; then

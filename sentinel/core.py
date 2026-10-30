@@ -300,6 +300,7 @@ class Alerter:
                 f.write(json.dumps(asdict(ev), ensure_ascii=False) + "\n")
             if new:
                 os.chmod(self.path, 0o640)
+            if new or os.stat(self.path).st_gid == 0:
                 share_with_adm(self.path)
         except OSError:
             pass
