@@ -46,7 +46,7 @@ class InstallTests(unittest.TestCase):
 @unittest.skipUnless(shutil.which("dpkg-deb") and shutil.which("fakeroot"), "falta dpkg-deb o fakeroot")
 class DebTests(unittest.TestCase):
     def test_paquete_deb(self):
-        p = subprocess.run([os.path.join(ROOT, "packaging", "build-deb.sh")], capture_output=True, text=True, timeout=120)
+        p = subprocess.run([os.path.join(ROOT, "packaging", "build-deb.sh")], capture_output=True, text=True, timeout=120, env=dict(os.environ, SENTINEL_DIST=tempfile.mkdtemp()))   # no pisar dist/ con las pruebas
         self.assertEqual(p.returncode, 0, p.stderr)
         deb = p.stdout.strip().splitlines()[-1]
         info = subprocess.run(["dpkg-deb", "--info", deb], capture_output=True, text=True).stdout
