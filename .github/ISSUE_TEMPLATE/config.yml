@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar una vulnerabilidad (privado)
+    url: https://github.com/saraivaruas/sentinel-hids/security/advisories/new
+    about: Las vulnerabilidades no se reportan en issues públicos.

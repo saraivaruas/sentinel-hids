@@ -1,0 +1,40 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python }} en ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+        python: ["3.8", "3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Dependencias del sistema
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends inotify-tools fakeroot dpkg-dev procps iproute2
+      - name: Pruebas
+        run: cd tests && python -W ignore -m unittest discover -s . -v
+
+  shell:
+    name: Scripts de shell
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends shellcheck
+          shellcheck -S warning -e SC2086,SC2046,SC2015,SC2034 install.sh uninstall.sh install-gui.sh packaging/*.sh packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm || true
+          bash -n install.sh && bash -n uninstall.sh && bash -n install-gui.sh

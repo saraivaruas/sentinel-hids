@@ -1,0 +1,23 @@
+name: Error
+description: Algo no funciona como debería
+labels: [bug]
+body:
+  - type: textarea
+    id: que
+    attributes: {label: Qué pasó, description: Y qué esperabas que pasara}
+    validations: {required: true}
+  - type: textarea
+    id: pasos
+    attributes: {label: Pasos para reproducirlo}
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes: {label: Versión de Sentinel, description: "Resultado de `sentinel status`"}
+    validations: {required: true}
+  - type: input
+    id: distro
+    attributes: {label: Distribución y versión, placeholder: Ubuntu 24.04}
+    validations: {required: true}
+  - type: textarea
+    id: logs
+    attributes: {label: Registros relevantes, description: "`sentinel events --min low` o `journalctl -t sentinel`. Quita datos privados (IPs, usuarios).", render: text}

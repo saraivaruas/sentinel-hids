@@ -1,0 +1,17 @@
+name: Idea o mejora
+description: Propón una función nueva
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes: {label: Qué problema resuelve}
+    validations: {required: true}
+  - type: textarea
+    id: propuesta
+    attributes: {label: Cómo lo imaginas}
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Colaboración
+      options:
+        - label: Me gustaría implementarlo yo mismo mediante un Pull Request
