@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
-# Lanzador: usa el código instalado en /opt/sentinel (o el de esta carpeta al desarrollar).
+# Lanzador de Sentinel. Usa el código de la carpeta donde está instalado (/opt/sentinel) y NO el de la carpeta actual:
+# «python -m» busca primero en el directorio de trabajo, y con «sudo sentinel» eso permitiría ejecutar como administrador
+# un paquete falso llamado «sentinel» que alguien deje en esa carpeta. La opción -I (aislado) ignora el directorio actual,
+# PYTHONPATH y los paquetes del usuario.
 D="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-exec env PYTHONPATH="$D" python3 -m sentinel "$@"
+exec python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); sys.argv[0] = "sentinel"; from sentinel.cli import main; sys.exit(main(sys.argv[2:]))' "$D" "$@"

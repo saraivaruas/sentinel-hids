@@ -11,6 +11,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Explicaciones en lenguaje sencillo** («como para un niño») de cada tipo de ataque y de cada tipo de paquete, con semáforo de peligro y recomendaciones.
 - Panel: páginas **Atacantes** (con liberar y bloquear) y **Paquetes** (qué es un paquete, glosario, últimos sospechosos). Comandos `sentinel attackers`, `attacker`, `packets` y `bans ban`.
 
+- **Actualizaciones:** el panel detecta cuando hay una versión nueva publicada en GitHub y ofrece instalarla con un botón. Se descarga solo de las publicaciones del repositorio, se exige que la huella SHA-256 coincida y que el paquete sea Sentinel con la versión anunciada; el panel se reinicia solo. `sentinel update [--instalar]`. Desactivable con `[update] check = no`.
+
+### Seguridad
+- El lanzador `sentinel` ya no carga código de la carpeta actual ni de `PYTHONPATH` (usa `python -I`). Antes, ejecutar `sudo sentinel` dentro de una carpeta con un paquete falso llamado `sentinel` lo ejecutaba como administrador.
+
 ### Corregido
 - Los paquetes de la interfaz local (tipo de enlace 772) no se interpretaban.
 
