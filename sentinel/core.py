@@ -18,7 +18,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.1.0"
+VERSION = "2.1.1"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -83,6 +83,11 @@ scan_ports = 12
 scan_window = 60
 ban_on_failures = yes
 ban_on_scan = yes
+
+[update]
+; buscar versiones nuevas en GitHub (solo consulta; instalar siempre lo decides tú). check = no para no consultar nada
+check = yes
+repo = saraivaruas/sentinel-hids
 
 [intel]
 ; de dónde sale la ubicación del atacante: auto (archivo local si existe, si no RIPEstat/RDAP), offline (solo archivo local), online, off
@@ -295,6 +300,7 @@ class Alerter:
                 f.write(json.dumps(asdict(ev), ensure_ascii=False) + "\n")
             if new:
                 os.chmod(self.path, 0o640)
+            if new or os.stat(self.path).st_gid == 0:
                 share_with_adm(self.path)
         except OSError:
             pass

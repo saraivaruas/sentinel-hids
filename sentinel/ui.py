@@ -21,7 +21,7 @@ import time
 import urllib.parse
 import webbrowser
 
-from . import audit, core, explain, geoip, incidents
+from . import audit, core, explain, geoip, incidents, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
@@ -59,6 +59,7 @@ class Data:
         self._audit_running = False
         self._svc: tuple[float, dict] = (0, {})
         self.lock = threading.Lock()
+        self._upd_running = False
 
     def services(self) -> dict:
         if time.time() - self._svc[0] < 4:
@@ -163,6 +164,24 @@ class Data:
         stats = core.read_json(os.path.join(core.state_dir(), "packets_stats.json"))
         return {"recientes": rec, "captura": stats, "captura_viva": bool(stats and core.now() - stats.get("ts", 0) < 120 and stats.get("activo"))}
 
+    def update_info(self, force: bool = False) -> dict:
+        """Estado de las actualizaciones, sin bloquear el panel: la consulta a GitHub se hace en segundo plano."""
+        c = core.read_json(update.cache_path()) or {}
+        stale = force or core.now() - c.get("checked_at", 0) > update.TTL or c.get("current") != core.VERSION
+        if stale and self.cfg.getboolean("update", "check", fallback=True) and not self._upd_running:
+            self._upd_running = True
+            def run():
+                try:
+                    update.check(self.cfg, force=True)
+                finally:
+                    self._upd_running = False
+            threading.Thread(target=run, daemon=True).start()
+        base = {"current": core.VERSION, "latest": core.VERSION, "available": False, "enabled": self.cfg.getboolean("update", "check", fallback=True)}
+        out = dict(base, **{k: v for k, v in c.items() if k in ("latest", "available", "notes", "release_url", "published", "checked_at", "error")}) if c.get("current") == core.VERSION else base
+        out["available"] = bool(out.get("available")) and update.vtuple(out["latest"]) > update.vtuple(core.VERSION)
+        out["checking"] = self._upd_running
+        return out
+
     @staticmethod
     def glossary() -> dict:
         return {"paquetes": explain.PAQUETES, "tipos": explain.TIPOS, "glosario": explain.GLOSARIO, "niveles": {k: v[1] for k, v in explain.NIVELES.items()}}
@@ -195,6 +214,8 @@ def build_action(body: dict) -> list[str]:
         ip = str(body.get("ip", ""))
         ipaddress.ip_address(ip)
         return ["bans", "unban", ip]
+    if name == "update":
+        return ["update", "--instalar"]
     if name == "ban":
         ip = str(body.get("ip", ""))
         ipaddress.ip_address(ip)
@@ -322,6 +343,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "IP inválida"}, 400)
             r = d.attacker(ip)
             return self._json(r) if r else self._json({"error": "sin expediente"}, 404)
+        if u.path == "/api/update":
+            return self._json(d.update_info())
         if u.path == "/api/packets":
             return self._json(d.packets())
         if u.path == "/api/glossary":
@@ -342,10 +365,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(min(n, 20000)) or b"{}")
         except (ValueError, OSError):
             return self._json({"ok": False, "out": "Solicitud inválida"}, 400)
+        if self.path == "/api/update/refresh":
+            return self._json(self.server.data.update_info(force=True))
         if self.path == "/api/audit/refresh":
             return self._json(self.server.data.audit(force=True))
         if self.path == "/api/action":
-            return self._json(run_action(body))
+            res = run_action(body)
+            if body.get("name") == "update" and res.get("ok"):
+                self.server.schedule_restart()      # el panel se reinicia solo con el código nuevo
+            return self._json(res)
         self._send(404, b"no encontrado", "text/plain; charset=utf-8")
 
     def _static(self, name: str) -> None:
@@ -366,6 +394,20 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     def __init__(self, port: int, token: str, data: Data):
         super().__init__(("127.0.0.1", port), Handler)
         self.token, self.data = token, data
+        self.restart_enabled = True
+
+    def schedule_restart(self) -> None:
+        """Tras actualizar, el panel vuelve a lanzarse a sí mismo (mismo puerto) para usar la versión nueva."""
+        if not self.restart_enabled:
+            return
+        port, binp = self.server_address[1], sentinel_bin() or "sentinel"
+        def go():
+            try:
+                self.server_close()
+                os.execv(binp, [binp, "ui", "--sin-abrir", "--port", str(port)])
+            except OSError:
+                os._exit(0)
+        threading.Timer(1.5, go).start()
 
 
 def open_window(url: str) -> None:

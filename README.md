@@ -102,7 +102,7 @@ Después de instalar: `sentinel status`, `sentinel test` (debería salir una not
 
 Motor de bloqueo (`[ban] backend = auto`): CrowdSec → firewalld → ufw (activo) → iptables. Todos con caducidad (24 h).
 
-Opciones del instalador: `--sin-dependencias`, `--sin-limpiar` (no toca la v1), `--exponer-senuelos` (abre los puertos señuelo hacia Internet; por defecto quedan cerrados y el escaneo externo se detecta igual con el cortafuegos).
+Opciones del instalador: `--sin-dependencias`, `--sin-limpiar` (no toca la v1), `--exponer-senuelos` (activa los señuelos y abre sus puertos; por defecto **no se abre ningún puerto**, y el escaneo externo se detecta igual con el cortafuegos).
 Desinstalar: `sudo apt purge sentinel` o `sudo ./uninstall.sh` (`--todo` borra también registros y referencias).
 Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` → `dist/`.
 

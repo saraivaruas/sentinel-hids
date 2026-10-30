@@ -358,6 +358,39 @@
       const td = el("td"); td.appendChild(nivelBadge(p.info.nivel)); td.appendChild(document.createTextNode(" " + p.info.nombre)); td.setAttribute("title", p.info.nino); tr.appendChild(td); body.appendChild(tr); });
   }
 
+
+  // ---------- Actualizaciones
+  let upd = null;
+  const dismissed = () => { try { return localStorage.getItem("sentinel-upd-later"); } catch (e) { return null; } };
+  async function loadUpdate(force) {
+    try { upd = force ? await api("/api/update/refresh", {}) : await api("/api/update"); } catch (e) { return; }
+    $("#upd-ver").textContent = "v" + upd.current;
+    const show = upd.available && dismissed() !== upd.latest;
+    $("#upd").hidden = !show;
+    if (!show) return;
+    $("#upd-t").textContent = "Hay una versión nueva de Sentinel: " + upd.latest;
+    $("#upd-s").textContent = "Tienes la " + upd.current + ". Se descarga de GitHub, se verifica su huella y se instala; los servicios se reinician solos. Te pedirá tu clave de administrador.";
+    $("#upd-n").hidden = !upd.notes; $("#upd-pre").textContent = upd.notes || "";
+  }
+  async function doUpdate() {
+    if (!(await confirmDlg("Actualizar Sentinel", "Se instalará la versión " + upd.latest + ". Se verifica la huella del archivo antes de instalar y el panel se reiniciará. ¿Continuar?", "Actualizar"))) return;
+    const r = await runAction("update", null, $("#upd-go"));
+    if (!r || !r.ok) return;
+    const bz = $("#busy"); bz.hidden = false; $("#busy-t").textContent = "Reiniciando con la versión " + upd.latest + "…";
+    const t0 = Date.now();
+    const poll = setInterval(async () => {
+      try { const o = await (await fetch("/api/overview")).json(); if (o.version === upd.latest) { clearInterval(poll); location.reload(); } } catch (e) { /* el panel se está reiniciando */ }
+      if (Date.now() - t0 > 90000) { clearInterval(poll); bz.hidden = true; toast("Se instaló, pero el panel no volvió solo: ciérralo y ábrelo de nuevo.", true); }
+    }, 2000);
+  }
+  $("#upd-go").addEventListener("click", doUpdate);
+  $("#upd-later").addEventListener("click", () => { try { localStorage.setItem("sentinel-upd-later", upd.latest); } catch (e) { /* sin almacenamiento */ } $("#upd").hidden = true; });
+  $("#upd-check").addEventListener("click", async () => {
+    toast("Buscando actualizaciones…"); try { localStorage.removeItem("sentinel-upd-later"); } catch (e) { /* sin almacenamiento */ }
+    await loadUpdate(true); await new Promise((r) => setTimeout(r, 2500)); await loadUpdate(false);
+    if (!upd.available) toast(upd.error && !upd.checking ? "No se pudo buscar: " + (upd.error === "sin_publicaciones" ? "todavía no hay versiones publicadas" : upd.error === "sin_conexion" ? "sin conexión con GitHub" : upd.error) : "Estás al día: versión " + upd.current);
+  });
+
   // ---------- ciclo
   async function refresh() {
     try { render(await api("/api/overview")); } catch (e) { $("#mini").className = "mini bad"; $("#mini-t").textContent = "Sin conexión con el panel"; $("#live").classList.add("off"); }
@@ -376,6 +409,7 @@
   chips();
   go(location.hash.slice(1) || "resumen");
   refresh();
+  loadUpdate(false); setTimeout(() => loadUpdate(false), 4000); setInterval(() => loadUpdate(false), 600000);
   setInterval(() => { if (!document.hidden) { refresh(); if (st.view === "eventos" && !$("#f-q").value) loadEvents(); if (st.view === "atacantes" && !$("#att-q").value) loadAttackers(); if (st.view === "paquetes") loadPackets(); } }, 3000);
   setInterval(() => ($("#clock").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false })), 15000);
 })();

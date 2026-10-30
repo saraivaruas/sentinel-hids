@@ -2,7 +2,6 @@
 Description=Sentinel: monitor de intrusiones y cambios
 Documentation=file:///opt/sentinel/README.md
 After=network.target systemd-journald.service
-Wants=sentinel-honeypot.service
 
 [Service]
 Type=simple

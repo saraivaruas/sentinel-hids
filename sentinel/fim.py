@@ -166,6 +166,15 @@ def scan_content(path: str, exts: list[str], limit: int = 2_000_000) -> list[str
     return [name for name, rx in SIGNATURES.items() if rx.search(data)]
 
 
+# Los archivos de Sentinel mismo: si cambian durante una actualización de paquetes es la propia actualización, no un ataque.
+SELF_DIRS = ("/opt/sentinel", "/etc/sentinel")
+SELF_FILES = ("/usr/bin/sentinel", "/usr/local/bin/sentinel", "/usr/share/applications/sentinel", "/usr/share/icons/hicolor/scalable/apps/sentinel")
+
+
+def es_de_sentinel(path: str) -> bool:
+    return any(path == d or path.startswith(d + "/") for d in SELF_DIRS) or path.startswith(SELF_FILES)
+
+
 def package_activity(window: int = 300, log: str = "/var/log/dpkg.log") -> bool:
     """¿Se instaló o actualizó algún paquete hace poco? (para no alarmar por cambios normales de apt)"""
     try:
@@ -231,7 +240,9 @@ class Fim:
                     sev, detail = "critical", f"posible puerta trasera: {', '.join(sigs)}"
                 elif f["kind"] == "added" and os.path.splitext(f["path"])[1].lstrip(".").lower() in self.exts:
                     sev = "high"; detail = "archivo ejecutable nuevo en carpeta web"
-            if pkg and not sigs and f["path"].startswith(("/usr/", "/etc/", "/opt/", "/lib")) and f["kind"] in ("modified", "added", "perm") and sev in ("medium", "high"):
+            if pkg and not sigs and es_de_sentinel(f["path"]):
+                sev = "info"; detail += " (actualización de Sentinel)"
+            elif pkg and not sigs and f["path"].startswith(("/usr/", "/etc/", "/opt/", "/lib")) and f["kind"] in ("modified", "added", "perm") and sev in ("medium", "high"):
                 sev = "low"; detail += " (durante una actualización de paquetes)"
             f2 = dict(f, sev=sev, detail=detail)
             results.append(f2)
