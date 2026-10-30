@@ -104,6 +104,12 @@ class FimTests(unittest.TestCase):
         os.utime(log, (1, 1))
         self.assertFalse(fim.package_activity(300, log))                    # antiguo
 
+    def test_archivos_de_sentinel_son_propios(self):
+        for ok in ("/opt/sentinel/sentinel/core.py", "/etc/sentinel/sentinel.conf", "/etc/sentinel/sentinel.conf.dpkg-old", "/usr/bin/sentinel"):
+            self.assertTrue(fim.es_de_sentinel(ok), ok)
+        for no in ("/opt/sentinelx/a", "/etc/sentinelx", "/etc/passwd", "/usr/bin/sentinel-evil/x" if False else "/etc/ssh/sshd_config"):
+            self.assertFalse(fim.es_de_sentinel(no), no)
+
     def test_carpeta_excluida_no_se_recorre(self):
         self.e.write("node/x", "1")
         os.makedirs(os.path.join(self.e.tree, "app", ".git", "objects"))

@@ -73,3 +73,11 @@ dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);co
 .pk-intro{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr);gap:1.4rem;align-items:center;margin-bottom:.9rem}.pk-intro h2{margin:0 0 .4rem}.pk-intro p{color:var(--tx);margin:.4rem 0}.pk-svg{width:100%;height:auto;stroke-width:1}.pk-svg text{stroke:none}
 .pk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:.7rem}.pk-cards .kid{margin:0}.gloss{margin:0}.gloss dt{font-weight:700;margin-top:.7rem}.gloss dd{margin:.15rem 0 0;color:var(--mu)}
 @media(max-width:1100px){.att-grid,.pk-intro{grid-template-columns:1fr}.att-listc{max-height:none}}
+
+/* Aviso de actualización */
+.upd{display:flex;gap:1rem;align-items:center;margin-bottom:1rem;padding:.9rem 1.2rem;border-radius:16px;border:1px solid color-mix(in srgb,var(--brand) 55%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--brand) 22%,var(--card)),var(--card) 75%);box-shadow:var(--shadow)}.upd[hidden]{display:none}
+.upd-i{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;flex:none}.upd-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem}.upd-t span{color:var(--mu);font-size:.88rem}.upd-a{display:flex;gap:.5rem;flex-wrap:wrap}
+.upd details{margin-top:.3rem}.upd summary{cursor:pointer;color:var(--brand);font-weight:600;font-size:.86rem}.upd pre{white-space:pre-wrap;max-height:220px;overflow:auto;margin:.4rem 0 0;padding:.7rem;background:var(--bg);border:1px solid var(--line);border-radius:10px;font-size:.78rem}
+.overlay{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;background:rgba(5,10,25,.82);backdrop-filter:blur(4px);color:#fff;text-align:center;padding:2rem}.overlay[hidden]{display:none}.overlay span{opacity:.8}
+.spin{width:54px;height:54px;border-radius:50%;border:5px solid rgba(255,255,255,.2);border-top-color:var(--brand);animation:giro 1s linear infinite}@keyframes giro{to{transform:rotate(360deg)}}
+@media(max-width:760px){.upd{flex-wrap:wrap}.upd-a{width:100%}}

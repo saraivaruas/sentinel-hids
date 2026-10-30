@@ -2,6 +2,15 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.1.1] - 2026-10-30
+
+### Seguridad
+- **Los señuelos (honeypot) ya no se activan solos**: la instalación no abre ningún puerto nuevo. Se activan a propósito con `sudo systemctl enable --now sentinel-honeypot` o `./install.sh --exponer-senuelos`. Si ya estaban activos, la actualización no los toca.
+
+### Corregido
+- Los cambios en los archivos de Sentinel durante su propia actualización ya no se muestran como alertas (quedan como informativos) y la nueva versión se acepta como referencia de integridad.
+- El panel no podía leer `events.jsonl` creado por versiones anteriores (dueño `root:root`) y mostraba la lista de eventos vacía; ahora se corrige el grupo `adm` al escribir y al actualizar el paquete.
+
 ## [2.1.0] - 2026-10-30
 
 ### Agregado
@@ -10,6 +19,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Captura y análisis de paquetes** propia (AF_PACKET, sin dependencias): escaneos de puertos SYN y UDP, escaneos sigilosos (NULL/FIN/XMAS), inundación SYN y ping masivo, con bloqueo automático.
 - **Explicaciones en lenguaje sencillo** («como para un niño») de cada tipo de ataque y de cada tipo de paquete, con semáforo de peligro y recomendaciones.
 - Panel: páginas **Atacantes** (con liberar y bloquear) y **Paquetes** (qué es un paquete, glosario, últimos sospechosos). Comandos `sentinel attackers`, `attacker`, `packets` y `bans ban`.
+
+- **Actualizaciones:** el panel detecta cuando hay una versión nueva publicada en GitHub y ofrece instalarla con un botón. Se descarga solo de las publicaciones del repositorio, se exige que la huella SHA-256 coincida y que el paquete sea Sentinel con la versión anunciada; el panel se reinicia solo. `sentinel update [--instalar]`. Desactivable con `[update] check = no`.
+
+### Seguridad
+- El lanzador `sentinel` ya no carga código de la carpeta actual ni de `PYTHONPATH` (usa `python -I`). Antes, ejecutar `sudo sentinel` dentro de una carpeta con un paquete falso llamado `sentinel` lo ejecutaba como administrador.
 
 ### Corregido
 - Los paquetes de la interfaz local (tipo de enlace 772) no se interpretaban.

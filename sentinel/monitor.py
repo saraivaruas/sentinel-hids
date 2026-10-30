@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, fim, honeypot, hostcheck, intel as intel_mod, packets
+from . import authwatch, core, fim, honeypot, hostcheck, intel as intel_mod, packets, update
 
 
 class Monitor:
@@ -120,6 +120,14 @@ class Monitor:
             t = core.now()
             self.heartbeat()
             self.banner.expire()
+            if t - getattr(self, "_upd", 0) > update.TTL:
+                self._upd = t
+                try:
+                    u = update.check(self.cfg, force=True)
+                    if u["available"]:
+                        self.alerter.emit("low", "update", "disponible", f"Hay una versión nueva de Sentinel: {u['latest']} (tienes la {u['current']}). Ábrela en el panel para actualizar.", key=f"update:{u['latest']}")
+                except Exception:
+                    pass
             if t - getattr(self, "_pruned", 0) > 86400:
                 self._pruned = t
                 try:

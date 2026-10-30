@@ -131,13 +131,13 @@ paso "6/8 Referencia inicial de integridad y del equipo"
 do_ /usr/local/bin/sentinel baseline init
 
 paso "7/8 Arrancar"
-[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl enable --now sentinel-honeypot.service sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || echo "  (sin systemd: inicia a mano con «sentinel monitor»)"
+[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer && { [ "$EXPONER" = 1 ] && do_ systemctl enable --now sentinel-honeypot.service || true; } || echo "  (sin systemd: inicia a mano con «sentinel monitor»)"
 
 paso "8/8 Cortafuegos de los señuelos"
 if [ "$EXPONER" = 1 ]; then
   for p in $(python3 -c "import sys;sys.path.insert(0,'$AQUI');from sentinel import core;print(' '.join(core.csv(core.load_config().get('honeypot','ports'))))"); do
     do_ ufw allow "$p/tcp" comment sentinel-senuelo; done
-else echo "  Los puertos señuelo quedan cerrados hacia afuera (detectan escaneos locales). El escaneo de puertos externo se detecta igual con los registros del cortafuegos."; echo "  Para exponerlos: sudo ./install.sh --exponer-senuelos"; fi
+else echo "  Los señuelos NO se activan (no se abre ningún puerto nuevo). El escaneo de puertos se detecta igual con los registros del cortafuegos."; echo "  Para activarlos: sudo ./install.sh --exponer-senuelos"; fi
 
 [ "$DRY" = 0 ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || true
 echo; echo "Listo. Comprueba con:  sentinel status   y   sentinel test"

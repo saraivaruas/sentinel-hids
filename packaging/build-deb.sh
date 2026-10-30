@@ -3,7 +3,7 @@
 set -euo pipefail
 AQUI="$(cd "$(dirname "$0")/.." && pwd)"
 VER="$(python3 -c "import sys;sys.path.insert(0,'$AQUI');from sentinel import core;print(core.VERSION)")"
-OUT="$AQUI/dist"; T="$(mktemp -d)"; P="$T/pkg"
+OUT="${SENTINEL_DIST:-$AQUI/dist}"; T="$(mktemp -d)"; P="$T/pkg"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$OUT" "$P/DEBIAN" "$P/opt/sentinel" "$P/usr/bin" "$P/lib/systemd/system" "$P/usr/share/applications" "$P/usr/share/icons/hicolor/scalable/apps" "$P/etc/sentinel" "$P/etc/logrotate.d" "$P/usr/share/doc/sentinel"
 
