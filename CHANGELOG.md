@@ -2,6 +2,14 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.1.1] - 2026-10-30
+
+### Seguridad
+- **Los señuelos (honeypot) ya no se activan solos**: la instalación no abre ningún puerto nuevo. Se activan a propósito con `sudo systemctl enable --now sentinel-honeypot` o `./install.sh --exponer-senuelos`. Si ya estaban activos, la actualización no los toca.
+
+### Corregido
+- El panel no podía leer `events.jsonl` creado por versiones anteriores (dueño `root:root`) y mostraba la lista de eventos vacía; ahora se corrige el grupo `adm` al escribir y al actualizar el paquete.
+
 ## [2.1.0] - 2026-10-30
 
 ### Agregado
