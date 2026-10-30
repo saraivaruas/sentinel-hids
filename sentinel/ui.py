@@ -21,7 +21,7 @@ import time
 import urllib.parse
 import webbrowser
 
-from . import audit, core
+from . import audit, core, explain, geoip, incidents
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
@@ -118,6 +118,55 @@ class Data:
                 "bans": [{"ip": ip, "reason": b["reason"], "backend": b["backend"], "left": int(b["until"] - now)} for ip, b in sorted(active.items(), key=lambda kv: kv[1]["until"])],
                 "events": ev7[-60:][::-1], "root": core.is_root(), "installed": sentinel_bin() is not None}
 
+    def _store(self):
+        try:
+            return incidents.Store(readonly=True)
+        except Exception:
+            return None
+
+    def attackers(self, q: str = "", status: str = "") -> dict:
+        st = self._store()
+        if not st:
+            return {"items": [], "stats": None}
+        try:
+            kinds = st.kinds_by_ip()
+            items = []
+            for r in st.list_ips(200, q, status):
+                pts, nivel = explain.puntaje(kinds.get(r["ip"], {}), 0, 0)
+                items.append({"ip": r["ip"], "riesgo": pts, "nivel": nivel, "lugar": geoip.place_text(r), "pais": r.get("country"), "codigo": r.get("country_code"), "intentos": r["attempts"], "estado": r["status"],
+                              "primera": r["first_seen"], "ultima": r["last_seen"], "bloqueo_hasta": r.get("ban_until"), "paquetes": r.get("pkt_total", 0)})
+            return {"items": items, "stats": st.stats()}
+        finally:
+            st.close()
+
+    def attacker(self, ip: str) -> dict | None:
+        st = self._store()
+        if not st:
+            return None
+        try:
+            d = st.dossier(ip)
+            return {"dossier": d, "explicacion": explain.explicar(d), "paquetes_recientes": st.recent_packets(30, ip)} if d else None
+        finally:
+            st.close()
+
+    def packets(self) -> dict:
+        st = self._store()
+        rec = []
+        if st:
+            try:
+                rec = st.recent_packets(60)
+            finally:
+                st.close()
+        for r in rec:
+            r["clave"] = explain.clasificar_paquete(r["proto"], r["flags"], r["dport"])
+            r["info"] = {k: explain.PAQUETES[r["clave"]][k] for k in ("nombre", "nivel", "nino")}
+        stats = core.read_json(os.path.join(core.state_dir(), "packets_stats.json"))
+        return {"recientes": rec, "captura": stats, "captura_viva": bool(stats and core.now() - stats.get("ts", 0) < 120 and stats.get("activo"))}
+
+    @staticmethod
+    def glossary() -> dict:
+        return {"paquetes": explain.PAQUETES, "tipos": explain.TIPOS, "glosario": explain.GLOSARIO, "niveles": {k: v[1] for k, v in explain.NIVELES.items()}}
+
     def events(self, hours: int, min_sev: str, q: str, limit: int) -> list[dict]:
         ev = core.read_events(core.now() - hours * 3600, min_sev)
         if q:
@@ -146,6 +195,14 @@ def build_action(body: dict) -> list[str]:
         ip = str(body.get("ip", ""))
         ipaddress.ip_address(ip)
         return ["bans", "unban", ip]
+    if name == "ban":
+        ip = str(body.get("ip", ""))
+        ipaddress.ip_address(ip)
+        horas = int(body.get("horas", 24))
+        if not 1 <= horas <= 720:
+            raise ValueError("horas entre 1 y 720")
+        motivo = re.sub(r"[^\w .,:()/-]", "", str(body.get("motivo", "bloqueo manual")))[:80] or "bloqueo manual"
+        return ["bans", "ban", ip, "--horas", str(horas), "--motivo", motivo]
     if name == "baseline_accept":
         paths = body.get("paths") or []
         if not isinstance(paths, list) or len(paths) > 50 or not all(isinstance(p, str) and p.startswith("/") and re.fullmatch(r"[\w./@+=:,~-]+", p) for p in paths):
@@ -255,6 +312,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(d.events(hours, sev if sev in core.SEV else "info", (q.get("q") or [""])[0][:100], max(1, min(500, int((q.get("limit") or ["200"])[0] or 200)))))
         if u.path == "/api/audit":
             return self._json(d.audit())
+        if u.path == "/api/attackers":
+            return self._json(d.attackers((q.get("q") or [""])[0][:60], (q.get("estado") or [""])[0][:20]))
+        if u.path == "/api/attacker":
+            ip = (q.get("ip") or [""])[0]
+            try:
+                ipaddress.ip_address(ip)
+            except ValueError:
+                return self._json({"error": "IP inválida"}, 400)
+            r = d.attacker(ip)
+            return self._json(r) if r else self._json({"error": "sin expediente"}, 404)
+        if u.path == "/api/packets":
+            return self._json(d.packets())
+        if u.path == "/api/glossary":
+            return self._json(d.glossary())
         self._send(404, b"no encontrado", "text/plain; charset=utf-8")
 
     def do_POST(self) -> None:
