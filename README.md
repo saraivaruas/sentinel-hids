@@ -1,7 +1,16 @@
-# Sentinel v2
+# Sentinel — detector de intrusiones para Linux (HIDS)
 
-Detector de intrusiones y de cambios para Linux (estaciones de trabajo y servidores). Reemplaza a Sentinel-JSR v1.
-Escrito en Python con la biblioteca estándar: no instala dependencias nuevas. Se apoya en lo que ya hay (systemd, CrowdSec o ufw, inotify, journal).
+[![tests](https://github.com/saraivaruas/sentinel-hids/actions/workflows/tests.yml/badge.svg)](https://github.com/saraivaruas/sentinel-hids/actions/workflows/tests.yml)
+[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-green.svg)](LICENSE)
+![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)
+![Linux](https://img.shields.io/badge/plataforma-Linux-lightgrey)
+![Sin dependencias](https://img.shields.io/badge/dependencias%20de%20Python-0-brightgreen)
+
+**Sentinel** es un **sistema de detección de intrusiones para el equipo (HIDS)** de código abierto para Linux: vigila la **integridad de archivos**, detecta **puertas traseras web (webshells)**, **fuerza bruta**, **escaneo de puertos** y **procesos sospechosos**, tiene **señuelos (honeypots)**, bloquea atacantes de forma temporal y te avisa con **ventanas de alerta** y un **panel gráfico**. Escrito en Python, sin librerías externas. 🇬🇧 [English version](README.en.md).
+
+![Panel de Sentinel](docs/panel-resumen-oscuro.png)
+
+> Reemplaza a «Sentinel-JSR» (v1, scripts de shell). Se instala solo, con sus dependencias, en Ubuntu/Debian, Fedora/RHEL, Arch y openSUSE.
 
 ## Qué detecta
 
@@ -20,8 +29,6 @@ Escrito en Python con la biblioteca estándar: no instala dependencias nuevas. S
 **Ventanas de alerta.** Desde la gravedad alta (`popup_min`, configurable) salta una ventana en tu pantalla con el detalle y el botón **Abrir panel**; las críticas no se cierran solas, las demás a los 2 minutos. Máximo 3 por minuto para no inundarte. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
 
 ## Panel gráfico
-
-![Panel de Sentinel](docs/panel-resumen-oscuro.png)
 
 Se abre desde el menú de aplicaciones («Sentinel») o con `sentinel ui`, como una ventana de aplicación. Funciona sin internet: es una página local que solo escucha en `127.0.0.1` y exige una llave que se guarda en `~/.config/sentinel/ui_token`.
 
@@ -116,3 +123,13 @@ Incluyen los dos fallos de la v1: el reemplazo de archivos por renombre y la ext
 - Un atacante que ya tiene **root** puede detenerlo o alterar sus referencias. Sentinel lo hace más difícil (programa y referencias son de root, latido vigilado, vigila su propio directorio) y lo avisa si queda mudo, pero para ese caso hace falta además un registro remoto (correo/ntfy) o un monitoreo externo.
 - La referencia de integridad se crea al instalar: instálalo en un equipo que consideres limpio.
 - Las firmas de puertas traseras cubren patrones comunes, no ofuscación avanzada.
+
+## Contribuir
+
+Es código abierto (MIT) y las mejoras son bienvenidas, pero **todo cambio entra mediante un Pull Request** revisado por el mantenedor: nadie escribe directamente en `main`. Lee [CONTRIBUTING.md](CONTRIBUTING.md). Las vulnerabilidades se reportan en privado: [SECURITY.md](SECURITY.md).
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Jorge Luis Saraiva Ruas.
+
+<sub>Palabras clave: HIDS, detección de intrusiones, intrusion detection, monitoreo de integridad de archivos, file integrity monitoring, FIM, detector de webshells, honeypot, fuerza bruta SSH, escaneo de puertos, seguridad Linux, blue team, CrowdSec, ufw, firewalld, systemd, panel de seguridad.</sub>

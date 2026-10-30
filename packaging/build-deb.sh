@@ -25,7 +25,7 @@ cat > "$P/etc/logrotate.d/sentinel" <<'EOF'
 }
 EOF
 cp "$AQUI/README.md" "$P/usr/share/doc/sentinel/README.md"
-printf 'Sentinel v2 — Jorge Luis Saraiva Ruas.\nUso interno y del cliente; todos los derechos reservados.\n' > "$P/usr/share/doc/sentinel/copyright"
+cp "$AQUI/LICENSE" "$P/usr/share/doc/sentinel/copyright"
 install -m 755 "$AQUI/packaging/debian/postinst" "$AQUI/packaging/debian/prerm" "$AQUI/packaging/debian/postrm" "$P/DEBIAN/"
 echo /etc/sentinel/sentinel.conf > "$P/DEBIAN/conffiles"
 find "$P" -type d -exec chmod 755 {} +; find "$P" -type f ! -path "*/DEBIAN/*" ! -perm -u+x -exec chmod 644 {} +; find "$P/opt/sentinel" -type f -exec chmod go-w,a+r {} +; chmod 755 "$P/opt/sentinel/bin/sentinel"

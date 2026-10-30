@@ -15,8 +15,8 @@ class PopupTests(unittest.TestCase):
         self.e.close()
 
     def test_comando_de_la_ventana(self):
-        cmd = self.a.popup_cmd(self.ev, "jorge", 1000, root=True)
-        self.assertEqual(cmd[:5], ["runuser", "-u", "jorge", "--", "env"])
+        cmd = self.a.popup_cmd(self.ev, "ana", 1000, root=True)
+        self.assertEqual(cmd[:5], ["runuser", "-u", "ana", "--", "env"])
         self.assertIn("zenity", cmd); self.assertIn("--no-markup", cmd)            # el texto hostil no se interpreta como formato
         self.assertIn("--ok-label=Abrir panel", cmd); self.assertIn("--timeout=120", cmd)
         self.assertTrue(any(c.startswith("DBUS_SESSION_BUS_ADDRESS=") for c in cmd))
@@ -24,12 +24,12 @@ class PopupTests(unittest.TestCase):
 
     def test_las_criticas_no_se_cierran_solas(self):
         ev = core.Event("critical", "fim", "added", "puerta trasera")
-        cmd = self.a.popup_cmd(ev, "jorge", 1000, root=False)
+        cmd = self.a.popup_cmd(ev, "ana", 1000, root=False)
         self.assertFalse(any(c.startswith("--timeout") for c in cmd)); self.assertIn("--icon-name=dialog-error", cmd)
         self.assertEqual(cmd[0], "env")
 
     def test_solo_desde_la_gravedad_configurada_y_con_limite_por_minuto(self):
-        with mock.patch.object(core.shutil, "which", return_value="/usr/bin/zenity"), mock.patch.object(core.Alerter, "desktop_target", return_value=("jorge", 1000)), \
+        with mock.patch.object(core.shutil, "which", return_value="/usr/bin/zenity"), mock.patch.object(core.Alerter, "desktop_target", return_value=("ana", 1000)), \
              mock.patch.object(core.threading, "Thread") as th:
             self.assertEqual(sum(self.a.popup(self.ev) for _ in range(6)), 3)         # máximo 3 por minuto
             self.assertEqual(th.call_count, 3)

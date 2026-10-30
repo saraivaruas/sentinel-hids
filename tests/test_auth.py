@@ -32,13 +32,13 @@ class AuthTests(unittest.TestCase):
 
     def test_red_local_no_se_bloquea(self):
         for i in range(8):
-            self.a.handle("sshd", "Failed password for jorge from 192.168.1.50 port 22 ssh2", 1000 + i)
+            self.a.handle("sshd", "Failed password for ana from 192.168.1.50 port 22 ssh2", 1000 + i)
         self.assertIn("fuerza_bruta", self.kinds()); self.assertIn("protegida", self.kinds()); self.assertNotIn("simulado", self.kinds())
 
     def test_acceso_tras_ataque_es_critico(self):
         for i in range(4):
-            self.a.handle("sshd", "Failed password for jorge from 203.0.113.9 port 22 ssh2", 1000 + i)
-        self.a.handle("sshd", "Accepted password for jorge from 203.0.113.9 port 22 ssh2", 1010)
+            self.a.handle("sshd", "Failed password for ana from 203.0.113.9 port 22 ssh2", 1000 + i)
+        self.a.handle("sshd", "Accepted password for ana from 203.0.113.9 port 22 ssh2", 1010)
         self.assertEqual([x["sev"] for x in self.e.events() if x["kind"] == "acceso_tras_ataque"], ["critical"])
 
     def test_root_remoto(self):
@@ -57,5 +57,5 @@ class AuthTests(unittest.TestCase):
         self.assertEqual([x["sev"] for x in ev], ["low"])
 
     def test_sudo_fallido(self):
-        self.a.handle("sudo", "jorge : 3 incorrect password attempts ; TTY=pts/0 ; PWD=/home/jorge ; USER=root ; COMMAND=/bin/ls", 1)
+        self.a.handle("sudo", "ana : 3 incorrect password attempts ; TTY=pts/0 ; PWD=/home/ana ; USER=root ; COMMAND=/bin/ls", 1)
         self.assertIn("sudo_fallido", self.kinds())

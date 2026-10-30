@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel-hids"
+version = "2.0.0"
+description = "Detector de intrusiones y cambios para Linux (HIDS): integridad de archivos, webshells, fuerza bruta, señuelos y panel gráfico"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [{name = "Jorge Luis Saraiva Ruas"}]
+keywords = ["hids", "intrusion-detection", "file-integrity-monitoring", "honeypot", "linux-security", "webshell", "brute-force", "crowdsec", "security-monitoring", "blue-team"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+  "Topic :: System :: Monitoring",
+  "Topic :: System :: Systems Administration",
+]
+
+[project.urls]
+Homepage = "https://github.com/saraivaruas/sentinel-hids"
+Issues = "https://github.com/saraivaruas/sentinel-hids/issues"
+Changelog = "https://github.com/saraivaruas/sentinel-hids/blob/main/CHANGELOG.md"
+
+[project.scripts]
+sentinel = "sentinel.cli:main"
+
+[tool.setuptools]
+packages = ["sentinel"]
+
+[tool.setuptools.package-data]
+sentinel = ["ui/*"]
