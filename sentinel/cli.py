@@ -448,6 +448,11 @@ def cmd_aprender(a) -> int:
     return 0
 
 
+def cmd_tray(a) -> int:
+    from . import tray
+    return tray.run()
+
+
 def cmd_toast(a) -> int:
     from . import toast
     return toast.show(a.titulo[:120], a.mensaje[:400], a.sev, a.seg)
@@ -510,6 +515,7 @@ def main(argv=None) -> int:
     sub.add_parser("iniciar", help="vuelve a encender Sentinel").set_defaults(fn=cmd_iniciar)
     s = sub.add_parser("aprender", help="modo aprendizaje: acepta como normales los puertos, USB y módulos nuevos durante N días (0 = terminar)"); s.add_argument("dias", type=int, nargs="?", default=3); s.set_defaults(fn=cmd_aprender)
     s = sub.add_parser("resolver", help="marca un evento como resuelto (deja de contar en el resumen y los informes)"); s.add_argument("clave"); s.add_argument("epoch", type=float); s.set_defaults(fn=cmd_resolver)
+    sub.add_parser("tray", help="ícono de estado en la barra del sistema (se inicia solo al abrir la sesión)").set_defaults(fn=cmd_tray)
     s = sub.add_parser("toast", help="muestra un aviso en la esquina de la pantalla (lo usa Sentinel)"); s.add_argument("mensaje"); s.add_argument("--sev", default="medium", choices=list(core.SEV)); s.add_argument("--seg", type=int, default=8); s.add_argument("--titulo", default="Sentinel"); s.set_defaults(fn=cmd_toast)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)

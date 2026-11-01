@@ -14,6 +14,7 @@ ln -s /opt/sentinel/bin/sentinel "$P/usr/bin/sentinel"
 cp "$AQUI/packaging/polkit/org.sentinel.policy" "$P/usr/share/polkit-1/actions/org.sentinel.policy"
 cp "$AQUI"/systemd/*.service "$AQUI"/systemd/*.timer "$P/lib/systemd/system/"
 install -m 644 "$AQUI/desktop/sentinel.desktop" "$P/usr/share/applications/sentinel.desktop"
+mkdir -p "$P/etc/xdg/autostart"; install -m 644 "$AQUI/desktop/sentinel-tray.desktop" "$P/etc/xdg/autostart/sentinel-tray.desktop"
 install -m 644 "$AQUI/sentinel/ui/icon.svg" "$P/usr/share/icons/hicolor/scalable/apps/sentinel.svg"
 sed 's/^desktop_user = .*/desktop_user =/' "$AQUI/etc/sentinel.conf.example" > "$P/etc/sentinel/sentinel.conf"
 cat > "$P/etc/logrotate.d/sentinel" <<'EOF'
@@ -41,7 +42,7 @@ Architecture: all
 Installed-Size: $SIZE
 Maintainer: Jorge Luis Saraiva Ruas <28052181+saraivaruas@users.noreply.github.com>
 Depends: python3 (>= 3.8), systemd, procps, iproute2, util-linux, coreutils
-Recommends: inotify-tools, libnotify-bin, python3-gi, gir1.2-gtk-3.0, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
+Recommends: inotify-tools, libnotify-bin, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
 Suggests: clamav, yara, crowdsec, crowdsec-firewall-bouncer-iptables, lynis, mailutils
 Description: Sentinel: detector de intrusiones y cambios para Linux
  Vigila la integridad de archivos críticos, detecta puertas traseras web,
