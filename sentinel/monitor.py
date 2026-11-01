@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, fim, honeypot, hostcheck, intel as intel_mod, packets, update
+from . import authwatch, core, firewall, fim, honeypot, hostcheck, intel as intel_mod, packets, update
 
 
 class Monitor:
@@ -138,6 +138,7 @@ class Monitor:
                 last_host = t
                 try:
                     self.host.run(deep=False)
+                    firewall.save_snapshot(self.cfg)
                 except Exception as e:
                     self.alerter.emit("low", "monitor", "error", f"Revisión del equipo falló ({type(e).__name__})", key="mon:err:host")
             if t - last_fim >= 900:

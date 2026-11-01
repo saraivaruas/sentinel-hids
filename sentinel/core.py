@@ -54,6 +54,12 @@ backend = auto
 ttl_seconds = 86400
 protect_private = yes
 
+[firewall]
+backend = auto
+allow_tcp = 80,443
+allow_udp =
+keep_ssh = yes
+
 [fim]
 ; rutas críticas (archivos o carpetas; admite comodines)
 paths = /etc/passwd,/etc/shadow,/etc/group,/etc/gshadow,/etc/sudoers,/etc/sudoers.d,/etc/ssh,/etc/pam.d,/etc/ld.so.preload,/etc/rc.local,/etc/crontab,/etc/cron.d,/etc/cron.daily,/etc/cron.hourly,/etc/systemd/system,/etc/profile.d,/etc/environment,/etc/hosts,/etc/ufw,/etc/crowdsec,/etc/sentinel,/usr/local/bin,/usr/local/sbin,/opt/sentinel,/root/.ssh,/home/*/.ssh,/home/*/.bashrc,/home/*/.profile,/home/*/.config/autostart

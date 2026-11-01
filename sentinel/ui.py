@@ -224,6 +224,15 @@ def build_action(body: dict) -> list[str]:
             raise ValueError("horas entre 1 y 720")
         motivo = re.sub(r"[^\w .,:()/-]", "", str(body.get("motivo", "bloqueo manual")))[:80] or "bloqueo manual"
         return ["bans", "ban", ip, "--horas", str(horas), "--motivo", motivo]
+    if name == "fw_estado":
+        return ["firewall", "estado", "--guardar"]
+    if name == "fw_aplicar":
+        return ["firewall", "aplicar"] + (["--endurecer"] if body.get("endurecer") is True else [])
+    if name == "fw_config":
+        clave, valor = str(body.get("clave", "")), str(body.get("valor", ""))
+        if clave not in ("allow_tcp", "allow_udp", "keep_ssh", "backend") or not re.fullmatch(r"[\w,. -]{0,80}", valor):
+            raise ValueError("ajuste inválido")
+        return ["firewall", "config", clave, valor]
     if name == "baseline_accept":
         paths = body.get("paths") or []
         if not isinstance(paths, list) or len(paths) > 50 or not all(isinstance(p, str) and p.startswith("/") and re.fullmatch(r"[\w./@+=:,~-]+", p) for p in paths):
@@ -331,6 +340,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             hours = max(1, min(720, int((q.get("hours") or ["24"])[0] or 24)))
             sev = (q.get("min") or ["info"])[0]
             return self._json(d.events(hours, sev if sev in core.SEV else "info", (q.get("q") or [""])[0][:100], max(1, min(500, int((q.get("limit") or ["200"])[0] or 200)))))
+        if u.path == "/api/firewall":
+            return self._json(core.read_json(os.path.join(core.state_dir(), "firewall.json"), {}) or {"ok": False})
         if u.path == "/api/audit":
             return self._json(d.audit())
         if u.path == "/api/attackers":

@@ -12,6 +12,18 @@
 
 > Reemplaza a «Sentinel-JSR» (v1, scripts de shell). Se instala solo, con sus dependencias, en Ubuntu/Debian, Fedora/RHEL, Arch y openSUSE.
 
+## Firewall (módulo aparte)
+
+Sentinel detecta y avisa; el **módulo Firewall** decide qué puertos quedan abiertos. Se configura en `[firewall]` de `sentinel.conf` (o en el panel, grupo «Firewall») y funciona con **ufw** o **iptables**:
+
+```bash
+sentinel firewall plan                      # muestra qué se cerraría y qué se abriría (no cambia nada)
+sudo sentinel firewall aplicar              # lo aplica, guardando antes una copia de las reglas
+sudo sentinel firewall config allow_tcp 80,443,8443
+```
+
+Por defecto solo quedan abiertos el **80 y el 443**, más el puerto de SSH si este equipo sirve SSH. Las conexiones ssh que haces *desde* este equipo hacia otros servidores (despliegues) no se ven afectadas, y no se aplica nada si el tráfico saliente está bloqueado.
+
 ## Qué detecta
 
 | Detector | Qué hace | Gravedad típica |
