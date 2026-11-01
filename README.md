@@ -12,6 +12,18 @@
 
 > Reemplaza a «Sentinel-JSR» (v1, scripts de shell). Se instala solo, con sus dependencias, en Ubuntu/Debian, Fedora/RHEL, Arch y openSUSE.
 
+## Firewall (módulo aparte)
+
+Sentinel detecta y avisa; el **módulo Firewall** decide qué puertos quedan abiertos. Se configura en `[firewall]` de `sentinel.conf` (o en el panel, grupo «Firewall») y funciona con **ufw** o **iptables**:
+
+```bash
+sentinel firewall plan                      # muestra qué se cerraría y qué se abriría (no cambia nada)
+sudo sentinel firewall aplicar              # lo aplica, guardando antes una copia de las reglas
+sudo sentinel firewall config allow_tcp 80,443,8443
+```
+
+Por defecto solo quedan abiertos el **80 y el 443**, más el puerto de SSH si este equipo sirve SSH. Las conexiones ssh que haces *desde* este equipo hacia otros servidores (despliegues) no se ven afectadas, y no se aplica nada si el tráfico saliente está bloqueado.
+
 ## Qué detecta
 
 | Detector | Qué hace | Gravedad típica |
@@ -26,7 +38,7 @@
 **Respuesta.** Los atacantes se bloquean de forma **temporal** (24 h) con CrowdSec o ufw; nunca la red local, Tailscale ni la lista blanca. A diferencia de la v1, **no detiene procesos ni modifica tus archivos**.
 **Avisos.** Registro JSONL privado, journal, notificación de escritorio, **ventana emergente de alerta** y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
 
-**Ventanas de alerta.** Desde la gravedad alta (`popup_min`, configurable) salta una ventana en tu pantalla con el detalle y el botón **Abrir panel**; las críticas no se cierran solas, las demás a los 2 minutos. Máximo 3 por minuto para no inundarte. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
+**Avisos de alerta.** Los avisos salen como notificación en la esquina de tu pantalla y se cierran solos a los pocos segundos (`notify_seconds`, 8 por defecto; las graves 15), así no molestan. Quedan en el historial de notificaciones de tu escritorio. Si prefieres una ventana grande con el botón **Abrir panel**, actívala con `popup_min = high`. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
 
 ## Expedientes de atacantes y paquetes
 
@@ -102,7 +114,7 @@ Después de instalar: `sentinel status`, `sentinel test` (debería salir una not
 
 Motor de bloqueo (`[ban] backend = auto`): CrowdSec → firewalld → ufw (activo) → iptables. Todos con caducidad (24 h).
 
-Opciones del instalador: `--sin-dependencias`, `--sin-limpiar` (no toca la v1), `--exponer-senuelos` (activa los señuelos y abre sus puertos; por defecto **no se abre ningún puerto**, y el escaneo externo se detecta igual con el cortafuegos).
+Opciones del instalador: `--sin-dependencias`, `--sin-limpiar` (no toca la v1).
 Desinstalar: `sudo apt purge sentinel` o `sudo ./uninstall.sh` (`--todo` borra también registros y referencias).
 Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` → `dist/`.
 

@@ -18,7 +18,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.1.1"
+VERSION = "2.2.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -26,8 +26,11 @@ DEFAULTS = """
 [general]
 desktop_user =
 notify_min = medium
-; ventana emergente (con botón «Abrir panel») desde esta gravedad; ventanas máximas por minuto; segundos que dura abierta (0 = hasta cerrarla; las críticas nunca se cierran solas)
-popup_min = high
+; aviso en la esquina de la pantalla (se cierra solo): segundos visible; las críticas un poco más
+notify_seconds = 8
+notify_seconds_critical = 15
+; ventana emergente grande (con botón «Abrir panel») desde esta gravedad (never = nunca, solo avisos de esquina); máximo por minuto; segundos abierta
+popup_min = never
 popup_max_per_min = 3
 popup_seconds = 120
 journal_min = low
@@ -53,6 +56,13 @@ paths =
 backend = auto
 ttl_seconds = 86400
 protect_private = yes
+
+[firewall]
+backend = auto
+allow_tcp = 80,443
+allow_udp =
+keep_ssh = yes
+refresh_seconds = 60
 
 [fim]
 ; rutas críticas (archivos o carpetas; admite comodines)
@@ -258,7 +268,8 @@ class Alerter:
         self.dedupe = read_json(self._dedupe_path, {}) or {}
 
     def _min(self, name: str) -> int:
-        return SEV.get(self.cfg.get("general", name, fallback="high"), 3)
+        v = self.cfg.get("general", name, fallback="high")
+        return 99 if v in ("never", "nunca", "off", "no") else SEV.get(v, 3)
 
     def emit(self, sev: str, source: str, kind: str, msg: str, key: str | None = None, **data) -> Event | None:
         with self.lock:
@@ -414,7 +425,10 @@ class Alerter:
         if not tgt:
             return
         user, uid = tgt
-        base = ["notify-send", "-a", "Sentinel", "-u", "critical" if ev.sev in ("high", "critical") else "normal", f"Sentinel · {SEV_ES[ev.sev]}", ev.msg[:300]]
+        secs = self.cfg.getint("general", "notify_seconds_critical" if ev.sev in ("high", "critical") else "notify_seconds", fallback=8)
+        # -t: milisegundos visible (el aviso se cierra solo); queda en el historial de notificaciones del escritorio
+        base = ["notify-send", "-a", "Sentinel", "-t", str(max(2, secs) * 1000), "-i", "dialog-warning" if ev.sev in ("high", "critical") else "security-medium",
+                "-u", "normal", f"Sentinel · {SEV_ES[ev.sev]}", ev.msg[:300]]
         env = f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus"
         if is_root():
             run(["runuser", "-u", user, "--", "env", env, *base], 6)

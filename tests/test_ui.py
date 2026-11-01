@@ -94,6 +94,22 @@ class UiTests(unittest.TestCase):
         self.assertEqual(ui.build_action({"name": "allow", "tipo": "ip", "valor": "203.0.113.0/24"}), ["allow", "ip", "203.0.113.0/24"])
         self.assertEqual(ui.build_action({"name": "scan_deep"}), ["scan", "--deep", "--quiet"])
 
+    def test_acciones_del_firewall(self):
+        self.assertEqual(ui.build_action({"name": "fw_estado"}), ["firewall", "estado", "--guardar"])
+        self.assertEqual(ui.build_action({"name": "fw_aplicar"}), ["firewall", "aplicar"])
+        self.assertEqual(ui.build_action({"name": "fw_aplicar", "endurecer": True}), ["firewall", "aplicar", "--endurecer"])
+        self.assertEqual(ui.build_action({"name": "fw_aplicar", "endurecer": "--rm"}), ["firewall", "aplicar"])
+        self.assertEqual(ui.build_action({"name": "fw_config", "clave": "allow_tcp", "valor": "80,443"}), ["firewall", "config", "allow_tcp", "80,443"])
+        for b in ({"name": "fw_config", "clave": "x", "valor": "1"}, {"name": "fw_config", "clave": "allow_tcp", "valor": "80;reboot"}, {"name": "fw_config", "clave": "backend", "valor": "$(id)"}):
+            self.assertFalse(self.req("POST", "/api/action", {"Content-Type": "application/json"}, json.dumps(b))[0] == 200 and json.loads(self.req("POST", "/api/action", {"Content-Type": "application/json"}, json.dumps(b))[2])["ok"], b)
+
+    def test_api_firewall_lee_la_foto(self):
+        code, _, data = self.req("GET", "/api/firewall")
+        self.assertEqual(code, 200); self.assertFalse(json.loads(data)["ok"])          # sin foto todavía
+        core.atomic_write_json(os.path.join(core.state_dir(), "firewall.json"), {"ok": True, "backend": "ufw", "plan": {}}, 0o640)
+        self.assertEqual(json.loads(self.req("GET", "/api/firewall")[2])["backend"], "ufw")
+        self.assertEqual(self.req("GET", "/api/firewall", cookie=False)[0], 403)
+
     def test_la_llave_es_privada(self):
         import stat
         self.assertEqual(stat.S_IMODE(os.stat(ui.token_path()).st_mode), 0o600); self.assertGreaterEqual(len(self.token), 40)

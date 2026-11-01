@@ -44,12 +44,12 @@ echo "== 1/8 Dependencias"; echo "== 8/8 Cortafuegos"; exit "${PKEXEC_RC:-0}"'''
         self.assertIn("zenity --list", calls); self.assertIn("pkexec", calls)   # opciones y autorización del sistema
         self.assertIn(os.path.join(ROOT, "install.sh"), calls)
         self.assertIn("zenity --progress", calls); self.assertIn("sentinel test", calls)   # avance y alerta de prueba
-        self.assertNotIn("--exponer-senuelos", calls); self.assertNotIn("--sin-dependencias", calls)
+        self.assertNotIn("--sin-dependencias", calls)
 
     def test_opciones_elegidas_se_traducen_a_banderas(self):
-        rc, calls = self.run_gui(ZENITY_LIST="Abrir los puertos señuelo hacia Internet (avanzado)")
+        rc, calls = self.run_gui(ZENITY_LIST="Retirar la versión 1 de Sentinel (con copia de respaldo)")
         line = [l for l in calls.splitlines() if l.startswith("pkexec")][0]
-        self.assertIn("--sin-dependencias", line); self.assertIn("--sin-limpiar", line); self.assertIn("--exponer-senuelos", line)
+        self.assertIn("--sin-dependencias", line); self.assertNotIn("--sin-limpiar", line)
 
     def test_cancelar_en_la_bienvenida_no_pide_nada(self):
         rc, calls = self.run_gui(ZENITY_QUESTION_RC="1")

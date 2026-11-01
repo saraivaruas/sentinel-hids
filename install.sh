@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Instala Sentinel v2 y las dependencias que falten (Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE).
-# Uso: sudo ./install.sh [--dry-run] [--sin-dependencias] [--sin-limpiar] [--exponer-senuelos]
+# Uso: sudo ./install.sh [--dry-run] [--sin-dependencias] [--sin-limpiar]
 #   --dry-run            muestra lo que haría sin cambiar nada
 #   --sin-dependencias   no instala paquetes (solo copia Sentinel)
 #   --sin-limpiar        no retira los restos de la versión 1 (scripts antiguos y la línea de rc.local)
-#   --exponer-senuelos   abre en el cortafuegos los puertos señuelo para que los vea Internet (por defecto quedan cerrados)
 set -euo pipefail
 
-DRY=0; LIMPIAR=1; EXPONER=0; DEPS=1
-for a in "$@"; do case "$a" in --dry-run) DRY=1;; --sin-dependencias) DEPS=0;; --sin-limpiar) LIMPIAR=0;; --exponer-senuelos) EXPONER=1;; -h|--help) sed -n 2,8p "$0"; exit 0;; *) echo "Opción desconocida: $a"; exit 1;; esac; done
+DRY=0; LIMPIAR=1; DEPS=1
+for a in "$@"; do case "$a" in --dry-run) DRY=1;; --sin-dependencias) DEPS=0;; --sin-limpiar) LIMPIAR=0;; -h|--help) sed -n 2,8p "$0"; exit 0;; *) echo "Opción desconocida: $a"; exit 1;; esac; done
 
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 DEST=/opt/sentinel
@@ -131,13 +130,13 @@ paso "6/8 Referencia inicial de integridad y del equipo"
 do_ /usr/local/bin/sentinel baseline init
 
 paso "7/8 Arrancar"
-[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer && { [ "$EXPONER" = 1 ] && do_ systemctl enable --now sentinel-honeypot.service || true; } || echo "  (sin systemd: inicia a mano con «sentinel monitor»)"
+[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || echo "  (sin systemd: inicia a mano con «sentinel monitor»)"
 
-paso "8/8 Cortafuegos de los señuelos"
-if [ "$EXPONER" = 1 ]; then
-  for p in $(python3 -c "import sys;sys.path.insert(0,'$AQUI');from sentinel import core;print(' '.join(core.csv(core.load_config().get('honeypot','ports'))))"); do
-    do_ ufw allow "$p/tcp" comment sentinel-senuelo; done
-else echo "  Los señuelos NO se activan (no se abre ningún puerto nuevo). El escaneo de puertos se detecta igual con los registros del cortafuegos."; echo "  Para activarlos: sudo ./install.sh --exponer-senuelos"; fi
+paso "8/8 Cerrar puertos de señuelos antiguos"
+# Sentinel NUNCA abre puertos: retira las reglas de señuelos que dejaron versiones anteriores y apaga los señuelos
+[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl disable --now sentinel-honeypot.service 2>/dev/null || true
+[ "$DRY" = 0 ] && ufw status numbered 2>/dev/null | grep -q sentinel-senuelo && for p in $(ufw status numbered | grep sentinel-senuelo | awk -F'[][]' '{print $2}' | sort -rn); do yes | ufw delete "$p" >/dev/null; done || true
+echo "  Sentinel no abre ningún puerto: los señuelos quedan apagados y se retiraron sus reglas del cortafuegos."
 
 [ "$DRY" = 0 ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || true
 echo; echo "Listo. Comprueba con:  sentinel status   y   sentinel test"
