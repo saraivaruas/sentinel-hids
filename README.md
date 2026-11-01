@@ -26,6 +26,37 @@ El panel muestra la **exposición real** (incluidos los puertos de Docker, que s
 
 Por defecto solo quedan abiertos el **80 y el 443**, más el puerto de SSH si este equipo sirve SSH. Las conexiones ssh que haces *desde* este equipo hacia otros servidores (despliegues) no se ven afectadas, y no se aplica nada si el tráfico saliente está bloqueado.
 
+## Qué bloquea y qué solo avisa
+
+Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te avisa, pero **no toca tus archivos ni detiene procesos**.
+
+**Bloquea una IP por 24 horas** (con CrowdSec, firewalld, ufw o iptables) cuando:
+
+| Qué hace la IP | Umbral por defecto (configurable) |
+|---|---|
+| Adivina contraseñas (SSH, sudo, su) | 5 intentos fallidos en 10 minutos (`[auth] fail_threshold`) |
+| Escanea puertos | 12 puertos distintos en 60 segundos, visto en el registro del cortafuegos (`[auth] scan_ports`) |
+| Escaneo con paquetes (SYN, UDP, sigiloso NULL/FIN/XMAS) | según `[packets]`; necesita la captura de paquetes (root) |
+| Inundación de conexiones (SYN flood) o ping masivo | más de 300 intentos o 100 pings en 10 segundos |
+| Toca un señuelo | cualquier conexión (solo si activaste los señuelos) |
+
+**Nunca bloquea** tu red local, el equipo mismo (loopback), Tailscale ni lo que pongas en la lista blanca (`[allow] ips`). También puedes bloquear o liberar una IP a mano.
+
+**Solo avisa** (sin bloquear nada):
+
+| Qué detecta | Gravedad típica |
+|---|---|
+| Archivos del sistema cambiados, nuevos o borrados (`/etc/passwd`, `sudoers`, SSH, cron, servicios, llaves…), permisos abiertos y SUID nuevos | alta / crítica |
+| Puertas traseras web (webshells) en `/var/www/html` | crítica |
+| Ingreso exitoso después de muchos intentos fallidos, o ingreso remoto como root | crítica / alta |
+| Procesos desde `/tmp`, con el ejecutable borrado, mineros de criptomonedas, conexiones a puertos de troyanos | media / crítica |
+| Puertos nuevos en escucha, lectores de teclado no esperados, USB nuevos, módulos del kernel, cuentas nuevas o sin contraseña, procesos ocultos | media / crítica |
+| Cambios en el firewall hechos por fuera de Sentinel, y puertos que Docker publica saltándose el firewall | media / alta |
+
+**Qué cierra puertos.** Eso no lo hace el detector sino el **módulo Firewall** (ver arriba): deja abiertos solo lo que configures y cierra el resto.
+
+**Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Un atacante que ya es root puede apagar Sentinel (te avisa si deja de latir).
+
 ## Qué detecta
 
 | Detector | Qué hace | Gravedad típica |
@@ -33,12 +64,12 @@ Por defecto solo quedan abiertos el **80 y el 443**, más el puerto de SSH si es
 | **Integridad de archivos** | Referencia SHA-256 + permisos + dueño de `/etc/passwd`, `shadow`, `sudoers`, SSH, PAM, cron, servicios, `/usr/local/bin`, llaves `authorized_keys`, etc. Detecta archivos nuevos, modificados, eliminados, enlaces redirigidos, permisos abiertos y **SUID/SGID nuevos**. Vigila en vivo (inotify) carpetas completas, así que detecta el reemplazo de archivos que hacen `useradd` o `vipw`. | alta / crítica |
 | **Puertas traseras web** | En carpetas web (`/var/www/html`) revisa los archivos nuevos o modificados contra firmas de webshells y shells inversas (`eval(base64_decode(...))`, `system($_POST...)`, `/dev/tcp/...`, `curl \| sh`). | crítica |
 | **Ataques en vivo** | Lee el journal: fuerza bruta SSH/sudo/su, acceso exitoso tras intentos fallidos, root remoto y **escaneo de puertos** (bloqueos del cortafuegos). | alta / crítica |
-| **Señuelos** | Puertos falsos (2222, 2323, 3390, 5900, 60009) sin servicio real, en un proceso sin privilegios y aislado. Quien se conecta queda registrado y bloqueado. | alta |
+| **Señuelos** (opcionales) | Puertos falsos (2222, 2323, 3390, 5900, 60009) sin servicio real, en un proceso sin privilegios y aislado. **Vienen apagados** porque abren puertos; se activan desde *Ajustes* o con `sudo sentinel senuelos activar`. Quien se conecta queda registrado y bloqueado. | alta |
 | **Equipo** | Puertos nuevos en escucha o que pasan de local a públicos, procesos que corren desde `/tmp`, con el ejecutable borrado o con nombre de minero, conexiones a puertos de troyanos, lectores de teclado no esperados, USB, módulos del kernel, cuentas nuevas, UID 0 duplicado, cuentas sin contraseña, procesos ocultos y SUID nuevos. | media / crítica |
 | **Postura** | `sentinel audit`: 16 revisiones de configuración con su arreglo (cortafuegos, SSH, permisos web, parámetros del kernel, actualizaciones, credenciales con permisos abiertos…). | — |
 
 **Respuesta.** Los atacantes se bloquean de forma **temporal** (24 h) con CrowdSec o ufw; nunca la red local, Tailscale ni la lista blanca. A diferencia de la v1, **no detiene procesos ni modifica tus archivos**.
-**Avisos.** Registro JSONL privado, journal, notificación de escritorio, **ventana emergente de alerta** y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
+**Avisos.** Registro JSONL privado, journal, aviso en la esquina de la pantalla (y, si lo activas, una ventana grande de alerta) y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
 
 **Avisos de alerta.** Los avisos salen en la **esquina inferior derecha** de tu pantalla y se cierran solos a los pocos segundos (`notify_seconds`, 8 por defecto; las graves 15), así no molestan. Quedan en el historial de notificaciones de tu escritorio. Si prefieres una ventana grande con el botón **Abrir panel**, actívala con `popup_min = high`. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
 
@@ -69,9 +100,11 @@ La captura de paquetes se verificó con tráfico real en un contenedor (`tools/p
 Se abre desde el menú de aplicaciones («Sentinel») o con `sentinel ui`, como una ventana de aplicación. Funciona sin internet: es una página local que solo escucha en `127.0.0.1` y exige una llave que se guarda en `~/.config/sentinel/ui_token`.
 
 - **Resumen:** estado de la protección (Protegido, Para revisar, Requiere atención, Posible intrusión), eventos por gravedad, actividad de 24 horas, servicios, IPs más activas y eventos recientes en vivo.
-- **Eventos:** historial con filtros por gravedad, período y búsqueda; cada fila se abre para ver sus datos.
+- **Eventos:** historial con filtros por gravedad (con conteo), módulo, período y búsqueda; cada fila se abre para ver sus datos.
 - **Bloqueos:** IPs bloqueadas con su tiempo restante y botón para desbloquear; lista blanca.
 - **Postura:** puntaje de seguridad del equipo y cada hallazgo con su comando de arreglo (con botón «Copiar»).
+- **Ajustes:** activar o apagar los señuelos y configurar los avisos (gravedad mínima, esquina o notificación del sistema, segundos visibles).
+- **Firewall (grupo aparte en el menú):** *Puertos* (exposición real, plan, aplicar a prueba con confirmación) y *Reglas y ajustes* (reglas actuales, puertos abiertos, perfiles, orígenes permitidos).
 - **Acciones:** escanear ahora, revisión profunda, desbloquear y lista blanca. Las que necesitan administrador piden tu clave con la ventana normal del sistema (`pkexec`); el panel nunca corre como root.
 - Tema oscuro y claro, y adaptado a celular/ventanas angostas.
 
@@ -86,7 +119,7 @@ Sentinel no usa librerías de Python externas. Lo que sí necesita del sistema (
 **1. Paquete .deb (Ubuntu, Debian, Mint…) — la más simple.** `apt` resuelve y baja las dependencias:
 
 ```bash
-sudo apt install ./sentinel_2.0.0_all.deb
+sudo apt install ./sentinel_2.4.0_all.deb
 ```
 
 **2. Instalador (Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE).** Detecta la distribución, calcula qué falta, lo instala con `apt`, `dnf`, `pacman` o `zypper`, y después instala Sentinel:
