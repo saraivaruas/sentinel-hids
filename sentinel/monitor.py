@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, weblogs, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, update
+from . import authwatch, core, heartbeat, weblogs, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, update
 
 
 class Monitor:
@@ -148,6 +148,10 @@ class Monitor:
                     self.intel.store.prune(self.cfg.getint("intel", "retention_days", fallback=90))
                 except Exception:
                     pass
+            hb = self.cfg.get("alerts", "heartbeat_url", fallback="")
+            if hb and t - getattr(self, "_hb", 0) >= self.cfg.getint("alerts", "heartbeat_seconds", fallback=300):
+                self._hb = t
+                threading.Thread(target=heartbeat.ping, args=(hb,), daemon=True).start()      # no frena el monitor si el servicio tarda
             if t - last_fw >= self.cfg.getint("firewall", "refresh_seconds", fallback=60):
                 last_fw = t
                 try:

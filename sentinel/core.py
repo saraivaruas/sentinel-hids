@@ -60,6 +60,11 @@ backend = auto
 ttl_seconds = 86400
 protect_private = yes
 
+[alerts]
+; Dirección https del latido externo (por ejemplo la de healthchecks.io): si Sentinel deja de avisar, ese servicio te avisa a ti
+heartbeat_url =
+heartbeat_seconds = 300
+
 [weblog]
 ; Registros de acceso de tus sitios web (admite comodines). Si no existen, no se vigila nada.
 paths = /var/log/nginx/*access*.log,/var/log/apache2/*access*.log,/var/log/httpd/*access_log
@@ -175,6 +180,9 @@ EDITABLE = {
     ("general", "notify_seconds"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
     ("general", "notify_seconds_critical"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
     ("general", "notify_style"): lambda v: v in ("corner", "system"),
+    ("general", "email_to"): lambda v: v == "" or bool(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", v)),
+    ("general", "ntfy_url"): lambda v: v == "" or bool(re.fullmatch(r"https://[\w.-]{1,120}(?::\d{2,5})?/[\w.~%/-]{1,120}", v)),
+    ("alerts", "heartbeat_url"): lambda v: v == "" or __import__("sentinel.heartbeat", fromlist=["valid"]).valid(v),
 }
 
 
