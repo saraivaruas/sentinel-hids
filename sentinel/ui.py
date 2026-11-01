@@ -77,7 +77,8 @@ class Data:
         from . import toast
         on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 4)[1].strip().split("\n")[-1] == "active"
         st = core.read_json(os.path.join(core.state_dir(), "pin_state.json"), {}) or {}
-        return {"values": vals, "pin": {"enabled": bool(st.get("enabled")), "locked": pin.locked_for()}, "honeypot": {"active": on, "ports": core.csv(cfg.get("honeypot", "ports", fallback=""))}, "toast_available": toast.available()}
+        from . import hostcheck
+        return {"learning": int(hostcheck.learning_until()), "values": vals, "pin": {"enabled": bool(st.get("enabled")), "locked": pin.locked_for()}, "honeypot": {"active": on, "ports": core.csv(cfg.get("honeypot", "ports", fallback=""))}, "toast_available": toast.available()}
 
     def audit(self, force: bool = False) -> dict:
         with self.lock:
@@ -207,7 +208,9 @@ class Data:
         if q:
             ql = q.lower()
             ev = [e for e in ev if ql in (e["msg"] + e["kind"] + e["source"] + json.dumps(e.get("data") or {}, ensure_ascii=False)).lower()]
-        return ev[-limit:][::-1]
+        from . import normal
+        out = ev[-limit:][::-1]
+        return [dict(e, normal=normal.args_for(e) is not None) for e in out]
 
 
 def sentinel_bin() -> str | None:
@@ -253,6 +256,18 @@ def build_action(body: dict) -> list[str]:
         return out
     if name == "senuelos":
         return ["senuelos", "activar" if body.get("on") is True else "desactivar"]
+    if name == "normal":
+        from . import normal
+        e = normal.find_event(float(body.get("epoch", 0)), str(body.get("key", "")))
+        args = normal.args_for(e) if e else None
+        if not args:
+            raise ValueError("este evento no se puede marcar como normal")
+        return args
+    if name == "aprender":
+        dias = int(body.get("dias", 3))
+        if not 0 <= dias <= 30:
+            raise ValueError("días entre 0 y 30")
+        return ["aprender", str(dias)]
     if name == "pin_establecer":
         if len(str(body.get("nuevo", ""))) < 6 or "\n" in str(body.get("nuevo", "")) or "\n" in str(body.get("pin", "")):
             raise ValueError("el PIN nuevo debe tener al menos 6 caracteres y una sola línea")

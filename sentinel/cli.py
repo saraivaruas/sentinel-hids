@@ -77,6 +77,10 @@ def cmd_scan(a) -> int:
 def cmd_baseline(a) -> int:
     cfg, al, allow, _ = build()
     f = fim.Fim(cfg, al, allow)
+    if a.action == "host":
+        hostcheck.HostCheck(cfg, al, allow).init()
+        print("Referencia del equipo actualizada (puertos, USB y módulos actuales aceptados como normales)")
+        return 0
     if a.action == "init":
         n = f.init()
         hostcheck.HostCheck(cfg, al, allow).init()
@@ -337,7 +341,7 @@ def cmd_senuelos(a) -> int:
 def _protected(a) -> bool:
     """¿Este comando debilita o cambia la protección? Entonces exige el PIN (si hay uno)."""
     n = a.fn.__name__
-    if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener"):
+    if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender"):
         return True
     return ((n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
@@ -422,6 +426,21 @@ def cmd_iniciar(a) -> int:
     print("Sentinel iniciado." if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 
 
+def cmd_aprender(a) -> int:
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel aprender", file=sys.stderr); return 1
+    p = hostcheck.learn_path()
+    if a.dias == 0:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+        print("Modo aprendizaje terminado: desde ahora lo nuevo vuelve a avisar."); return 0
+    core.atomic_write_json(p, {"until": core.now() + a.dias * 86400, "since": core.iso()}, 0o640, share=True)
+    print(f"Modo aprendizaje por {a.dias} día(s): los puertos, USB y módulos nuevos se aceptan como normales sin avisar. Los ataques, los archivos y las cuentas siguen avisando igual.")
+    return 0
+
+
 def cmd_toast(a) -> int:
     from . import toast
     return toast.show(a.titulo[:120], a.mensaje[:400], a.sev, a.seg)
@@ -463,7 +482,7 @@ def main(argv=None) -> int:
     sub.add_parser("status", help="estado de los servicios y últimos eventos").set_defaults(fn=cmd_status)
     s = sub.add_parser("scan", help="revisa ahora integridad y estado del equipo"); s.add_argument("--deep", action="store_true", help="revisión profunda (recalcula todas las huellas, SUID, procesos ocultos)")
     s.add_argument("--json", action="store_true"); s.add_argument("--quiet", action="store_true", help="sin notificaciones"); s.add_argument("--watchdog", action="store_true", help="avisa si el monitor dejó de latir"); s.set_defaults(fn=cmd_scan)
-    s = sub.add_parser("baseline", help="crea o actualiza la referencia de integridad"); s.add_argument("action", choices=["init", "accept"]); s.add_argument("paths", nargs="*"); s.set_defaults(fn=cmd_baseline)
+    s = sub.add_parser("baseline", help="crea o actualiza la referencia de integridad"); s.add_argument("action", choices=["init", "accept", "host"]); s.add_argument("paths", nargs="*"); s.set_defaults(fn=cmd_baseline)
     s = sub.add_parser("events", help="muestra eventos"); s.add_argument("-n", type=int, default=30); s.add_argument("--horas", type=int, default=24); s.add_argument("--min", default="info", choices=list(core.SEV)); s.set_defaults(fn=cmd_events)
     s = sub.add_parser("bans", help="lista, agrega o quita bloqueos"); s.add_argument("action", nargs="?", default="list", choices=["list", "ban", "unban"]); s.add_argument("ip", nargs="?"); s.add_argument("--horas", type=int, default=24); s.add_argument("--motivo", default=""); s.set_defaults(fn=cmd_bans)
     s = sub.add_parser("attackers", help="lista los atacantes registrados con su riesgo"); s.add_argument("--q", default=""); s.add_argument("-n", type=int, default=30); s.set_defaults(fn=cmd_attackers)
@@ -482,6 +501,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("pin", help="PIN de protección: estado, establecer, quitar, verificar"); s.add_argument("accion", choices=["estado", "establecer", "quitar", "verificar", "autorizar"]); s.set_defaults(fn=cmd_pin)
     sub.add_parser("detener", help="detiene Sentinel (pide el PIN si hay uno)").set_defaults(fn=cmd_detener)
     sub.add_parser("iniciar", help="vuelve a encender Sentinel").set_defaults(fn=cmd_iniciar)
+    s = sub.add_parser("aprender", help="modo aprendizaje: acepta como normales los puertos, USB y módulos nuevos durante N días (0 = terminar)"); s.add_argument("dias", type=int, nargs="?", default=3); s.set_defaults(fn=cmd_aprender)
     s = sub.add_parser("toast", help="muestra un aviso en la esquina de la pantalla (lo usa Sentinel)"); s.add_argument("mensaje"); s.add_argument("--sev", default="medium", choices=list(core.SEV)); s.add_argument("--seg", type=int, default=8); s.add_argument("--titulo", default="Sentinel"); s.set_defaults(fn=cmd_toast)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)

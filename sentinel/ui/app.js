@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar"]);
+  const NEEDS_PIN = new Set(["normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -327,7 +327,19 @@
       tr.appendChild(el("td", null, e.source + "/" + e.kind));
       const d = el("td", "msg"); d.appendChild(el("div", null, e.msg)); tr.appendChild(d);
       let pre = null;
-      tr.addEventListener("click", () => { if (pre) { pre.remove(); pre = null; } else { pre = el("pre", null, JSON.stringify(e.data || {}, null, 2) + "\nclave: " + e.key); d.appendChild(pre); } });
+      let box = null;
+      tr.addEventListener("click", (ev) => {
+        if (ev.target.closest("button")) return;
+        if (box) { box.remove(); box = null; return; }
+        box = el("div", "ev-more"); box.appendChild(el("pre", null, JSON.stringify(e.data || {}, null, 2) + "\nclave: " + e.key));
+        if (e.normal) {
+          const b = el("button", "btn sm", "Esto es normal");
+          b.title = "Lo acepta como normal para que no vuelva a avisar (pide tu PIN y tu clave)";
+          b.addEventListener("click", async () => { const r = await runAction("normal", { epoch: e.epoch, key: e.key }, b); if (r && r.ok) loadEvents(); });
+          box.appendChild(b);
+        }
+        d.appendChild(box);
+      });
       body.appendChild(tr);
     });
   }
@@ -339,6 +351,7 @@
     $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"];
     st.pinSet = !!s.pin.enabled; $("#pin-st").textContent = st.pinSet ? "activo" : "sin PIN"; $("#pin-st").className = "badge sev-" + (st.pinSet ? "low" : "medium");
     $("#pin-old-l").hidden = !st.pinSet; $("#pin-clear").hidden = !st.pinSet; $("#pin-save").textContent = st.pinSet ? "Cambiar PIN" : "Activar PIN";
+    const lr = $("#st-learn"); if (lr) { lr.textContent = s.learning ? "activo hasta " + new Date(s.learning * 1000).toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "apagado"; lr.className = "badge sev-" + (s.learning ? "medium" : "info"); $("#st-learn-btn").textContent = s.learning ? "Terminar aprendizaje" : "Aprender por 3 días"; $("#st-learn-btn").dataset.on = s.learning ? "1" : ""; }
     const on = s.honeypot.active;
     $("#st-hp").textContent = on ? "activos" : "apagados"; $("#st-hp").className = "badge sev-" + (on ? "high" : "low");
     $("#st-hp-ports").textContent = s.honeypot.ports.join(", "); $("#st-hp-btn").textContent = on ? "Apagar señuelos" : "Activar señuelos"; $("#st-hp-btn").dataset.on = on ? "1" : "";
@@ -567,6 +580,7 @@
     if (on && !(await confirmDlg("Activar los señuelos", "Se abrirán puertos falsos en este equipo (el firewall los mantiene cerrados hacia afuera). ¿Seguro?", "Activar"))) return;
     await runAction("senuelos", { on }, e.currentTarget); loadSettings();
   });
+  $("#st-learn-btn").addEventListener("click", async (e) => { const r = await runAction("aprender", { dias: e.currentTarget.dataset.on ? 0 : 3 }, e.currentTarget); if (r && r.ok) loadSettings(); });
   $("#pin-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if ($("#pin-new").value !== $("#pin-new2").value) { toast("Los PIN nuevos no coinciden", true); return; }

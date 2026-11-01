@@ -191,6 +191,16 @@ def norm_listener(k: str, v: dict) -> tuple:
     return (k, v.get("proc", ""), v.get("scope", ""))
 
 
+def learn_path() -> str:
+    return os.path.join(core.state_dir(), "learn.json")
+
+
+def learning_until() -> float:
+    """Hasta cuándo (epoch) el equipo está en modo aprendizaje; 0 si no lo está."""
+    t = (core.read_json(learn_path(), {}) or {}).get("until", 0)
+    return t if t > core.now() else 0
+
+
 class HostCheck:
     def __init__(self, cfg, alerter: core.Alerter, allow: core.Allow):
         self.cfg, self.alerter, self.allow = cfg, alerter, allow
@@ -217,6 +227,15 @@ class HostCheck:
             core.atomic_write_json(self.path, {"created": core.iso(), **self.snapshot(deep=True)})
             emit("info", "host", "referencia", "Referencia del equipo creada (puertos, USB, módulos, cuentas, SUID)", key="host:ref")
             base = core.read_json(self.path)
+        if learning_until():
+            # Modo aprendizaje: lo nuevo (puertos, USB, módulos) se acepta como normal en lugar de avisar, para equipos recién instalados o con programas nuevos.
+            nuevos = {k: v for k, v in cur["listeners"].items() if k not in base["listeners"]}
+            usb_n = sorted(set(cur["usb"]) - set(base.get("usb", [])))
+            mod_n = sorted(set(cur["modules"]) - set(base.get("modules", [])))
+            if nuevos or usb_n or mod_n:
+                base["listeners"].update(nuevos); base["usb"] = sorted(set(base.get("usb", [])) | set(cur["usb"])); base["modules"] = sorted(set(base.get("modules", [])) | set(cur["modules"]))
+                core.atomic_write_json(self.path, base)
+                emit("info", "host", "aprendido", f"Modo aprendizaje: se aceptaron {len(nuevos)} puerto(s), {len(usb_n)} USB y {len(mod_n)} módulo(s) como normales", key=f"host:learn:{int(core.now() // 600)}")
         # puertos
         known = {norm_listener(k, v) for k, v in base["listeners"].items()}
         for k, v in cur["listeners"].items():
@@ -228,9 +247,9 @@ class HostCheck:
             if b is None:
                 local = v["scope"] == "solo local"
                 sev = "low" if local else "high" if v["scope"] == "todas las interfaces" else "medium"     # solo local = nadie de afuera lo alcanza
-                emit(sev, "host", "puerto_nuevo", f"Nuevo puerto en escucha {k} ({v['proc']}, {v['scope']})", key=f"host:port:{k}:{v['proc']}")
+                emit(sev, "host", "puerto_nuevo", f"Nuevo puerto en escucha {k} ({v['proc']}, {v['scope']})", key=f"host:port:{k}:{v['proc']}", port=v["port"], proto=k.split("/")[0], proc=v["proc"])
             elif b["scope"] != "todas las interfaces" and v["scope"] == "todas las interfaces":
-                emit("high", "host", "puerto_expuesto", f"El puerto {k} ({v['proc']}) pasó de local a todas las interfaces", key=f"host:expo:{k}")
+                emit("high", "host", "puerto_expuesto", f"El puerto {k} ({v['proc']}) pasó de local a todas las interfaces", key=f"host:expo:{k}", port=v["port"], proto=k.split("/")[0], proc=v["proc"])
         # cuentas
         a, b = cur["accounts"], base["accounts"]
         for u in a["uid0"]:
@@ -241,9 +260,9 @@ class HostCheck:
             emit("high", "host", "usuario_nuevo", f"Nueva cuenta con acceso al sistema: {u}", key=f"host:user:{u}")
         # USB y módulos
         for d in sorted(set(cur["usb"]) - set(base.get("usb", []))):
-            emit("low", "host", "usb_nuevo", f"Nuevo dispositivo USB: {d}", key=f"host:usb:{d}")
+            emit("low", "host", "usb_nuevo", f"Nuevo dispositivo USB: {d}", key=f"host:usb:{d}", usb=d)
         for m in sorted(set(cur["modules"]) - set(base.get("modules", []))):
-            emit("medium", "host", "modulo_nuevo", f"Nuevo módulo del kernel cargado: {m}", key=f"host:mod:{m}")
+            emit("medium", "host", "modulo_nuevo", f"Nuevo módulo del kernel cargado: {m}", key=f"host:mod:{m}", module=m)
         # SUID (solo en revisión profunda)
         if deep and "suid" in cur:
             for p in sorted(set(cur["suid"]) - set(base.get("suid", []))):
@@ -255,7 +274,7 @@ class HostCheck:
         for p in proc_scan(core.csv(c.get("hostcheck", "exec_dirs")), [m.lower() for m in core.csv(c.get("hostcheck", "miner_names"))], self.allow.procs):
             emit(p["sev"], "host", p["kind"], p["msg"], key=f"host:{p['kind']}:{p['comm']}:{p['exe']}")
         for r in input_readers(skip):
-            emit("medium", "host", "lector_de_teclado", f"{r['comm']} (PID {r['pid']}) lee directamente el teclado/ratón ({r['dev']}); revisa que sea legítimo", key=f"host:kbd:{r['comm']}")
+            emit("medium", "host", "lector_de_teclado", f"{r['comm']} (PID {r['pid']}) lee directamente el teclado/ratón ({r['dev']}); revisa que sea legítimo", key=f"host:kbd:{r['comm']}", proc=r["comm"])
         ports = {int(x) for x in core.csv(c.get("hostcheck", "suspicious_ports")) if x.isdigit()}
         for s in suspicious_connections(ports, self.allow.procs):
             emit("high", "host", "conexion_sospechosa", f"{s['proc']} está conectado a {s['remote']}, puerto usado por troyanos, mineros o canales de control", key=f"host:conn:{s['proc']}:{s['remote']}")
