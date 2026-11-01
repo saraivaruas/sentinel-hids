@@ -2,6 +2,12 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.6.1] - 2026-11-01
+
+### Corregido
+- **Informe y eventos más claros**: «eliminado» ahora dice qué significa (el archivo ya no existe: se borró o se reemplazó) y el informe junta los eventos repetidos de una misma carpeta en una sola fila (antes salían 21 líneas por 7 archivos).
+- Las copias antiguas de los servicios de Sentinel que el paquete reemplaza se aceptan en la referencia al actualizar, así no se vuelven a avisar cada hora como «eliminadas» (y bajan a gravedad baja con su explicación).
+
 ## [2.6.0] - 2026-11-01
 
 ### Cambiado (solo diseño; no se quitó ninguna función)

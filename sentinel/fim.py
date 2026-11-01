@@ -131,7 +131,7 @@ def diff(old: dict, new: dict, www: list[str] | None = None) -> list[dict]:
             else:
                 out.append({"kind": "added", "path": p, "sev": "low" if sev == "medium" else sev, "detail": d})
         elif n is None:
-            out.append({"kind": "removed", "path": p, "sev": sev if sev in ("critical", "high") else "medium", "detail": "eliminado"})
+            out.append({"kind": "removed", "path": p, "sev": sev if sev in ("critical", "high") else "medium", "detail": "eliminado (el archivo ya no existe: se borró o se reemplazó)"})
         else:
             if o.get("type") != n.get("type"):
                 out.append({"kind": "type", "path": p, "sev": "high" if sev == "medium" else sev, "detail": f"cambió de tipo ({o.get('type')} → {n.get('type')})"})
@@ -246,6 +246,8 @@ class Fim:
                     sev = "high"; detail = "archivo ejecutable nuevo en carpeta web"
             if pkg and not sigs and es_de_sentinel(f["path"]):
                 sev = "info"; detail += " (actualización de Sentinel)"
+            elif f["kind"] == "removed" and es_de_sentinel(f["path"]) and f["path"].startswith("/etc/systemd/system/"):
+                sev = "low"; detail += " — copia antigua de un servicio de Sentinel; el paquete la reemplazó por la de /lib/systemd/system"
             elif pkg and not sigs and f["path"].startswith(("/usr/", "/etc/", "/opt/", "/lib")) and f["kind"] in ("modified", "added", "perm") and sev in ("medium", "high"):
                 sev = "low"; detail += " (durante una actualización de paquetes)"
             f2 = dict(f, sev=sev, detail=detail)
