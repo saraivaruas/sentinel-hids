@@ -106,6 +106,13 @@ class Data:
             i = 23 - int((h0 - int(e["epoch"] // 3600) * 3600) // 3600)
             if 0 <= i < 24:
                 hours[i]["c"][e["sev"]] += 1
+        d0 = int(now // 86400) * 86400                       # 7 días (UTC) para las mini-gráficas de las tarjetas
+        days = [{"t": d0 - (6 - i) * 86400, "c": {s: 0 for s in core.SEV}} for i in range(7)]
+        for e in ev7:
+            i = 6 - int((d0 - int(e["epoch"] // 86400) * 86400) // 86400)
+            if 0 <= i < 7:
+                days[i]["c"][e["sev"]] += 1
+        modules = collections.Counter(e["source"] for e in ev24 if core.SEV[e["sev"]] >= 1)
         ips = collections.Counter(e["data"].get("ip") for e in ev7 if (e.get("data") or {}).get("ip") and core.SEV[e["sev"]] >= 2)
         bans = core.read_json(os.path.join(core.state_dir(), "bans.json"), {}) or {}
         active = {ip: b for ip, b in bans.items() if b["until"] > now}
@@ -124,7 +131,7 @@ class Data:
         else:
             level, why = "protegido", "Sin eventos graves en las últimas 24 horas"
         return {"version": core.VERSION, "now": now, "level": level, "why": why, "alive": alive, "heartbeat_age": age, "services": svc,
-                "baseline": meta, "counts24": c24, "counts7": count(ev7), "hours": hours, "top_ips": [{"ip": ip, "n": n, "banned": ip in active} for ip, n in ips.most_common(8)],
+                "baseline": meta, "counts24": c24, "counts7": count(ev7), "hours": hours, "days": days, "modules": [{"name": k, "n": n} for k, n in modules.most_common(8)], "top_ips": [{"ip": ip, "n": n, "banned": ip in active} for ip, n in ips.most_common(8)],
                 "bans": [{"ip": ip, "reason": b["reason"], "backend": b["backend"], "left": int(b["until"] - now)} for ip, b in sorted(active.items(), key=lambda kv: kv[1]["until"])],
                 "events": ev7[-60:][::-1], "root": core.is_root(), "installed": sentinel_bin() is not None}
 

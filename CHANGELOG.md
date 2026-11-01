@@ -2,6 +2,14 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.6.0] - 2026-11-01
+
+### Cambiado (solo diseño; no se quitó ninguna función)
+- **Menú lateral con hamburguesa**: se recoge a solo íconos (con la sección y el nombre al pasar el cursor), recuerda tu elección y en pantallas angostas es un cajón que se abre y se cierra.
+- **Tablero de gráficos** en Resumen: tarjetas con mini-gráfica de 7 días, actividad por hora, **dona por gravedad**, **barras por módulo**, IPs más activas, servicios y eventos recientes, en una cuadrícula ordenada de 12 columnas.
+- Barra superior fija, tablas con encabezado fijo y columnas ordenadas, contenedores con el mismo espacio y tamaño, insignias más sobrias y tema claro/oscuro más calmo.
+- Corregido: los botones y campos con `hidden` (por ejemplo «Quitar PIN» sin PIN) se veían igual.
+
 ## [2.5.1] - 2026-11-01
 
 ### Corregido

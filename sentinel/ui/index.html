@@ -9,7 +9,8 @@
 </head>
 <body>
 <div class="app">
-  <aside class="side" aria-label="Navegación">
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="side" aria-label="Navegación">
     <div class="brand"><img src="/static/icon.svg" alt="" width="34" height="34"><div><b>Sentinel</b><small id="ver">v2</small></div></div>
     <nav>
       <p class="nav-h">Sentinel · detección</p>
@@ -33,7 +34,8 @@
 
   <main>
     <header class="top">
-      <div><h1 id="title">Resumen</h1><p id="subtitle">Estado de la protección de este equipo</p></div>
+      <button class="burger" id="burger" aria-label="Mostrar u ocultar el menú" aria-expanded="true" aria-controls="side"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="top-t"><h1 id="title">Resumen</h1><p id="subtitle">Estado de la protección de este equipo</p></div>
       <div class="top-r"><span class="live" id="live"><i></i>en vivo</span><time id="clock"></time></div>
     </header>
 
@@ -51,30 +53,39 @@
       </div>
 
       <div class="kpis">
-        <article class="card kpi k-crit"><span>Críticas · 24 h</span><b id="k-crit">0</b><small>requieren acción inmediata</small></article>
-        <article class="card kpi k-high"><span>Altas · 24 h</span><b id="k-high">0</b><small>ataques o cambios importantes</small></article>
-        <article class="card kpi k-med"><span>Medias · 24 h</span><b id="k-med">0</b><small>para revisar con calma</small></article>
+        <article class="card kpi k-crit"><span>Críticas · 24 h</span><b id="k-crit">0</b><svg class="spark" id="sp-crit" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"></svg><small>requieren acción inmediata</small></article>
+        <article class="card kpi k-high"><span>Altas · 24 h</span><b id="k-high">0</b><svg class="spark" id="sp-high" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"></svg><small>ataques o cambios importantes</small></article>
+        <article class="card kpi k-med"><span>Medias · 24 h</span><b id="k-med">0</b><svg class="spark" id="sp-med" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"></svg><small>para revisar con calma</small></article>
         <article class="card kpi k-ban"><span>IPs bloqueadas</span><b id="k-ban">0</b><small>temporales (24 h)</small></article>
         <article class="card kpi k-fim"><span>Archivos vigilados</span><b id="k-fim">—</b><small id="k-fim-s">referencia sin crear</small></article>
       </div>
 
-      <div class="grid2">
-        <article class="card">
+      <div class="dash">
+        <article class="card c8">
           <div class="card-h"><h3>Actividad de las últimas 24 horas</h3><div class="legend" id="legend"></div></div>
           <div class="chart" id="chart"></div><div class="tip" id="tip" hidden></div>
         </article>
-        <article class="card">
-          <div class="card-h"><h3>Servicios</h3></div>
-          <ul class="svc" id="svc"></ul>
-          <div class="card-h sub"><h3>IPs más activas (7 días)</h3></div>
+        <article class="card c4">
+          <div class="card-h"><h3>Por gravedad (24 h)</h3></div>
+          <div class="donut-w"><div class="donut" id="donut"></div><ul class="donut-l" id="donut-l"></ul></div>
+        </article>
+        <article class="card c4">
+          <div class="card-h"><h3>Por módulo (24 h)</h3></div>
+          <ul class="hbars" id="mods"></ul>
+        </article>
+        <article class="card c4">
+          <div class="card-h"><h3>IPs más activas (7 días)</h3></div>
           <ul class="ips" id="ips"></ul>
         </article>
+        <article class="card c4">
+          <div class="card-h"><h3>Servicios</h3></div>
+          <ul class="svc" id="svc"></ul>
+        </article>
+        <article class="card c12">
+          <div class="card-h"><h3>Eventos recientes</h3><button class="link" data-goto="eventos">Ver todos →</button></div>
+          <ul class="feed" id="feed"></ul>
+        </article>
       </div>
-
-      <article class="card">
-        <div class="card-h"><h3>Eventos recientes</h3><button class="link" data-goto="eventos">Ver todos →</button></div>
-        <ul class="feed" id="feed"></ul>
-      </article>
     </section>
 
     <section class="view" id="view-eventos" hidden>
