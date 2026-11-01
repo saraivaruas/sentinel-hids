@@ -22,6 +22,8 @@ sudo sentinel firewall aplicar              # lo aplica, guardando antes una cop
 sudo sentinel firewall config allow_tcp 80,443,8443
 ```
 
+El panel muestra la **exposición real** (incluidos los puertos de Docker, que saltan el firewall), aplica los cambios **a prueba** (si no confirmas en 90 s vuelve atrás solo), permite limitar puertos a ciertos orígenes (`restrict`), elegir un perfil (`profile`) y avisa si alguien cambia las reglas por fuera de Sentinel.
+
 Por defecto solo quedan abiertos el **80 y el 443**, más el puerto de SSH si este equipo sirve SSH. Las conexiones ssh que haces *desde* este equipo hacia otros servidores (despliegues) no se ven afectadas, y no se aplica nada si el tráfico saliente está bloqueado.
 
 ## Qué detecta

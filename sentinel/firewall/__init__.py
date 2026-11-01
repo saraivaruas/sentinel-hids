@@ -213,6 +213,38 @@ def mark_applied() -> None:
         pass
 
 
+def _rule_key(r: dict) -> tuple:
+    return (re.sub(r"^\[\s*\d+\]\s*", "", r["label"]), r["action"], r["from"], r.get("comment", ""))
+
+
+def diff_snapshots(old: dict, new: dict) -> dict:
+    """Qué reglas aparecieron o desaparecieron y qué puertos de Docker quedaron expuestos entre dos fotos."""
+    o, n = {_rule_key(r): r for r in old.get("rules", [])}, {_rule_key(r): r for r in new.get("rules", [])}
+    od = {(e["proto"], e["port"]) for e in old.get("listening", []) if e.get("status") == "docker"}
+    return {"added": [n[k] for k in n if k not in o], "removed": [o[k] for k in o if k not in n],
+            "docker": [e for e in new.get("listening", []) if e.get("status") == "docker" and (e["proto"], e["port"]) not in od]}
+
+
+def watch(cfg, alerter) -> dict | None:
+    """Toma la foto del firewall y avisa si alguien cambió las reglas por fuera de Sentinel (programa, otro administrador, un atacante)."""
+    prev = core.read_json(snapshot_path(), None)
+    s = save_snapshot(cfg)
+    if not prev or not prev.get("ok") or not s.get("ok"):
+        return None
+    mine = core.read_json(os.path.join(core.state_dir(), "fw_applied.json"), None)
+    if mine and core.now() - mine.get("at", 0) < 180:       # cambios hechos por Sentinel: no se avisan
+        return None
+    d = diff_snapshots(prev, s)
+    for r in d["added"]:
+        wide = r["action"] == "ALLOW" and r["from"].lower().startswith("anywhere") and not r["label"].lower().startswith(("anywhere on lo", "anywhere (v6) on lo"))
+        alerter.emit("high" if wide else "medium", "firewall", "regla_nueva", f"Se agregó una regla al firewall fuera de Sentinel: {r['label']} {r['action']} desde {r['from']}" + (" (abierta a cualquiera)" if wide else ""), key=f"fw:add:{_rule_key(r)}")
+    for r in d["removed"]:
+        alerter.emit("medium" if r["action"] == "DENY" else "low", "firewall", "regla_quitada", f"Se quitó una regla del firewall fuera de Sentinel: {r['label']} {r['action']} desde {r['from']}", key=f"fw:del:{_rule_key(r)}")
+    for e in d["docker"]:
+        alerter.emit("high", "firewall", "docker_expuesto", f"Docker publicó el puerto {e['proto']}/{e['port']} en todas las interfaces y salta el firewall", key=f"fw:docker:{e['proto']}:{e['port']}")
+    return d
+
+
 def apply(cfg=None, harden: bool = False, state_dir: str | None = None, conf_dirs: list[str] | None = None, probar: int = 0) -> list[str]:
     """Aplica el plan: copia de las reglas, abre lo que falta, cierra lo que sobra y comprueba que el SSH siga permitido."""
     if not core.is_root():

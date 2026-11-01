@@ -214,6 +214,29 @@ udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
             ufw.allow(22, "tcp", limit=True); ufw.allow(80, "tcp")
         self.assertEqual(calls, [["ufw", "limit", "22/tcp"], ["ufw", "allow", "80/tcp"]])
 
+    def _snap(self, rules, docker=()):
+        return {"ok": True, "rules": [{"label": l, "action": a, "from": f, "comment": "", "port": 0, "v6": False} for l, a, f in rules],
+                "listening": [{"proto": "tcp", "port": p, "status": "docker"} for p in docker]}
+
+    def test_aviso_si_cambian_el_firewall_por_fuera(self):
+        emitted = []
+        al = mock.Mock(); al.emit = lambda *a, **k: emitted.append(a)
+        old = self._snap([("[ 1] 80/tcp", "ALLOW", "Anywhere")])
+        new = self._snap([("[ 1] 80/tcp", "ALLOW", "Anywhere"), ("[ 2] 4444/tcp", "ALLOW", "Anywhere")], docker=[8080])
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"SENTINEL_STATE": d}), mock.patch.object(firewall, "save_snapshot", return_value=new):
+            core.atomic_write_json(firewall.snapshot_path(), old)
+            firewall.watch(core.load_config(), al)
+            kinds = [(a[0], a[2]) for a in emitted]
+            self.assertIn(("high", "regla_nueva"), kinds); self.assertIn(("high", "docker_expuesto"), kinds)
+            emitted.clear(); firewall.mark_applied()
+            core.atomic_write_json(firewall.snapshot_path(), old); firewall.watch(core.load_config(), al)
+            self.assertEqual(emitted, [])                                        # lo cambió Sentinel: no se avisa
+
+    def test_diff_ignora_la_numeracion(self):
+        a = self._snap([("[ 1] 80/tcp", "ALLOW", "Anywhere"), ("[ 2] 443/tcp", "ALLOW", "Anywhere")])
+        b = self._snap([("[ 1] 443/tcp", "ALLOW", "Anywhere"), ("[ 2] 80/tcp", "ALLOW", "Anywhere")])
+        d = firewall.diff_snapshots(a, b); self.assertEqual((d["added"], d["removed"]), ([], []))
+
 
 if __name__ == "__main__":
     unittest.main()

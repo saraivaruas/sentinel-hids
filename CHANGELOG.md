@@ -2,6 +2,15 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.3.0] - 2026-11-01
+
+### Agregado
+- **Exposición real** en el módulo Firewall: cruza lo que escucha el equipo con lo que permite el firewall y dice, puerto por puerto, si se alcanza desde afuera, con el programa y un consejo (por ejemplo, hacer que un servicio escuche solo en 127.0.0.1).
+- **Detección de Docker**: los puertos que publica Docker en todas las interfaces saltan el firewall; ahora se detectan, se marcan como lo más grave y se avisa cuando aparece uno nuevo.
+- **Aplicar a prueba con reversión automática**: el panel aplica el plan con 90 s para confirmar; si no confirmas, el firewall vuelve solo a como estaba (`sentinel firewall aplicar --probar 90`, `confirmar`, `restaurar`).
+- **Puertos limitados por origen** (`restrict = 22=100.64.0.0/10|203.0.113.7`), **perfiles listos** (estación, web, servidor) y **límite de intentos al SSH** (`ssh_limit`, ufw limit).
+- **Aviso de cambios externos**: si alguien agrega o quita reglas del firewall sin pasar por Sentinel, se registra un evento (alto si abre un puerto a cualquiera).
+
 ## [2.2.0] - 2026-11-01
 
 ### Cambiado
