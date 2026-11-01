@@ -2,6 +2,16 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.5.0] - 2026-11-01
+
+### Agregado
+- **PIN de protección** (se configura en *Ajustes*): sin él no se puede detener Sentinel (`sentinel detener`, `systemctl stop`), desinstalarlo (`apt remove`, `uninstall.sh`), cambiar ajustes, ampliar la lista blanca, aceptar cambios de integridad, liberar IPs ni aplicar cambios al firewall. Se guarda como hash PBKDF2-SHA256 con sal; 5 errores seguidos bloquean 10 minutos; cada intento deja una alerta. Si alguien ordena detener el servicio sin PIN, el monitor **sigue vigilando** y lanza una alerta crítica. Límite: quien ya es root puede apagar cualquier programa a la fuerza (`kill -9`); el PIN cierra las vías normales y deja rastro.
+- **Detección de puertas traseras con desofuscación**: reconstruye texto partido (`'ev'.'al'`), `chr()`, `\x65`, comentarios dentro de palabras y base64/gzip anidados antes de buscar firmas, detecta funciones elegidas por la petición, `preg_replace /e`, decodificadores anidados y puntúa señales de ofuscación. Probado sin falsos positivos sobre 4000 archivos PHP reales.
+- Política de polkit (`org.sentinel.policy`) para que el sistema recuerde la clave unos minutos.
+
+### Cambiado
+- Menos contraseñas: guardar los ajustes del firewall pide la clave una sola vez (antes una por ajuste), el plan se actualiza solo y se quitó el botón «Actualizar (pide clave)».
+
 ## [2.4.0] - 2026-11-01
 
 ### Agregado

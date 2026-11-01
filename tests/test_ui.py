@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import unittest
+from unittest import mock
 
 from helpers import Env, core
 from sentinel import ui
@@ -122,6 +123,28 @@ class UiTests(unittest.TestCase):
         code, _, data = self.req("GET", "/api/settings")
         r = json.loads(data); self.assertEqual(code, 200)
         self.assertIn("general.notify_min", r["values"]); self.assertIn("active", r["honeypot"]); self.assertEqual(self.req("GET", "/api/settings", cookie=False)[0], 403)
+
+    def test_ajustes_del_firewall_en_una_sola_autorizacion(self):
+        self.assertEqual(ui.build_action({"name": "fw_config_varios", "pares": {"allow_tcp": "80,443", "profile": "web"}}), ["firewall", "config", "--pares", "allow_tcp=80,443", "profile=web"])
+        for malo in ({"zzz": "1"}, {"allow_tcp": "80;rm"}, {}, "x"):
+            with self.assertRaises((ValueError, TypeError)):
+                ui.build_action({"name": "fw_config_varios", "pares": malo})
+
+    def test_acciones_del_pin(self):
+        self.assertEqual(ui.build_action({"name": "pin_establecer", "pin": "", "nuevo": "secreto-1"}), ["pin", "establecer"])
+        self.assertEqual(ui.build_action({"name": "pin_quitar"}), ["pin", "quitar"])
+        for malo in ({"name": "pin_establecer", "nuevo": "corto"}, {"name": "pin_establecer", "nuevo": "secreto-1\n--x"}, {"name": "pin_establecer", "pin": "a\nb", "nuevo": "secreto-1"}):
+            with self.assertRaises(ValueError):
+                ui.build_action(malo)
+
+    def test_el_pin_viaja_por_stdin_y_no_en_los_argumentos(self):
+        seen = {}
+        def fake(cmd, **k):
+            seen["cmd"], seen["input"] = cmd, k.get("input")
+            return mock.Mock(returncode=0, stdout="ok", stderr="")
+        with mock.patch.object(ui, "sentinel_bin", return_value="/usr/bin/sentinel"), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(ui.subprocess, "run", side_effect=fake):
+            ui.run_action({"name": "ajustes", "pares": {"general.notify_min": "high"}, "pin": "secreto-1"})
+        self.assertIn("--pin-stdin", seen["cmd"]); self.assertNotIn("secreto-1", " ".join(seen["cmd"])); self.assertTrue(seen["input"].startswith("secreto-1\n"))
 
     def test_la_llave_es_privada(self):
         import stat

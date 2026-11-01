@@ -5,11 +5,12 @@ AQUI="$(cd "$(dirname "$0")/.." && pwd)"
 VER="$(python3 -c "import sys;sys.path.insert(0,'$AQUI');from sentinel import core;print(core.VERSION)")"
 OUT="${SENTINEL_DIST:-$AQUI/dist}"; T="$(mktemp -d)"; P="$T/pkg"
 trap 'rm -rf "$T"' EXIT
-mkdir -p "$OUT" "$P/DEBIAN" "$P/opt/sentinel" "$P/usr/bin" "$P/lib/systemd/system" "$P/usr/share/applications" "$P/usr/share/icons/hicolor/scalable/apps" "$P/etc/sentinel" "$P/etc/logrotate.d" "$P/usr/share/doc/sentinel"
+mkdir -p "$OUT" "$P/DEBIAN" "$P/opt/sentinel" "$P/usr/bin" "$P/lib/systemd/system" "$P/usr/share/applications" "$P/usr/share/icons/hicolor/scalable/apps" "$P/etc/sentinel" "$P/etc/logrotate.d" "$P/usr/share/doc/sentinel" "$P/usr/share/polkit-1/actions"
 
 cp -a "$AQUI/sentinel" "$AQUI/bin" "$AQUI/README.md" "$P/opt/sentinel/"
 find "$P/opt/sentinel" -name __pycache__ -prune -exec rm -rf {} +
 ln -s /opt/sentinel/bin/sentinel "$P/usr/bin/sentinel"
+cp "$AQUI/packaging/polkit/org.sentinel.policy" "$P/usr/share/polkit-1/actions/org.sentinel.policy"
 cp "$AQUI"/systemd/*.service "$AQUI"/systemd/*.timer "$P/lib/systemd/system/"
 install -m 644 "$AQUI/desktop/sentinel.desktop" "$P/usr/share/applications/sentinel.desktop"
 install -m 644 "$AQUI/sentinel/ui/icon.svg" "$P/usr/share/icons/hicolor/scalable/apps/sentinel.svg"

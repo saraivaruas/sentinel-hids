@@ -51,7 +51,25 @@
       d.showModal();
     });
   }
+  const NEEDS_PIN = new Set(["ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar"]);
+  let pinCache = { v: "", until: 0 };
+  function askPin() {
+    return new Promise((res) => {
+      const d = $("#pin-dlg"), i = $("#pin-dlg-in"); i.value = "";
+      d.onclose = () => res(d.returnValue === "si" ? i.value : null);
+      d.showModal(); setTimeout(() => i.focus(), 50);
+    });
+  }
   async function runAction(name, extra, btn) {
+    const needs = st.pinSet && (NEEDS_PIN.has(name) || (name === "senuelos" && !(extra && extra.on)));
+    if (needs && name !== "pin_establecer" && name !== "pin_quitar") {
+      let p = Date.now() < pinCache.until ? pinCache.v : await askPin();
+      if (p == null) return null;
+      pinCache = { v: p, until: Date.now() + 90000 };
+      extra = Object.assign({}, extra, { pin: p });
+    } else if (st.pinSet && (name === "pin_establecer" || name === "pin_quitar")) {
+      if (!extra || extra.pin == null) return null;
+    } else if (name === "pin_establecer") { extra = Object.assign({ pin: "" }, extra); }
     if (!st.installed) { toast("Sentinel aún no está instalado en el sistema. Ejecuta «sudo ./install.sh».", true); return null; }
     if (btn) { btn.disabled = true; btn.dataset.l = btn.textContent; btn.textContent = "Trabajando…"; }
     try {
@@ -260,6 +278,8 @@
     const s = await api("/api/settings"), v = s.values;
     $("#st-desk").value = v["general.enable_desktop"] === "no" ? "no" : "yes"; $("#st-min").value = v["general.notify_min"]; $("#st-style").value = v["general.notify_style"] || "corner";
     $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"];
+    st.pinSet = !!s.pin.enabled; $("#pin-st").textContent = st.pinSet ? "activo" : "sin PIN"; $("#pin-st").className = "badge sev-" + (st.pinSet ? "low" : "medium");
+    $("#pin-old-l").hidden = !st.pinSet; $("#pin-clear").hidden = !st.pinSet; $("#pin-save").textContent = st.pinSet ? "Cambiar PIN" : "Activar PIN";
     const on = s.honeypot.active;
     $("#st-hp").textContent = on ? "activos" : "apagados"; $("#st-hp").className = "badge sev-" + (on ? "high" : "low");
     $("#st-hp-ports").textContent = s.honeypot.ports.join(", "); $("#st-hp-btn").textContent = on ? "Apagar señuelos" : "Activar señuelos"; $("#st-hp-btn").dataset.on = on ? "1" : "";
@@ -472,21 +492,32 @@
   document.querySelectorAll(".fw-reload").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { await loadFirewall(); toast("Información recargada"); } finally { b.disabled = false; } }));
   $("#fw-confirm").addEventListener("click", async (e) => { await runAction("fw_confirmar", null, e.currentTarget); fwDeadline = 0; loadFirewall(); });
   $("#fw-revert").addEventListener("click", async (e) => { await runAction("fw_revertir", null, e.currentTarget); fwDeadline = 0; loadFirewall(); });
-  $("#fw-refresh").addEventListener("click", async (e) => { await runAction("fw_estado", null, e.currentTarget); loadFirewall(); });
   $("#fw-apply").addEventListener("click", async (e) => {
     if (!(await confirmDlg("Aplicar el plan del firewall", "Se cerrarán los puertos indicados y quedará abierto solo lo que elegiste. Se aplica A PRUEBA: tendrás 90 segundos para confirmar; si no confirmas, vuelve solo a como estaba. Tu SSH se mantiene.", "Aplicar"))) return;
     const f = await api("/api/firewall"); await runAction("fw_aplicar", { endurecer: !!(f && f.needs_harden) }, e.currentTarget); loadFirewall();
   });
   $("#fw-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    for (const [k, id] of [["profile", "fw-profile"], ["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["restrict", "fw-restrict"], ["keep_ssh", "fw-ssh"], ["ssh_limit", "fw-sshlimit"], ["backend", "fw-backend"]]) { const r = await runAction("fw_config", { clave: k, valor: $("#" + id).value.trim() }); if (!r || !r.ok) return; }
-    toast("Ajustes guardados. Pulsa «Actualizar» en Puertos para ver el plan nuevo."); loadFirewall();
+    const pares = {}; for (const [k, id] of [["profile", "fw-profile"], ["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["restrict", "fw-restrict"], ["keep_ssh", "fw-ssh"], ["ssh_limit", "fw-sshlimit"], ["backend", "fw-backend"]]) pares[k] = $("#" + id).value.trim();
+    const r = await runAction("fw_config_varios", { pares }); if (!r || !r.ok) return;
+    toast("Ajustes guardados. El plan de Puertos ya está actualizado."); loadFirewall();
   });
   $("#f-mod").addEventListener("change", renderEvents);
   $("#st-hp-btn").addEventListener("click", async (e) => {
     const on = !e.currentTarget.dataset.on;
     if (on && !(await confirmDlg("Activar los señuelos", "Se abrirán puertos falsos en este equipo (el firewall los mantiene cerrados hacia afuera). ¿Seguro?", "Activar"))) return;
     await runAction("senuelos", { on }, e.currentTarget); loadSettings();
+  });
+  $("#pin-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if ($("#pin-new").value !== $("#pin-new2").value) { toast("Los PIN nuevos no coinciden", true); return; }
+    const r = await runAction("pin_establecer", { pin: $("#pin-old").value, nuevo: $("#pin-new").value });
+    if (r && r.ok) { $("#pin-form").reset(); pinCache = { v: "", until: 0 }; loadSettings(); }
+  });
+  $("#pin-clear").addEventListener("click", async (e) => {
+    if (!(await confirmDlg("Quitar el PIN", "Sentinel dejará de pedir PIN para detenerlo o cambiar su configuración.", "Quitar"))) return;
+    const p = await askPin(); if (p == null) return;
+    const r = await runAction("pin_quitar", { pin: p }, e.currentTarget); if (r && r.ok) { pinCache = { v: "", until: 0 }; loadSettings(); }
   });
   $("#st-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -504,6 +535,7 @@
   chips();
   go(location.hash.slice(1) || "resumen");
   refresh();
+  api("/api/settings").then((s) => { st.pinSet = !!s.pin.enabled; }).catch(() => {});
   loadUpdate(false); setTimeout(() => loadUpdate(false), 4000); setInterval(() => loadUpdate(false), 600000);
   setInterval(() => { if (!document.hidden) { refresh(); if (st.view === "eventos" && !$("#f-q").value) loadEvents(); if (st.view === "atacantes" && !$("#att-q").value) loadAttackers(); if (st.view === "paquetes") loadPackets(); } }, 3000);
   setInterval(() => { if (!document.hidden && st.view.startsWith("fw-")) loadFirewall(); }, 5000);

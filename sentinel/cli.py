@@ -10,7 +10,7 @@ import shutil
 import sys
 import time
 
-from . import audit, core, explain, fim, geoip, honeypot, hostcheck, incidents, report, update
+from . import audit, core, explain, fim, geoip, honeypot, hostcheck, incidents, pin, report, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -179,6 +179,8 @@ def cmd_packets(a) -> int:
 
 
 def cmd_update(a) -> int:
+    if a.instalar and pin.required() and core.is_root():
+        pin.authorize_stop()                      # ya demostró el PIN: el reinicio del servicio durante la actualización es legítimo
     cfg = core.load_config()
     if a.instalar:
         ok, msg = update.install(cfg)
@@ -259,11 +261,23 @@ def cmd_test(a) -> int:
 def cmd_firewall(a) -> int:
     from . import firewall
     cfg = core.load_config()
+    if a.accion == "config" and a.pares:           # varios ajustes en una sola autorización
+        try:
+            for par in a.pares:
+                k, _, v = par.partition("=")
+                firewall.set_config(k, v)
+        except (ValueError, TypeError, OSError) as e:
+            print("No se cambió:", e); return 1
+        if core.is_root():
+            firewall.save_snapshot(core.load_config())        # el panel ve el plan nuevo de inmediato, sin pedir otra clave
+        print(f"Listo: {len(a.pares)} ajuste(s) del firewall guardados"); return 0
     if a.accion == "config":
         try:
             firewall.set_config(a.clave, a.valor)
         except (ValueError, TypeError, OSError) as e:
             print("No se cambió:", e); return 1
+        if core.is_root():
+            firewall.save_snapshot(core.load_config())
         print(f"Listo: [firewall] {a.clave} = {a.valor}"); return 0
     if a.accion in ("estado", "plan"):
         s = firewall.state(cfg)
@@ -303,7 +317,7 @@ def cmd_config(a) -> int:
             print("No se cambió:", e); return 1
         changed += 1
     print(f"Guardado ({changed} ajuste{'s' if changed != 1 else ''}). Los avisos nuevos usan los valores de inmediato; el monitor los lee al reiniciar: sudo systemctl restart sentinel-monitor")
-    if core.is_root() and shutil.which("systemctl"):
+    if core.is_root() and shutil.which("systemctl") and core.conf_path() == "/etc/sentinel/sentinel.conf":      # solo con la configuración real del sistema
         core.run(["systemctl", "try-restart", "sentinel-monitor.service"], 20)
     return 0
 
@@ -318,6 +332,90 @@ def cmd_senuelos(a) -> int:
     rc, out = core.run(cmd, 30)
     print(("Señuelos activados: abren los puertos " + ", ".join(core.csv(core.load_config().get("honeypot", "ports", fallback=""))) + " en este equipo (el firewall los mantiene cerrados hacia afuera salvo que los abras tú)." if a.accion == "activar" else "Señuelos apagados: sus puertos se cerraron.") if rc == 0 else out.strip())
     return 0 if rc == 0 else 1
+
+
+def _protected(a) -> bool:
+    """¿Este comando debilita o cambia la protección? Entonces exige el PIN (si hay uno)."""
+    n = a.fn.__name__
+    if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener"):
+        return True
+    return ((n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
+            or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
+            or (n == "cmd_pin" and a.accion in ("establecer", "quitar")))
+
+
+def gate(a) -> int | None:
+    """None = puede seguir. Si hay PIN y no se demuestra, devuelve el código de salida."""
+    if not core.is_root() or not pin.required() or not _protected(a):
+        return None
+    given = pin.next_stdin_line() if a.pin_stdin else pin.ask()
+    _last_given[0] = given or ""
+    if given is None:
+        print("Este comando necesita el PIN de Sentinel y no hay forma de preguntarlo (usa una terminal).", file=sys.stderr); return 2
+    ok, msg = pin.verify(given, core.Alerter(core.load_config()))
+    if not ok:
+        print(msg, file=sys.stderr); return 2
+    return None
+
+
+def cmd_pin(a) -> int:
+    was = pin.required()
+    cfg = core.load_config()
+    if a.accion == "estado":
+        print("PIN:", "activo" if was else "no configurado"); return 0
+    if a.accion == "verificar":                # lo usa el desinstalador: sin PIN correcto no sigue
+        if not was:
+            return 0
+        given = pin.next_stdin_line() if a.pin_stdin else pin.ask()
+        ok, msg = pin.verify(given or "", core.Alerter(cfg)) if given is not None else (False, "No pude preguntar el PIN.")
+        if not ok:
+            print(msg, file=sys.stderr)
+        else:
+            pin.authorize_stop()                # demostró el PIN: ya puede detener los servicios para desinstalar
+        return 0 if ok else 1
+    if a.accion == "autorizar":                # la actualización del paquete pide permiso para reiniciar el servicio
+        if not was or pin.stop_authorized():
+            return 0
+        given = pin.ask("PIN de Sentinel (para actualizar): ")
+        ok, msg = pin.verify(given or "", core.Alerter(cfg)) if given is not None else (False, "No pude preguntar el PIN.")
+        if ok:
+            pin.authorize_stop()
+        else:
+            print(msg, file=sys.stderr)
+        return 0 if ok else 1
+    if a.accion == "quitar":
+        ok, msg = pin.clear(_last_given[0], core.Alerter(cfg))
+        print(msg); return 0 if ok else 1
+    # establecer / cambiar
+    if a.pin_stdin:
+        if not was:
+            pin.next_stdin_line()              # la línea del PIN actual viene vacía
+        new = pin.next_stdin_line()
+    else:
+        new = pin.ask("PIN nuevo (mínimo 6 caracteres): ")
+        if new is None or new != pin.ask("Repite el PIN nuevo: "):
+            print("No coinciden o no pude preguntarlo.", file=sys.stderr); return 1
+    ok, msg = pin.set_pin(new, _last_given[0], core.Alerter(cfg))
+    print(msg); return 0 if ok else 1
+
+
+_last_given: list[str] = [""]
+
+
+def cmd_detener(a) -> int:
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel detener", file=sys.stderr); return 1
+    pin.authorize_stop()
+    units = ["sentinel-monitor.service", "sentinel-honeypot.service", "sentinel-scan.timer", "sentinel-report.timer"]
+    rc, out = core.run(["systemctl", "stop", *units], 60)
+    core.Alerter(core.load_config()).emit("high", "pin", "detenido", "Sentinel fue detenido de forma autorizada", key=f"stop:{int(core.now())}")
+    pin.revoke_stop()
+    print("Sentinel detenido. Para volver a encenderlo:  sudo sentinel iniciar" if rc == 0 else out.strip()); return 0 if rc == 0 else 1
+
+
+def cmd_iniciar(a) -> int:
+    rc, out = core.run(["systemctl", "start", "sentinel-monitor.service", "sentinel-scan.timer", "sentinel-report.timer"], 60)
+    print("Sentinel iniciado." if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 
 
 def cmd_toast(a) -> int:
@@ -356,6 +454,7 @@ def cmd_honeypot(a) -> int:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="sentinel", description=f"Sentinel {core.VERSION}: detector de intrusiones y cambios")
+    p.add_argument("--pin-stdin", action="store_true", help="lee el PIN de la entrada estándar (lo usa el panel)")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status", help="estado de los servicios y últimos eventos").set_defaults(fn=cmd_status)
     s = sub.add_parser("scan", help="revisa ahora integridad y estado del equipo"); s.add_argument("--deep", action="store_true", help="revisión profunda (recalcula todas las huellas, SUID, procesos ocultos)")
@@ -372,13 +471,19 @@ def main(argv=None) -> int:
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
     s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config", "confirmar", "restaurar"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")
-    s.add_argument("--json", action="store_true"); s.add_argument("--guardar", action="store_true", help="guarda la foto para el panel"); s.add_argument("--endurecer", action="store_true", help="iptables: política de entrada DROP")
+    s.add_argument("--pares", nargs="+", metavar="clave=valor", help="config: varios ajustes a la vez"); s.add_argument("--json", action="store_true"); s.add_argument("--guardar", action="store_true", help="guarda la foto para el panel"); s.add_argument("--endurecer", action="store_true", help="iptables: política de entrada DROP")
     s.add_argument("--probar", type=int, default=0, metavar="SEG", help="aplica a prueba: si no confirmas en SEG segundos, vuelve atrás solo"); s.add_argument("--pendiente", action="store_true", help="restaurar: la copia de los cambios a prueba"); s.set_defaults(fn=cmd_firewall)
     s = sub.add_parser("config", help="cambia ajustes de avisos (usado por el panel): sentinel config general.notify_min=high ..."); s.add_argument("pares", nargs="+", metavar="seccion.clave=valor"); s.set_defaults(fn=cmd_config)
     s = sub.add_parser("senuelos", help="activa o apaga los señuelos (puertos falsos)"); s.add_argument("accion", choices=["activar", "desactivar", "estado"]); s.set_defaults(fn=cmd_senuelos)
+    s = sub.add_parser("pin", help="PIN de protección: estado, establecer, quitar, verificar"); s.add_argument("accion", choices=["estado", "establecer", "quitar", "verificar", "autorizar"]); s.set_defaults(fn=cmd_pin)
+    sub.add_parser("detener", help="detiene Sentinel (pide el PIN si hay uno)").set_defaults(fn=cmd_detener)
+    sub.add_parser("iniciar", help="vuelve a encender Sentinel").set_defaults(fn=cmd_iniciar)
     s = sub.add_parser("toast", help="muestra un aviso en la esquina de la pantalla (lo usa Sentinel)"); s.add_argument("mensaje"); s.add_argument("--sev", default="medium", choices=list(core.SEV)); s.add_argument("--seg", type=int, default=8); s.add_argument("--titulo", default="Sentinel"); s.set_defaults(fn=cmd_toast)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)
     sub.add_parser("honeypot", help="servicio de señuelos (lo lanza systemd)").set_defaults(fn=cmd_honeypot)
     a = p.parse_args(argv)
+    code = gate(a)
+    if code is not None:
+        return code
     return a.fn(a)

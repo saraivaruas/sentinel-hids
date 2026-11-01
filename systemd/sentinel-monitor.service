@@ -4,6 +4,7 @@ Documentation=file:///opt/sentinel/README.md
 After=network.target systemd-journald.service
 
 [Service]
+TimeoutStopSec=20
 Type=simple
 Environment=PYTHONPATH=/opt/sentinel PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 -m sentinel monitor

@@ -55,14 +55,16 @@ Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te a
 
 **Qué cierra puertos.** Eso no lo hace el detector sino el **módulo Firewall** (ver arriba): deja abiertos solo lo que configures y cierra el resto.
 
-**Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Un atacante que ya es root puede apagar Sentinel (te avisa si deja de latir).
+**PIN de protección.** En *Ajustes* puedes registrar un PIN. Con PIN, para detener Sentinel, desinstalarlo, cambiar sus ajustes, ampliar la lista blanca, aceptar cambios de integridad o aplicar cambios al firewall hay que escribirlo (el panel y los comandos lo piden; `apt remove` y `uninstall.sh` también). Se guarda como hash, 5 errores seguidos bloquean 10 minutos y cada intento sin PIN deja una alerta crítica; si alguien ordena detener el servicio sin PIN, **Sentinel sigue vigilando**.
+
+**Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Quien ya es root puede apagar cualquier programa a la fuerza (por ejemplo `kill -9`): el PIN cierra las vías normales, avisa y deja rastro, pero no es una barrera absoluta. Si el monitor deja de latir, un temporizador aparte te avisa.
 
 ## Qué detecta
 
 | Detector | Qué hace | Gravedad típica |
 |---|---|---|
 | **Integridad de archivos** | Referencia SHA-256 + permisos + dueño de `/etc/passwd`, `shadow`, `sudoers`, SSH, PAM, cron, servicios, `/usr/local/bin`, llaves `authorized_keys`, etc. Detecta archivos nuevos, modificados, eliminados, enlaces redirigidos, permisos abiertos y **SUID/SGID nuevos**. Vigila en vivo (inotify) carpetas completas, así que detecta el reemplazo de archivos que hacen `useradd` o `vipw`. | alta / crítica |
-| **Puertas traseras web** | En carpetas web (`/var/www/html`) revisa los archivos nuevos o modificados contra firmas de webshells y shells inversas (`eval(base64_decode(...))`, `system($_POST...)`, `/dev/tcp/...`, `curl \| sh`). | crítica |
+| **Puertas traseras web** | En carpetas web (`/var/www/html`) revisa los archivos nuevos o modificados contra firmas de webshells y shells inversas, **incluso ofuscadas**: reconstruye texto partido (`'ev'.'al'`), `chr()`, `\x65`, comentarios dentro de palabras y base64/gzip anidados, y puntúa señales de ofuscación. No es infalible ante código hecho a medida. | crítica |
 | **Ataques en vivo** | Lee el journal: fuerza bruta SSH/sudo/su, acceso exitoso tras intentos fallidos, root remoto y **escaneo de puertos** (bloqueos del cortafuegos). | alta / crítica |
 | **Señuelos** (opcionales) | Puertos falsos (2222, 2323, 3390, 5900, 60009) sin servicio real, en un proceso sin privilegios y aislado. **Vienen apagados** porque abren puertos; se activan desde *Ajustes* o con `sudo sentinel senuelos activar`. Quien se conecta queda registrado y bloqueado. | alta |
 | **Equipo** | Puertos nuevos en escucha o que pasan de local a públicos, procesos que corren desde `/tmp`, con el ejecutable borrado o con nombre de minero, conexiones a puertos de troyanos, lectores de teclado no esperados, USB, módulos del kernel, cuentas nuevas, UID 0 duplicado, cuentas sin contraseña, procesos ocultos y SUID nuevos. | media / crítica |

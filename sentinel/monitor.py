@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, firewall, fim, honeypot, hostcheck, intel as intel_mod, packets, update
+from . import authwatch, core, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, update
 
 
 class Monitor:
@@ -99,8 +99,19 @@ class Monitor:
             if not self.stop.wait(5):
                 continue
 
+    def _on_term(self, *a) -> None:
+        """Con PIN configurado, una orden de detener sin autorización no apaga Sentinel: avisa de inmediato y sigue vigilando.
+        (El apagado o reinicio del equipo y las paradas autorizadas con el PIN sí lo detienen.)"""
+        try:
+            if pin.required() and not pin.stop_authorized() and not pin.shutting_down():
+                self.alerter.emit("critical", "pin", "intento_detener", "Alguien intentó detener Sentinel sin el PIN (systemctl stop, kill u otra vía). Sigue vigilando; si fuiste tú, usa «sudo sentinel detener».", key=f"pin:term:{int(core.now())}")
+                return
+        except Exception:
+            pass
+        self.stop.set()
+
     def run(self) -> None:
-        signal.signal(signal.SIGTERM, lambda *a: self.stop.set())
+        signal.signal(signal.SIGTERM, self._on_term)
         signal.signal(signal.SIGINT, lambda *a: self.stop.set())
         core.ensure_dir(core.state_dir(), 0o750)
         if self.fim.load() is None:

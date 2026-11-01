@@ -99,6 +99,7 @@ if [ -e /etc/sentinel/sentinel.conf ]; then echo "  /etc/sentinel/sentinel.conf 
 do_ chown root:adm /etc/sentinel/sentinel.conf; do_ chmod 640 /etc/sentinel/sentinel.conf
 do_ install -d -m 750 -o root -g adm /var/lib/sentinel /var/log/sentinel
 do_ install -d -m 770 -o root -g sentinel /var/log/sentinel/decoy
+[ -d /usr/share/polkit-1/actions ] && do_ install -m 644 "$AQUI/packaging/polkit/org.sentinel.policy" /usr/share/polkit-1/actions/org.sentinel.policy || true
 do_ install -m 644 /dev/stdin /etc/logrotate.d/sentinel <<'EOF'
 /var/log/sentinel/events.jsonl /var/log/sentinel/decoy/honeypot.jsonl {
     weekly
