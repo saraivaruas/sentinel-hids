@@ -163,7 +163,8 @@ def scan_content(path: str, exts: list[str], limit: int = 2_000_000) -> list[str
             data = f.read()
     except OSError:
         return []
-    return [name for name, rx in SIGNATURES.items() if rx.search(data)]
+    from . import webshell
+    return webshell.analyze(data)
 
 
 # Los archivos de Sentinel mismo: si cambian durante una actualización de paquetes es la propia actualización, no un ataque.
