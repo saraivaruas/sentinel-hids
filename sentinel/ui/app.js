@@ -81,6 +81,18 @@
     finally { if (btn) { btn.disabled = false; btn.textContent = btn.dataset.l; } }
   }
 
+  // ---------- menú lateral (hamburguesa): se recoge a solo íconos; en pantallas angostas es un cajón
+  const narrow = () => matchMedia("(max-width: 900px)").matches;
+  function setSidebar(open, save) {
+    const b = document.body;
+    if (narrow()) b.classList.toggle("sb-open", open); else b.classList.toggle("sb-collapsed", !open);
+    $("#burger").setAttribute("aria-expanded", String(open));
+    if (save && !narrow()) { try { localStorage.setItem("sentinel-sb", open ? "1" : "0"); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
+  }
+  $("#burger").addEventListener("click", () => setSidebar(narrow() ? !document.body.classList.contains("sb-open") : document.body.classList.contains("sb-collapsed"), true));
+  $("#scrim").addEventListener("click", () => setSidebar(false));
+  document.querySelectorAll(".nav").forEach((b) => { const t = b.querySelector("span"); if (t) b.setAttribute("title", t.textContent); });
+  try { if (!narrow() && localStorage.getItem("sentinel-sb") === "0") setSidebar(false); } catch (e) { /* idem */ }
   // ---------- navegación
   const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
@@ -92,6 +104,7 @@
     document.querySelectorAll(".nav").forEach((b) => b.setAttribute("aria-current", b.dataset.view === v ? "page" : "false"));
     $("#title").textContent = TITLES[v][0]; $("#subtitle").textContent = TITLES[v][1];
     if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
+    if (narrow()) setSidebar(false);
     if (v.startsWith("fw-")) loadFirewall();
     if (v === "ajustes") loadSettings();
     if (v === "eventos") loadEvents();
@@ -141,13 +154,59 @@
     const nb = $("#nav-bans"); nb.hidden = !o.bans.length; nb.textContent = o.bans.length;
     const hi = o.counts24.high + o.counts24.critical, ne = $("#nav-ev"); ne.hidden = !hi; ne.textContent = hi;
   }
+  // Mini-gráficas de 7 días en las tarjetas (área suave, sin números: el número grande ya es el dato)
+  function renderSparks(o) {
+    [["sp-crit", "critical"], ["sp-high", "high"], ["sp-med", "medium"]].forEach(([id, sev]) => {
+      const s = $("#" + id); clear(s);
+      const v = (o.days || []).map((d) => d.c[sev]), max = Math.max(1, ...v), n = v.length - 1;
+      if (v.length < 2) return;
+      const pts = v.map((y, i) => [(i / n) * 100, 26 - (y / max) * 22]);
+      const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+      s.appendChild(svg("path", { d: line + " L100 28 L0 28 Z", fill: SEV_COL[sev], "fill-opacity": ".16", stroke: "none" }));
+      s.appendChild(svg("path", { d: line, fill: "none", stroke: SEV_COL[sev], "stroke-width": 1.8, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }));
+      const t = svg("title", {}, "Últimos 7 días: " + v.join(" · ")); s.appendChild(t);
+    });
+  }
+  // Dona: reparto por gravedad de las últimas 24 horas (cada porción con su nombre y número en la leyenda: nunca solo color)
+  function renderDonut(o) {
+    const box = $("#donut"), lg = $("#donut-l"); clear(box); clear(lg);
+    const order = ["critical", "high", "medium", "low", "info"], total = order.reduce((a, k) => a + o.counts24[k], 0);
+    const s = svg("svg", { viewBox: "0 0 120 120", role: "img", "aria-label": "Eventos por gravedad en las últimas 24 horas" });
+    const r = 46, c = 2 * Math.PI * r; let off = 0;
+    s.appendChild(svg("circle", { cx: 60, cy: 60, r, fill: "none", stroke: "currentColor", "stroke-opacity": ".1", "stroke-width": 14 }));
+    if (total) order.forEach((k) => {
+      const n = o.counts24[k]; if (!n) return;
+      const len = (n / total) * c, gap = total > n ? 2 : 0;
+      s.appendChild(svg("circle", { cx: 60, cy: 60, r, fill: "none", stroke: SEV_COL[k], "stroke-width": 14, "stroke-dasharray": Math.max(0, len - gap) + " " + c, "stroke-dashoffset": -off, transform: "rotate(-90 60 60)" }, null));
+      off += len;
+    });
+    s.appendChild(svg("text", { x: 60, y: 58, "text-anchor": "middle", class: "dn-n" }, nf.format(total)));
+    s.appendChild(svg("text", { x: 60, y: 74, "text-anchor": "middle", class: "dn-l" }, "eventos"));
+    box.appendChild(s);
+    order.forEach((k) => {
+      const li = el("li"); const i = el("i"); i.style.setProperty("--c", SEV_COL[k]); li.appendChild(i);
+      li.appendChild(el("span", null, SEV_ES[k])); li.appendChild(el("b", null, nf.format(o.counts24[k])));
+      lg.appendChild(li);
+    });
+  }
+  // Barras horizontales: eventos por módulo (un solo color: aquí importa la cantidad, no la gravedad)
+  function renderMods(o) {
+    const ul = $("#mods"); clear(ul);
+    if (!(o.modules || []).length) { ul.appendChild(el("li", "empty", "Sin eventos relevantes en las últimas 24 horas.")); return; }
+    const NAMES = { fim: "Archivos", auth: "Accesos", host: "Equipo", ban: "Bloqueos", decoy: "Señuelos", packets: "Paquetes", monitor: "Monitor", firewall: "Firewall", pin: "PIN", update: "Actualización", test: "Prueba" };
+    const m = o.modules[0].n;
+    o.modules.forEach((x) => {
+      const li = el("li"); li.appendChild(el("span", "hb-n", NAMES[x.name] || x.name)); li.appendChild(el("b", null, nf.format(x.n)));
+      const b = el("div", "hb-bar"); const i = el("i"); i.style.width = Math.max(3, (x.n / m) * 100) + "%"; b.appendChild(i); li.appendChild(b); ul.appendChild(li);
+    });
+  }
   function renderLegend() {
     const lg = $("#legend"); if (lg.firstChild) return;
     ["critical", "high", "medium", "low", "info"].forEach((s) => { const sp = el("span", null, SEV_ES[s]); const i = el("i"); i.style.setProperty("--c", SEV_COL[s]); sp.prepend(i); lg.appendChild(sp); });
   }
   function renderChart(o) {
     const box = $("#chart"); clear(box);
-    const W = 720, H = 300, L = 34, B = 26, T = 8, bw = (W - L) / 24;
+    const W = 720, H = 250, L = 34, B = 26, T = 8, bw = (W - L) / 24;
     const tot = o.hours.map((h) => SEV.reduce((s, k) => s + h.c[k], 0));
     const max = Math.max(4, ...tot), top = Math.ceil(max / 4) * 4;
     const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Eventos por hora en las últimas 24 horas" });
@@ -229,7 +288,7 @@
   function render(o) {
     st.ov = o; st.installed = o.installed;
     $("#ver").textContent = "v" + o.version;
-    renderHero(o); renderKpis(o); renderLegend(); renderChart(o); renderServices(o); renderIps(o); renderFeed(o); renderBans(o);
+    renderHero(o); renderKpis(o); renderSparks(o); renderLegend(); renderChart(o); renderDonut(o); renderMods(o); renderServices(o); renderIps(o); renderFeed(o); renderBans(o);
     $("#clock").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false });
   }
 

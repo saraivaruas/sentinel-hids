@@ -145,6 +145,10 @@ class UiTests(unittest.TestCase):
             with self.assertRaises((ValueError, TypeError)):
                 ui.build_action({"name": "fw_config_varios", "pares": malo})
 
+    def test_resumen_trae_datos_para_los_graficos(self):
+        o = json.loads(self.req("GET", "/api/overview")[2])
+        self.assertEqual(len(o["days"]), 7); self.assertEqual(set(o["days"][0]["c"]), set(core.SEV)); self.assertIsInstance(o["modules"], list)
+
     def test_acciones_del_pin(self):
         self.assertEqual(ui.build_action({"name": "pin_establecer", "pin": "", "nuevo": "secreto-1"}), ["pin", "establecer"])
         self.assertEqual(ui.build_action({"name": "pin_quitar"}), ["pin", "quitar"])
