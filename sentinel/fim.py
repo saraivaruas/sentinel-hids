@@ -187,6 +187,19 @@ def package_activity(window: int = 300, log: str = "/var/log/dpkg.log") -> bool:
         return False
 
 
+def reclassify(path: str, kind: str, sev: str, detail: str, pkg: bool, sigs: list) -> tuple[str, str]:
+    """Baja la gravedad de cambios que son esperables (la propia actualización de Sentinel, el firewall, apt) para que el informe solo muestre lo real."""
+    if pkg and not sigs and es_de_sentinel(path):
+        return "info", detail + " (actualización de Sentinel)"
+    if kind in ("removed", "link", "type") and es_de_sentinel(path) and path.startswith("/etc/systemd/system/"):
+        return "low", detail + " — copia antigua de un servicio de Sentinel; el paquete la reemplazó por la de /lib/systemd/system"
+    if re.match(r"^/etc/ufw/user6?\.rules$", path) and kind == "modified" and not sigs:
+        return "low", detail + " — las reglas del firewall cambiaron; el módulo Firewall avisa con detalle qué regla se agregó o quitó"
+    if pkg and not sigs and path.startswith(("/usr/", "/etc/", "/opt/", "/lib")) and kind in ("modified", "added", "perm") and sev in ("medium", "high"):
+        return "low", detail + " (durante una actualización de paquetes)"
+    return sev, detail
+
+
 class Fim:
     def __init__(self, cfg, alerter: core.Alerter, allow: core.Allow):
         self.cfg, self.alerter, self.allow = cfg, alerter, allow
@@ -244,12 +257,7 @@ class Fim:
                     sev, detail = "critical", f"posible puerta trasera: {', '.join(sigs)}"
                 elif f["kind"] == "added" and os.path.splitext(f["path"])[1].lstrip(".").lower() in self.exts:
                     sev = "high"; detail = "archivo ejecutable nuevo en carpeta web"
-            if pkg and not sigs and es_de_sentinel(f["path"]):
-                sev = "info"; detail += " (actualización de Sentinel)"
-            elif f["kind"] == "removed" and es_de_sentinel(f["path"]) and f["path"].startswith("/etc/systemd/system/"):
-                sev = "low"; detail += " — copia antigua de un servicio de Sentinel; el paquete la reemplazó por la de /lib/systemd/system"
-            elif pkg and not sigs and f["path"].startswith(("/usr/", "/etc/", "/opt/", "/lib")) and f["kind"] in ("modified", "added", "perm") and sev in ("medium", "high"):
-                sev = "low"; detail += " (durante una actualización de paquetes)"
+            sev, detail = reclassify(f["path"], f["kind"], sev, detail, pkg, sigs)
             f2 = dict(f, sev=sev, detail=detail)
             results.append(f2)
             self.alerter.emit(sev, "fim", f["kind"], f"{f['path']}: {detail}", key=f"fim:{f['kind']}:{f['path']}:{f.get('sha', '')}", path=f["path"], detail=detail, signatures=sigs)

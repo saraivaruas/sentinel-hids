@@ -41,6 +41,32 @@ class HostTests(unittest.TestCase):
         finally:
             e.close()
 
+    def _run_con(self, base_ss, cur_ss):
+        import unittest.mock as m
+        e = Env()
+        try:
+            hc = hostcheck.HostCheck(e.cfg, e.alerter, e.allow)
+            base = {"listeners": hostcheck.parse_listeners(base_ss), "usb": [], "modules": [], "accounts": {"users": [], "uid0": [], "empty": []}}
+            core.atomic_write_json(hc.path, base)
+            with m.patch.object(hostcheck, "listeners", return_value=hostcheck.parse_listeners(cur_ss)), m.patch.object(hostcheck, "accounts", return_value=base["accounts"]), \
+                 m.patch.object(hostcheck, "proc_scan", return_value=[]), m.patch.object(hostcheck, "input_readers", return_value=[]), m.patch.object(hostcheck, "suspicious_connections", return_value=[]), \
+                 m.patch.object(hostcheck, "usb_devices", return_value=[]), m.patch.object(hostcheck, "kernel_modules", return_value=[]):
+                return [(ev.kind, ev.sev) for ev in hc.run()]
+        finally:
+            e.close()
+
+    def test_puertos_udp_efimeros_no_son_ruido(self):
+        base = SS + 'udp UNCONN 0 0 0.0.0.0:41099 0.0.0.0:* users:(("syncthing",pid=5,fd=3))\n'
+        cur = SS + 'udp UNCONN 0 0 0.0.0.0:38330 0.0.0.0:* users:(("syncthing",pid=5,fd=3))\n'          # syncthing eligió otro puerto alto al reiniciar
+        self.assertEqual(self._run_con(base, cur), [])
+        raro = SS + 'udp UNCONN 0 0 0.0.0.0:38330 0.0.0.0:* users:(("desconocido",pid=6,fd=3))\n'       # otro programa escuchando en todas las interfaces: sí avisa
+        self.assertEqual(self._run_con(base, raro), [("puerto_nuevo", "high")])
+        tcp = SS + 'tcp LISTEN 0 1 0.0.0.0:4444 0.0.0.0:* users:(("nc",pid=9,fd=3))\n'
+        self.assertEqual(self._run_con(base, tcp), [("puerto_nuevo", "high")])                            # un puerto TCP nuevo expuesto siempre avisa
+
+    def test_puerto_nuevo_solo_local_es_gravedad_baja(self):
+        self.assertEqual(self._run_con(SS, SS + 'tcp LISTEN 0 1 127.0.0.1:8081 0.0.0.0:* users:(("node",pid=8,fd=3))\n'), [("puerto_nuevo", "low")])
+
     def test_proceso_desde_carpeta_temporal_y_binario_borrado(self):
         d = tempfile.mkdtemp(prefix="sent_proc_", dir="/tmp")
         exe = os.path.join(d, "trabajo")

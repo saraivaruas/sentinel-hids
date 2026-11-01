@@ -84,3 +84,22 @@ class InformeTests(unittest.TestCase):
         from sentinel import fim
         out = fim.diff({"/etc/x": {"type": "f", "mode": 0o644, "uid": 0, "gid": 0, "size": 1, "sha": "a", "mtime": 1, "ino": 1}}, {}, [])
         self.assertIn("ya no existe", out[0]["detail"])
+
+    def test_el_informe_solo_cuenta_hallazgos_reales(self):
+        from sentinel import report
+        mk = lambda src, kind, sev: {"sev": sev, "source": src, "kind": kind, "msg": "m", "ts": "t", "epoch": 1, "key": kind, "data": {}}
+        evs = [mk("test", "prueba", "medium"), mk("monitor", "inicio", "info"), mk("fim", "modified", "info"), mk("host", "usb_nuevo", "low"), mk("auth", "fuerza_bruta", "high")]
+        self.assertEqual([e["kind"] for e in report.relevant(evs)], ["usb_nuevo", "fuerza_bruta"])
+
+    def test_cambios_del_firewall_y_servicios_propios_no_son_alta(self):
+        from sentinel import fim
+        r = lambda path, kind, sev="high", pkg=False, sigs=(): fim.reclassify(path, kind, sev, "x", pkg, list(sigs))[0]
+        self.assertEqual(r("/etc/ufw/user.rules", "modified"), "low")
+        self.assertEqual(r("/etc/systemd/system/sentinel-monitor.service", "removed"), "low")
+        self.assertEqual(r("/etc/systemd/system/timers.target.wants/sentinel-scan.timer", "link"), "low")
+        self.assertEqual(r("/opt/sentinel/sentinel/core.py", "modified", pkg=True), "info")
+        # lo que sí debe seguir avisando
+        self.assertEqual(r("/etc/ssh/sshd_config", "modified"), "high")
+        self.assertEqual(r("/etc/systemd/system/backdoor.service", "added"), "high")
+        self.assertEqual(r("/etc/systemd/system/otro.service", "removed"), "high")
+        self.assertEqual(r("/etc/ufw/user.rules", "modified", sigs=["php: x"]), "high")

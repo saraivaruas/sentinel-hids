@@ -23,6 +23,11 @@ def lynis_index(run_lynis: bool = False) -> int | None:
     return hist[-1]["index"] if hist else None
 
 
+def relevant(events: list[dict]) -> list[dict]:
+    """Quita lo que no es un hallazgo: pruebas de alerta, arranques y paradas del monitor y avisos informativos."""
+    return [e for e in events if e["source"] not in ("test", "monitor") and core.SEV[e["sev"]] >= 1]
+
+
 def group_events(events: list[dict], min_group: int = 3) -> list[dict]:
     """Junta eventos repetidos del mismo tipo en la misma carpeta (p. ej. 6 «eliminado» en /etc/systemd/system) en una sola fila explicada."""
     groups: dict = {}
@@ -48,7 +53,9 @@ def group_events(events: list[dict], min_group: int = 3) -> list[dict]:
 def build(days: int = 7, run_lynis: bool = False, cfg=None) -> str:
     cfg = cfg or core.load_config()
     since = core.now() - days * 86400
-    ev = core.read_events(since)
+    todos = core.read_events(since)
+    ev = relevant(todos)                       # el informe cuenta solo lo que de verdad pasó (sin pruebas ni avisos informativos)
+    ocultos = len(todos) - len(ev)
     au = audit.run_audit(cfg)
     by_sev = collections.Counter(e["sev"] for e in ev)
     by_kind = collections.Counter(f"{e['source']}/{e['kind']}" for e in ev)
@@ -65,8 +72,8 @@ body{{font:15px system-ui,sans-serif;max-width:980px;margin:2rem auto;padding:0 
 td,th{{border-bottom:1px solid #e8eaed;padding:.4rem .6rem;text-align:left;vertical-align:top}}.k{{display:flex;gap:1rem;flex-wrap:wrap}}.k div{{flex:1;min-width:130px;background:#f0f8fd;border-radius:12px;padding:.8rem}}
 .k b{{display:block;font-size:1.8rem;color:#00629b}}tr.fallo td,tr.critical td{{background:#fdecea}}tr.aviso td,tr.high td{{background:#fff6e8}}small{{color:#4a5568}}</style>
 <h1>Informe de Sentinel · últimos {days} días</h1><p>Generado el {core.iso()} · versión {core.VERSION}</p>
-<div class=k><div><b>{len(ev)}</b>eventos</div><div><b>{by_sev.get('critical', 0) + by_sev.get('high', 0)}</b>alta o crítica</div><div><b>{au['score']}/100</b>postura de seguridad</div><div><b>{li if li is not None else '—'}</b>índice Lynis</div></div>
-<h2>Eventos graves recientes</h2><p><small>Los eventos repetidos de una misma carpeta se muestran en una sola fila. «Eliminado» significa que el archivo ya no existe: lo borró un programa, una actualización o una persona; Sentinel no borra ni cambia tus archivos.</small></p><table>{top_rows}</table>
+<div class=k><div><b>{len(ev)}</b>hallazgos reales</div><div><b>{by_sev.get('critical', 0) + by_sev.get('high', 0)}</b>alta o crítica</div><div><b>{au['score']}/100</b>postura de seguridad</div><div><b>{li if li is not None else '—'}</b>índice Lynis</div></div>
+<h2>Eventos graves recientes</h2><p><small>El informe muestra solo hallazgos reales; se dejaron fuera {ocultos} registro(s) informativos (pruebas, arranques y paradas de Sentinel). Los eventos repetidos de una misma carpeta se muestran en una sola fila. «Eliminado» significa que el archivo ya no existe: lo borró un programa, una actualización o una persona; Sentinel no borra ni cambia tus archivos.</small></p><table>{top_rows}</table>
 <h2>Por tipo</h2><table>{rows(by_kind)}</table><h2>IPs más activas</h2><table>{rows(ips)}</table><h2>Por día</h2><table>{rows(day, 14)}</table>
 <h2>Postura de seguridad</h2><table>{audit_rows}</table>"""
 
