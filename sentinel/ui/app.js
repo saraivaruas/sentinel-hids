@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar"]);
+  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -298,7 +298,7 @@
     const c = $("#sev-chips"); clear(c);
     const all = st.evAll || [], mod = $("#f-mod").value;
     [["info", "Todo"], ["low", "Baja+"], ["medium", "Media+"], ["high", "Alta+"], ["critical", "Crítica"]].forEach(([k, l]) => {
-      const n = all.filter((e) => SEVN[e.sev] >= SEVN[k] && (!mod || e.source === mod)).length;
+      const n = all.filter((e) => SEVN[e.sev] >= SEVN[k] && (!mod || e.source === mod) && (!e.resolved || $("#f-res").checked)).length;
       const b = el("button", "chip", l + " · " + n, { "aria-pressed": String(st.minSev === k) });
       b.addEventListener("click", () => { st.minSev = k; renderEvents(); });
       c.appendChild(b);
@@ -317,11 +317,11 @@
   function renderEvents() {
     chips();
     const mod = $("#f-mod").value;
-    const list = (st.evAll || []).filter((e) => SEVN[e.sev] >= SEVN[st.minSev] && (!mod || e.source === mod));
+    const list = (st.evAll || []).filter((e) => SEVN[e.sev] >= SEVN[st.minSev] && (!mod || e.source === mod) && (!e.resolved || $("#f-res").checked));
     const body = $("#ev-body"); clear(body);
     $("#ev-empty").hidden = list.length > 0;
     list.forEach((e) => {
-      const tr = el("tr", "row");
+      const tr = el("tr", e.resolved ? "row done" : "row");
       tr.appendChild(el("td", "mono", when(e.epoch)));
       const t = el("td"); t.appendChild(el("span", "badge sev-" + e.sev, SEV_ES[e.sev])); tr.appendChild(t);
       tr.appendChild(el("td", null, e.source + "/" + e.kind));
@@ -332,6 +332,12 @@
         if (ev.target.closest("button")) return;
         if (box) { box.remove(); box = null; return; }
         box = el("div", "ev-more"); box.appendChild(el("pre", null, JSON.stringify(e.data || {}, null, 2) + "\nclave: " + e.key));
+        if (!e.resolved && SEVN[e.sev] >= 1) {
+          const r = el("button", "btn sm", "Marcar como resuelto");
+          r.title = "Deja de contar en el resumen y en los informes (sigue en el historial). Pide tu PIN y tu clave";
+          r.addEventListener("click", async () => { const x = await runAction("resolver", { epoch: e.epoch, key: e.key }, r); if (x && x.ok) loadEvents(); });
+          box.appendChild(r);
+        }
         if (e.normal) {
           const b = el("button", "btn sm", "Esto es normal");
           b.title = "Lo acepta como normal para que no vuelva a avisar (pide tu PIN y tu clave)";
@@ -348,7 +354,7 @@
   async function loadSettings() {
     const s = await api("/api/settings"), v = s.values;
     $("#st-desk").value = v["general.enable_desktop"] === "no" ? "no" : "yes"; $("#st-min").value = v["general.notify_min"]; $("#st-style").value = v["general.notify_style"] || "corner";
-    $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"]; $("#st-hb").value = v["alerts.heartbeat_url"] || ""; $("#st-ntfy").value = v["general.ntfy_url"] || ""; $("#st-mail").value = v["general.email_to"] || "";
+    $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"]; $("#st-hb").value = v["alerts.heartbeat_url"] || ""; $("#st-qf").value = v["general.quiet_from"] || ""; $("#st-qt").value = v["general.quiet_to"] || ""; $("#st-ntfy").value = v["general.ntfy_url"] || ""; $("#st-mail").value = v["general.email_to"] || "";
     st.pinSet = !!s.pin.enabled; $("#pin-st").textContent = st.pinSet ? "activo" : "sin PIN"; $("#pin-st").className = "badge sev-" + (st.pinSet ? "low" : "medium");
     $("#pin-old-l").hidden = !st.pinSet; $("#pin-clear").hidden = !st.pinSet; $("#pin-save").textContent = st.pinSet ? "Cambiar PIN" : "Activar PIN";
     const lr = $("#st-learn"); if (lr) { lr.textContent = s.learning ? "activo hasta " + new Date(s.learning * 1000).toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "apagado"; lr.className = "badge sev-" + (s.learning ? "medium" : "info"); $("#st-learn-btn").textContent = s.learning ? "Terminar aprendizaje" : "Aprender por 3 días"; $("#st-learn-btn").dataset.on = s.learning ? "1" : ""; }
@@ -575,6 +581,7 @@
     toast("Ajustes guardados. El plan de Puertos ya está actualizado."); loadFirewall();
   });
   $("#f-mod").addEventListener("change", renderEvents);
+  $("#f-res").addEventListener("change", renderEvents);
   $("#st-hp-btn").addEventListener("click", async (e) => {
     const on = !e.currentTarget.dataset.on;
     if (on && !(await confirmDlg("Activar los señuelos", "Se abrirán puertos falsos en este equipo (el firewall los mantiene cerrados hacia afuera). ¿Seguro?", "Activar"))) return;
@@ -594,7 +601,7 @@
   });
   $("#st-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const r = await runAction("ajustes", { pares: { "general.enable_desktop": $("#st-desk").value, "general.notify_min": $("#st-min").value, "general.notify_style": $("#st-style").value, "general.notify_seconds": $("#st-secs").value, "general.notify_seconds_critical": $("#st-secs-c").value, "general.popup_min": $("#st-popup").value, "alerts.heartbeat_url": $("#st-hb").value.trim(), "general.ntfy_url": $("#st-ntfy").value.trim(), "general.email_to": $("#st-mail").value.trim() } });
+    const r = await runAction("ajustes", { pares: { "general.enable_desktop": $("#st-desk").value, "general.notify_min": $("#st-min").value, "general.notify_style": $("#st-style").value, "general.notify_seconds": $("#st-secs").value, "general.notify_seconds_critical": $("#st-secs-c").value, "general.popup_min": $("#st-popup").value, "alerts.heartbeat_url": $("#st-hb").value.trim(), "general.quiet_from": $("#st-qf").value, "general.quiet_to": $("#st-qt").value, "general.ntfy_url": $("#st-ntfy").value.trim(), "general.email_to": $("#st-mail").value.trim() } });
     if (r && r.ok) loadSettings();
   });
   $("#f-hours").addEventListener("change", loadEvents);

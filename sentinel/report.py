@@ -25,7 +25,8 @@ def lynis_index(run_lynis: bool = False) -> int | None:
 
 def relevant(events: list[dict]) -> list[dict]:
     """Quita lo que no es un hallazgo: pruebas de alerta, arranques y paradas del monitor y avisos informativos."""
-    return [e for e in events if e["source"] not in ("test", "monitor") and core.SEV[e["sev"]] >= 1]
+    done = core.resolved_ids()
+    return [e for e in events if e["source"] not in ("test", "monitor") and core.SEV[e["sev"]] >= 1 and core.event_id(e) not in done]
 
 
 def group_events(events: list[dict], min_group: int = 3) -> list[dict]:

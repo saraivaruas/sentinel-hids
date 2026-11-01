@@ -98,7 +98,8 @@ class Data:
 
     def overview(self) -> dict:
         now = core.now()
-        ev7 = core.read_events(now - 7 * 86400)
+        done = core.resolved_ids()
+        ev7 = [e for e in core.read_events(now - 7 * 86400) if core.event_id(e) not in done]       # lo resuelto ya no cuenta
         ev24 = [e for e in ev7 if e["epoch"] >= now - 86400]
         count = lambda lst: {s: sum(1 for e in lst if e["sev"] == s) for s in core.SEV}
         h0 = int(now // 3600) * 3600
@@ -210,7 +211,8 @@ class Data:
             ev = [e for e in ev if ql in (e["msg"] + e["kind"] + e["source"] + json.dumps(e.get("data") or {}, ensure_ascii=False)).lower()]
         from . import normal
         out = ev[-limit:][::-1]
-        return [dict(e, normal=normal.args_for(e) is not None) for e in out]
+        done = core.resolved_ids()
+        return [dict(e, normal=normal.args_for(e) is not None, resolved=core.event_id(e) in done) for e in out]
 
 
 def sentinel_bin() -> str | None:
@@ -263,6 +265,12 @@ def build_action(body: dict) -> list[str]:
         if not args:
             raise ValueError("este evento no se puede marcar como normal")
         return args
+    if name == "resolver":
+        from . import normal
+        e = normal.find_event(float(body.get("epoch", 0)), str(body.get("key", "")))
+        if not e:
+            raise ValueError("no encontré ese evento")
+        return ["resolver", str(e["key"]), str(e["epoch"])]
     if name == "aprender":
         dias = int(body.get("dias", 3))
         if not 0 <= dias <= 30:
