@@ -2,6 +2,7 @@ import http.client
 import json
 import os
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -94,6 +95,20 @@ class UiTests(unittest.TestCase):
         self.assertEqual(ui.build_action({"name": "unban", "ip": "203.0.113.9"}), ["bans", "unban", "203.0.113.9"])
         self.assertEqual(ui.build_action({"name": "allow", "tipo": "ip", "valor": "203.0.113.0/24"}), ["allow", "ip", "203.0.113.0/24"])
         self.assertEqual(ui.build_action({"name": "scan_deep"}), ["scan", "--deep", "--quiet"])
+
+    def test_el_panel_se_reinicia_si_cambia_la_version_instalada(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            f = os.path.join(d, "core.py"); open(f, "w").write('VERSION = "9.9.9"\n')
+            self.assertEqual(ui.installed_version(f), "9.9.9"); self.assertIsNone(ui.installed_version(os.path.join(d, "no.py")))
+            srv = mock.Mock(); ui.watch_updates(srv, every=0.05, core_file=f)
+            for _ in range(40):
+                if srv.schedule_restart.called:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(srv.schedule_restart.called)                       # el disco tiene otra versión que la que corre
+            same = mock.Mock(); open(f, "w").write(f'VERSION = "{core.VERSION}"\n'); ui.watch_updates(same, every=0.05, core_file=f); time.sleep(0.3)
+            self.assertFalse(same.schedule_restart.called)
 
     def test_acciones_del_firewall(self):
         self.assertEqual(ui.build_action({"name": "fw_estado"}), ["firewall", "estado", "--guardar"])

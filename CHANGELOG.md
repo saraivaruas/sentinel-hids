@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.5.1] - 2026-11-01
+
+### Corregido
+- Si se instala una versión nueva con `apt` o el instalador mientras el panel está abierto, el panel **se reinicia solo** con el código nuevo (antes seguía con el viejo y rechazaba las acciones nuevas, como guardar el PIN).
+
 ## [2.5.0] - 2026-11-01
 
 ### Agregado
