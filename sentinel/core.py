@@ -60,6 +60,17 @@ backend = auto
 ttl_seconds = 86400
 protect_private = yes
 
+[weblog]
+; Registros de acceso de tus sitios web (admite comodines). Si no existen, no se vigila nada.
+paths = /var/log/nginx/*access*.log,/var/log/apache2/*access*.log,/var/log/httpd/*access_log
+; bloquear 24 h a quien ataca (ejecución de comandos, inyección SQL, escáneres, fuerza bruta)
+ban = yes
+window = 600
+scan_404 = 30
+login_fail = 15
+attack_hits = 3
+probe_hits = 8
+
 [firewall]
 backend = auto
 allow_tcp = 80,443

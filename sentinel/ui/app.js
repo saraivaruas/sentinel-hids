@@ -193,7 +193,7 @@
   function renderMods(o) {
     const ul = $("#mods"); clear(ul);
     if (!(o.modules || []).length) { ul.appendChild(el("li", "empty", "Sin eventos relevantes en las últimas 24 horas.")); return; }
-    const NAMES = { fim: "Archivos", auth: "Accesos", host: "Equipo", ban: "Bloqueos", decoy: "Señuelos", packets: "Paquetes", monitor: "Monitor", firewall: "Firewall", pin: "PIN", update: "Actualización", test: "Prueba" };
+    const NAMES = { fim: "Archivos", auth: "Accesos", host: "Equipo", web: "Sitio web", ban: "Bloqueos", decoy: "Señuelos", packets: "Paquetes", monitor: "Monitor", firewall: "Firewall", pin: "PIN", update: "Actualización", test: "Prueba" };
     const m = o.modules[0].n;
     o.modules.forEach((x) => {
       const li = el("li"); li.appendChild(el("span", "hb-n", NAMES[x.name] || x.name)); li.appendChild(el("b", null, nf.format(x.n)));
@@ -389,7 +389,7 @@
 
   // ---------- Atacantes
   const NIV = { bajo: ["🟢", "Poco peligroso", "low"], medio: ["🟡", "Para vigilar", "medium"], alto: ["🔴", "Peligroso", "critical"] };
-  const KIND_ES = { ssh_clave: "Adivinar contraseñas", ssh_usuario_invalido: "Probar usuarios", ssh_llave: "Probar llaves", escaneo_puertos: "Revisar puertas", escaneo_syn: "Escaneo de puertos", escaneo_sigiloso: "Escaneo sigiloso", escaneo_udp: "Escaneo UDP", inundacion_syn: "Inundación de timbres", ping_masivo: "Ping masivo", senuelo: "Cayó en el señuelo" };
+  const KIND_ES = { ssh_clave: "Adivinar contraseñas", ssh_usuario_invalido: "Probar usuarios", ssh_llave: "Probar llaves", escaneo_puertos: "Revisar puertas", escaneo_syn: "Escaneo de puertos", escaneo_sigiloso: "Escaneo sigiloso", escaneo_udp: "Escaneo UDP", inundacion_syn: "Inundación de timbres", ping_masivo: "Ping masivo", senuelo: "Cayó en el señuelo", web_rce: "Comandos en el sitio web", web_sqli: "Inyección SQL", web_traversal: "Salir de la carpeta (../)", web_xss: "Scripts (XSS)", web_secretos: "Archivos secretos", web_escaner: "Escáner web", web_sondeo: "Buscar paneles de admin", web_login: "Fuerza bruta de login web", web_404: "Ráfaga de 404" };
   const flag = (cc) => (cc && cc.length === 2 && /^[A-Za-z]+$/.test(cc)) ? String.fromCodePoint(...cc.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0))) : "🌐";
   let attSel = null, attTimer = 0, glossCache = null;
   async function glossary() { if (!glossCache) glossCache = await api("/api/glossary"); return glossCache; }
