@@ -2,6 +2,16 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.4.0] - 2026-11-01
+
+### Agregado
+- **Aviso en la esquina inferior derecha** (propio, con GTK): aparece unos segundos y se cierra solo, y un aviso nuevo reemplaza al anterior. Si no hay GTK, se usa la notificación normal del escritorio. Se elige con `notify_style`.
+- Panel: página **Ajustes** para activar o apagar los señuelos y configurar los avisos (gravedad mínima, dónde aparecen, segundos visibles, ventana grande).
+- Eventos: los filtros de gravedad muestran cuántos eventos hay en cada nivel, se filtran al instante y hay un selector de **módulo**.
+
+### Corregido
+- Los cambios en los servicios de Sentinel (`/etc/systemd/system/sentinel-*`, enlaces `*.wants`) durante su propia actualización salían como eventos de gravedad alta; ahora quedan informativos.
+
 ## [2.3.0] - 2026-11-01
 
 ### Agregado
