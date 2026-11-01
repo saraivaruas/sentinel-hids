@@ -487,6 +487,28 @@ def open_window(url: str) -> None:
     webbrowser.open(url)
 
 
+def installed_version(core_file: str | None = None) -> str | None:
+    """Versión que hay instalada ahora en disco (lee el archivo, no lo importa): si cambió, este panel está corriendo código viejo."""
+    try:
+        with open(core_file or core.__file__, encoding="utf-8") as f:
+            m = re.search(r'^VERSION = "([\d.]+)"', f.read(), re.M)
+        return m.group(1) if m else None
+    except OSError:
+        return None
+
+
+def watch_updates(srv, every: float = 20.0, core_file: str | None = None) -> None:
+    """Si se instala una versión nueva mientras el panel está abierto (apt, instalador), el panel se reinicia solo con el código nuevo."""
+    def loop():
+        while True:
+            time.sleep(every)
+            v = installed_version(core_file)
+            if v and v != core.VERSION:
+                srv.schedule_restart()
+                return
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def run_ui(port: int = DEFAULT_PORT, open_browser: bool = True, cfg=None) -> int:
     token = load_token()
     url = f"http://127.0.0.1:{port}/?t={token}"
@@ -500,6 +522,7 @@ def run_ui(port: int = DEFAULT_PORT, open_browser: bool = True, cfg=None) -> int
     print(f"Panel de Sentinel en http://127.0.0.1:{port}/  (solo este equipo). Ctrl+C para cerrar.")
     if open_browser:
         threading.Timer(0.6, open_window, args=(url,)).start()
+    watch_updates(srv)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
