@@ -70,6 +70,13 @@ class Data:
         self._svc = (time.time(), res)
         return res
 
+    def settings(self) -> dict:
+        cfg = core.load_config()
+        vals = {f"{s}.{k}": cfg.get(s, k, fallback="") for (s, k) in core.EDITABLE}
+        from . import toast
+        on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 4)[1].strip().split("\n")[-1] == "active"
+        return {"values": vals, "honeypot": {"active": on, "ports": core.csv(cfg.get("honeypot", "ports", fallback=""))}, "toast_available": toast.available()}
+
     def audit(self, force: bool = False) -> dict:
         with self.lock:
             stale = time.time() - self._audit_at > 900
@@ -224,6 +231,19 @@ def build_action(body: dict) -> list[str]:
             raise ValueError("horas entre 1 y 720")
         motivo = re.sub(r"[^\w .,:()/-]", "", str(body.get("motivo", "bloqueo manual")))[:80] or "bloqueo manual"
         return ["bans", "ban", ip, "--horas", str(horas), "--motivo", motivo]
+    if name == "ajustes":
+        pares = body.get("pares")
+        if not isinstance(pares, dict) or not pares or len(pares) > 12:
+            raise ValueError("ajustes inválidos")
+        out = ["config"]
+        for k, v in pares.items():
+            sec, _, key = str(k).partition(".")
+            if (sec, key) not in core.EDITABLE or not core.EDITABLE[(sec, key)](str(v)):
+                raise ValueError("ajuste no permitido")
+            out.append(f"{sec}.{key}={v}")
+        return out
+    if name == "senuelos":
+        return ["senuelos", "activar" if body.get("on") is True else "desactivar"]
     if name == "fw_estado":
         return ["firewall", "estado", "--guardar"]
     if name == "fw_aplicar":
@@ -344,6 +364,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             hours = max(1, min(720, int((q.get("hours") or ["24"])[0] or 24)))
             sev = (q.get("min") or ["info"])[0]
             return self._json(d.events(hours, sev if sev in core.SEV else "info", (q.get("q") or [""])[0][:100], max(1, min(500, int((q.get("limit") or ["200"])[0] or 200)))))
+        if u.path == "/api/settings":
+            return self._json(d.settings())
         if u.path == "/api/firewall":
             return self._json(core.read_json(os.path.join(core.state_dir(), "firewall.json"), {}) or {"ok": False})
         if u.path == "/api/audit":

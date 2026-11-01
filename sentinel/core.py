@@ -11,6 +11,7 @@ import ipaddress
 import json
 import os
 import pwd
+import re
 import shutil
 import subprocess
 import threading
@@ -152,6 +153,39 @@ def load_config(path: str | None = None) -> configparser.ConfigParser:
     if os.path.exists(p):
         cfg.read(p, encoding="utf-8")
     return cfg
+
+
+SEVS = ("info", "low", "medium", "high", "critical")
+# Ajustes que el panel puede cambiar: (sección, clave) -> validador. Todo lo demás se edita a mano en sentinel.conf.
+EDITABLE = {
+    ("general", "enable_desktop"): lambda v: v in ("yes", "no"),
+    ("general", "notify_min"): lambda v: v in SEVS,
+    ("general", "popup_min"): lambda v: v in SEVS or v == "never",
+    ("general", "notify_seconds"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
+    ("general", "notify_seconds_critical"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
+    ("general", "notify_style"): lambda v: v in ("corner", "system"),
+}
+
+
+def set_setting(section: str, key: str, value: str, path: str | None = None) -> None:
+    """Cambia un valor de sentinel.conf (solo los de EDITABLE, validados) sin tocar el resto del archivo."""
+    ok = EDITABLE.get((section, key))
+    if ok is None or not ok(value):
+        raise ValueError(f"ajuste no permitido: {section}.{key} = {value!r}")
+    path = path or conf_path()
+    txt = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    m = re.search(rf"^\[{section}\]\s*$", txt, re.M)
+    if not m:
+        txt = txt.rstrip("\n") + f"\n\n[{section}]\n{key} = {value}\n"
+    else:
+        end = re.search(r"^\[", txt[m.end():], re.M)
+        stop = m.end() + end.start() if end else len(txt)
+        sec = txt[m.end():stop]
+        k = re.search(rf"^{key}\s*=.*$", sec, re.M)
+        sec = sec[:k.start()] + f"{key} = {value}" + sec[k.end():] if k else sec.rstrip("\n") + f"\n{key} = {value}\n" + ("\n" if end else "")
+        txt = txt[:m.end()] + sec + txt[stop:]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(txt)
 
 
 def csv(value: str) -> list[str]:

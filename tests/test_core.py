@@ -46,3 +46,21 @@ class CoreTests(unittest.TestCase):
         self.e.alerter.emit("info", "t", "k", "m", key="p")
         import os, stat
         self.assertEqual(stat.S_IMODE(os.stat(self.e.alerter.path).st_mode), 0o640)
+
+
+class AjustesTests(unittest.TestCase):
+    def test_set_setting_cambia_solo_lo_pedido(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "s.conf")
+            with open(p, "w") as f:
+                f.write("[general]\nnotify_min = medium\nemail_to = a@b.cl\n\n[ban]\nbackend = auto\n")
+            core.set_setting("general", "notify_min", "high", p); core.set_setting("general", "popup_min", "never", p)
+            with open(p) as f:
+                txt = f.read()
+            self.assertIn("notify_min = high", txt); self.assertIn("email_to = a@b.cl", txt); self.assertIn("[ban]\nbackend = auto", txt)
+            self.assertEqual(core.load_config(p).get("general", "popup_min"), "never")
+            for bad in (("general", "email_to", "x"), ("general", "notify_min", "ultra"), ("ban", "backend", "none"), ("general", "notify_seconds", "1")):
+                with self.assertRaises(ValueError):
+                    core.set_setting(*bad, path=p)
