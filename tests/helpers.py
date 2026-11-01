@@ -17,7 +17,8 @@ class Env:
         conf = os.path.join(self.dir, "sentinel.conf")
         with open(conf, "w", encoding="utf-8") as f:
             f.write(f"[general]\nenable_desktop = no\nenable_journal = no\n[fim]\npaths = {fim_paths or self.tree}\nwww = {www}\nexcludes = */.git/*,*.log\n[hostcheck]\nsuid_scan = no\n[ban]\nbackend = none\n{extra}\n")
-        os.environ.update(SENTINEL_CONF=conf, SENTINEL_STATE=os.path.join(self.dir, "state"), SENTINEL_LOG=os.path.join(self.dir, "log"))
+        os.environ.update(SENTINEL_CONF=conf, SENTINEL_STATE=os.path.join(self.dir, "state"), SENTINEL_LOG=os.path.join(self.dir, "log"),
+                          SENTINEL_RELEASE_KEY=os.path.join(self.dir, "sin-clave.asc"))
         self.cfg = core.load_config()
         self.alerter = core.Alerter(self.cfg, quiet=True)
         self.allow = core.Allow(self.cfg)
