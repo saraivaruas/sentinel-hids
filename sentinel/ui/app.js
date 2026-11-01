@@ -410,7 +410,7 @@
       $("#fw-sum").textContent = (f && f.error) ? "No pude leer el firewall: " + f.error : "Aún no hay datos: el monitor guarda una foto del firewall cada 5 minutos. Pulsa «Actualizar».";
       $("#fw-apply").disabled = true; $("#nav-fw").hidden = true; clear($("#fw-listen")); clear($("#fw-rules")); return;
     }
-    const p = f.plan, n = p.remove.length + p.missing.length;
+    const p = f.plan, n = p.remove.length + p.missing.length + (p.missing_from || []).length;
     $("#fw-sum").textContent = "Quedarán abiertos desde afuera: " + (p.keep_ports.join(", ") || "ninguno") + (f.ssh.ports.length ? " · SSH de este equipo: " + f.ssh.ports.join(", ") : " · este equipo no sirve SSH (tus despliegues por SSH hacia otros servidores no se tocan)") + " · foto de " + when(Date.parse(f.time) / 1000);
     p.remove.forEach((r) => row("−", "Se cerrará: " + r.label, r.comment || "Permite entrar a cualquiera", "aviso"));
     p.missing.forEach((m) => row("+", "Se abrirá el puerto " + m, "Lo pediste en los ajustes (o es el SSH de este equipo)", "info"));
