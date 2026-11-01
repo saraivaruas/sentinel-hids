@@ -9,7 +9,7 @@ import re
 import stat
 import time
 
-from . import core
+from . import core, malware
 
 CRITICAL = [r"^/etc/(passwd|shadow|gshadow|group|sudoers)(\.|$)", r"^/etc/sudoers\.d/", r"/\.ssh/authorized_keys2?$", r"^/etc/ld\.so\.preload$", r"^/etc/pam\.d/", r"^/root/\.ssh/"]
 HIGH = [r"^/etc/ssh/", r"^/usr/local/(s)?bin/", r"^/etc/systemd/system/", r"^/etc/cron", r"^/etc/rc\.local$", r"^/opt/sentinel", r"^/etc/profile", r"^/etc/environment$",
@@ -152,7 +152,7 @@ def diff(old: dict, new: dict, www: list[str] | None = None) -> list[dict]:
     return out
 
 
-def scan_content(path: str, exts: list[str], limit: int = 2_000_000) -> list[str]:
+def scan_content(path: str, exts: list[str], limit: int = 2_000_000, cfg=None) -> list[str]:
     """Busca firmas de puertas traseras en un archivo de aplicación web."""
     if os.path.splitext(path)[1].lstrip(".").lower() not in exts:
         return []
@@ -164,7 +164,8 @@ def scan_content(path: str, exts: list[str], limit: int = 2_000_000) -> list[str
     except OSError:
         return []
     from . import webshell
-    return webshell.analyze(data)
+    found = webshell.analyze(data)
+    return found + [x for x in malware.scan(path, cfg) if x not in found]
 
 
 # Los archivos de Sentinel mismo: si cambian durante una actualización de paquetes es la propia actualización, no un ataque.
@@ -245,6 +246,7 @@ class Fim:
             old_view = {p: v for p, v in old.items() if p in new or any(p == r or p.startswith(r + "/") for r in scope)}
         found = diff(old_view, new, self.www)
         pkg = package_activity()
+        malware.start_pass(self.cfg)
         results = []
         for f in found:
             if self.allow.path_ignored(f["path"]):
@@ -252,7 +254,7 @@ class Fim:
             sev, detail = f["sev"], f["detail"]
             sigs = []
             if f["kind"] in ("added", "modified") and any(f["path"].startswith(w.rstrip("/") + "/") for w in self.www):
-                sigs = scan_content(f["path"], self.exts)
+                sigs = scan_content(f["path"], self.exts, cfg=self.cfg)
                 if sigs:
                     sev, detail = "critical", f"posible puerta trasera: {', '.join(sigs)}"
                 elif f["kind"] == "added" and os.path.splitext(f["path"])[1].lstrip(".").lower() in self.exts:

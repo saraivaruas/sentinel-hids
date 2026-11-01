@@ -60,6 +60,13 @@ backend = auto
 ttl_seconds = 86400
 protect_private = yes
 
+[malware]
+; antivirus y reglas YARA para las carpetas web, solo si ya están instalados (clamav / yara). auto = usarlos si existen; no = nunca
+clamav = auto
+yara = auto
+; máximo de archivos que se mandan al antivirus en cada revisión
+max_per_scan = 25
+
 [alerts]
 ; Dirección https del latido externo (por ejemplo la de healthchecks.io): si Sentinel deja de avisar, ese servicio te avisa a ti
 heartbeat_url =
