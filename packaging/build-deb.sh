@@ -7,7 +7,7 @@ OUT="${SENTINEL_DIST:-$AQUI/dist}"; T="$(mktemp -d)"; P="$T/pkg"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$OUT" "$P/DEBIAN" "$P/opt/sentinel" "$P/usr/bin" "$P/lib/systemd/system" "$P/usr/share/applications" "$P/usr/share/icons/hicolor/scalable/apps" "$P/etc/sentinel" "$P/etc/logrotate.d" "$P/usr/share/doc/sentinel" "$P/usr/share/polkit-1/actions"
 
-cp -a "$AQUI/sentinel" "$AQUI/bin" "$AQUI/README.md" "$P/opt/sentinel/"
+cp -a "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$P/opt/sentinel/"
 find "$P/opt/sentinel" -name __pycache__ -prune -exec rm -rf {} +
 ln -s /opt/sentinel/bin/sentinel "$P/usr/bin/sentinel"
 [ -f "$AQUI/packaging/release-key.asc" ] && cp "$AQUI/packaging/release-key.asc" "$P/opt/sentinel/release-key.asc"
@@ -42,7 +42,7 @@ Installed-Size: $SIZE
 Maintainer: Jorge Luis Saraiva Ruas <28052181+saraivaruas@users.noreply.github.com>
 Depends: python3 (>= 3.8), systemd, procps, iproute2, util-linux, coreutils
 Recommends: inotify-tools, libnotify-bin, python3-gi, gir1.2-gtk-3.0, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
-Suggests: crowdsec, crowdsec-firewall-bouncer-iptables, lynis, mailutils
+Suggests: clamav, yara, crowdsec, crowdsec-firewall-bouncer-iptables, lynis, mailutils
 Description: Sentinel: detector de intrusiones y cambios para Linux
  Vigila la integridad de archivos críticos, detecta puertas traseras web,
  fuerza bruta, escaneos de puertos y procesos sospechosos, tiene puertos

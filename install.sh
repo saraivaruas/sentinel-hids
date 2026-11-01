@@ -86,7 +86,7 @@ id sentinel >/dev/null 2>&1 && echo "  ya existe" || do_ useradd --system --no-c
 
 paso "2/8 Programa en $DEST (solo root puede modificarlo)"
 do_ rm -rf "$DEST"; do_ mkdir -p "$DEST"
-do_ cp -a "$AQUI/sentinel" "$AQUI/bin" "$AQUI/README.md" "$DEST/"
+do_ cp -a "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$DEST/"
 do_ find "$DEST" -name __pycache__ -prune -exec rm -rf {} +
 do_ chown -R root:root "$DEST"; do_ chmod -R go-w "$DEST"
 do_ ln -sf "$DEST/bin/sentinel" /usr/local/bin/sentinel
