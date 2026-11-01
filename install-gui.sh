@@ -28,13 +28,11 @@ Qué hará:
 SEL="$(zenity --list --checklist $TO --title "$TIT" --width=560 --height=330 --text="Elige las opciones y pulsa Aceptar:" --separator="|" --hide-header \
   --column="" --column="Opción" \
   TRUE "Instalar las dependencias que falten" \
-  TRUE "Retirar la versión 1 de Sentinel (con copia de respaldo)" \
-  FALSE "Abrir los puertos señuelo hacia Internet (avanzado)")" || exit 0
+  TRUE "Retirar la versión 1 de Sentinel (con copia de respaldo)")" || exit 0
 
 flags=()
 case "$SEL" in *"dependencias"*) ;; *) flags+=(--sin-dependencias);; esac
 case "$SEL" in *"versión 1"*) ;; *) flags+=(--sin-limpiar);; esac
-case "$SEL" in *"señuelo"*) flags+=(--exponer-senuelos);; esac
 
 # pkexec muestra la ventana de autorización del sistema; el avance se ve en la barra de progreso
 pkexec "$AQUI/install.sh" "${flags[@]}" 2>&1 | tee "$LOG" \

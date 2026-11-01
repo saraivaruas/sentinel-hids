@@ -256,6 +256,35 @@ def cmd_test(a) -> int:
     return 0
 
 
+def cmd_firewall(a) -> int:
+    from . import firewall
+    cfg = core.load_config()
+    if a.accion == "config":
+        try:
+            firewall.set_config(a.clave, a.valor)
+        except (ValueError, TypeError, OSError) as e:
+            print("No se cambió:", e); return 1
+        print(f"Listo: [firewall] {a.clave} = {a.valor}"); return 0
+    if a.accion in ("estado", "plan"):
+        s = firewall.state(cfg)
+        if a.guardar and core.is_root():
+            firewall.save_snapshot(cfg)
+        if a.json:
+            print(json.dumps(s, ensure_ascii=False, indent=1)); return 0 if s.get("ok") else 1
+        if not s.get("ok"):
+            print("No pude leer el cortafuegos:", s.get("error"), "(¿falta sudo?)"); return 1
+        print("\n".join(s["text"]))
+        if s["needs_harden"]:
+            print("  ! iptables acepta todo por defecto: usa  sudo sentinel firewall aplicar --endurecer  para cerrar de verdad.")
+        if a.accion == "plan":
+            print("\nSolo es el plan. Para aplicarlo:  sudo sentinel firewall aplicar")
+        return 0
+    print("\n".join(firewall.apply(cfg, harden=a.endurecer)))
+    if core.is_root():
+        firewall.save_snapshot(cfg)
+    return 0
+
+
 def cmd_ui(a) -> int:
     from . import ui
     return ui.run_ui(a.port, not a.sin_abrir)
@@ -302,6 +331,8 @@ def main(argv=None) -> int:
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
+    s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")
+    s.add_argument("--json", action="store_true"); s.add_argument("--guardar", action="store_true", help="guarda la foto para el panel"); s.add_argument("--endurecer", action="store_true", help="iptables: política de entrada DROP"); s.set_defaults(fn=cmd_firewall)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)
     sub.add_parser("honeypot", help="servicio de señuelos (lo lanza systemd)").set_defaults(fn=cmd_honeypot)

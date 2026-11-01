@@ -2,6 +2,15 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.2.0] - 2026-11-01
+
+### Agregado
+- **Módulo Firewall**, separado de la detección: deja abiertos desde afuera solo los puertos que configures (por defecto 80 y 443) y cierra el resto, con **ufw** o **iptables** (`sentinel firewall estado|plan|aplicar|config`). Mantiene el puerto de SSH si el equipo sirve SSH (tus conexiones ssh de despliegue hacia otros servidores son salientes y no se tocan), nunca cierra nada si el tráfico saliente no está permitido y guarda una copia de las reglas antes de cambiar.
+- Panel: menú lateral en dos grupos, **Sentinel · detección** y **Firewall · puertos** (páginas *Puertos* y *Reglas y ajustes*, con plan, aplicar y configuración).
+
+### Seguridad
+- **Sentinel ya no abre puertos**: se eliminó la opción `--exponer-senuelos` y la regla de cortafuegos que permitía los puertos señuelo. La instalación y la actualización apagan los señuelos y borran las reglas `sentinel-senuelo` que dejaron versiones anteriores.
+
 ## [2.1.1] - 2026-10-30
 
 ### Seguridad

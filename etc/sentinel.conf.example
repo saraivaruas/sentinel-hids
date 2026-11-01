@@ -33,5 +33,14 @@ www = /var/www/html
 ; Rutas extra a vigilar (se suman a las de sistema por defecto). Para cambiar la lista completa, define «paths = ...» aquí.
 excludes = */node_modules/*,*/.git/*,*/cache/*,*/storage/logs/*,*/storage/framework/*,*.log,*/uploads/*,*/vendor/*
 
+[firewall]
+; Módulo cortafuegos (aparte de la detección). auto = ufw si está activo, si no iptables. Ver el plan:  sentinel firewall plan
+backend = auto
+; Puertos que quedan abiertos desde afuera (todo lo demás se cierra al aplicar)
+allow_tcp = 80,443
+allow_udp =
+; Si este equipo sirve SSH (sshd), mantener su puerto abierto para no quedarte sin acceso
+keep_ssh = yes
+
 [honeypot]
 ports = 2222,2323,3390,5900,60009
