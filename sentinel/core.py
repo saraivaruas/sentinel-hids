@@ -62,6 +62,9 @@ backend = auto
 allow_tcp = 80,443
 allow_udp =
 keep_ssh = yes
+profile = custom
+restrict =
+ssh_limit = no
 refresh_seconds = 60
 
 [fim]

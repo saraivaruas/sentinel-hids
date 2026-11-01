@@ -182,6 +182,38 @@ udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
                 log = firewall.restore(use_pending=True)
             self.assertEqual(got, [c]); self.assertIsNone(firewall.pending())
 
+    def test_puertos_por_origen(self):
+        txt = UFW.replace("[ 8] 9200/tcp                   ALLOW IN    10.0.0.7", "[ 8] 9200/tcp                   ALLOW IN    10.0.0.0/8") + "[11] 22/tcp                     ALLOW IN    Anywhere\n"
+        conf = dict(CONF, restrict=firewall.parse_restrict("22=100.64.0.0/10|203.0.113.7, 9200=10.0.0.0/8"))
+        p = firewall.plan(ufw.parse_rules(txt), conf, {"ports": [], "sessions": []})
+        self.assertIn(11, [r["id"] for r in p["remove"]])                       # 22 abierto a cualquiera sobra
+        self.assertIn(8, [r["id"] for r in p["keep"]]); self.assertEqual(p["review"], [])      # 9200 desde 10.0.0.0/8 es lo pedido
+        self.assertEqual(p["missing_from"], [(22, "100.64.0.0/10"), (22, "203.0.113.7/32")])
+        self.assertNotIn(22, p["missing"]); self.assertTrue(any("solo desde 203.0.113.7/32" in l for l in firewall.describe(p, "ufw")))
+        calls = []
+        with mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+            ufw.allow(22, "tcp", "100.64.0.0/10")
+        self.assertEqual(calls[0], ["ufw", "allow", "from", "100.64.0.0/10", "to", "any", "port", "22", "proto", "tcp"])
+
+    def test_perfiles_y_validacion(self):
+        cfg = core.load_config(); cfg.set("firewall", "profile", "estacion")
+        self.assertEqual(firewall.settings(cfg)["allow_tcp"], [])
+        cfg.set("firewall", "profile", "web"); self.assertEqual(firewall.settings(cfg)["allow_tcp"], [80, 443])
+        self.assertEqual(firewall.parse_restrict("22=bad|10.0.0.1, x=1, 80="), {22: ["10.0.0.1/32"]})
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "s.conf"); open(p, "w").write("[fim]\nwww = /x\n")
+            firewall.set_config("restrict", "22=100.64.0.0/10|203.0.113.7", p); firewall.set_config("profile", "web", p); firewall.set_config("ssh_limit", "yes", p)
+            self.assertEqual(firewall.settings(core.load_config(p))["restrict"], {22: ["100.64.0.0/10", "203.0.113.7/32"]})
+            for k, v in (("restrict", "22=nada"), ("restrict", "22=10.0.0.1|zzz"), ("profile", "x"), ("ssh_limit", "tal vez")):
+                with self.assertRaises(ValueError):
+                    firewall.set_config(k, v, p)
+
+    def test_ssh_con_limite_de_intentos(self):
+        calls = []
+        with mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+            ufw.allow(22, "tcp", limit=True); ufw.allow(80, "tcp")
+        self.assertEqual(calls, [["ufw", "limit", "22/tcp"], ["ufw", "allow", "80/tcp"]])
+
 
 if __name__ == "__main__":
     unittest.main()

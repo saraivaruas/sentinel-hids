@@ -49,8 +49,10 @@ def files() -> list[str]:
     return ["/etc/ufw/user.rules", "/etc/ufw/user6.rules"]
 
 
-def allow(port: int, proto: str = "tcp") -> tuple[int, str]:
-    return core.run(["ufw", "allow", f"{port}/{proto}"])
+def allow(port: int, proto: str = "tcp", src: str | None = None, limit: bool = False) -> tuple[int, str]:
+    if src:
+        return core.run(["ufw", "allow", "from", src, "to", "any", "port", str(port), "proto", proto])
+    return core.run(["ufw", "limit" if limit else "allow", f"{port}/{proto}"])
 
 
 def delete_all(rs: list[dict]) -> list[tuple[dict, int, str]]:

@@ -234,7 +234,7 @@ def build_action(body: dict) -> list[str]:
         return ["firewall", "restaurar", "--pendiente"]
     if name == "fw_config":
         clave, valor = str(body.get("clave", "")), str(body.get("valor", ""))
-        if clave not in ("allow_tcp", "allow_udp", "keep_ssh", "backend") or not re.fullmatch(r"[\w,. -]{0,80}", valor):
+        if clave not in ("allow_tcp", "allow_udp", "keep_ssh", "backend", "profile", "ssh_limit", "restrict") or not re.fullmatch(r"[\w,. =|/:-]{0,200}" if clave == "restrict" else r"[\w,. -]{0,80}", valor):
             raise ValueError("ajuste inválido")
         return ["firewall", "config", clave, valor]
     if name == "baseline_accept":

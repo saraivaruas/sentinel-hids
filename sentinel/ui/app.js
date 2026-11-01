@@ -414,6 +414,7 @@
     $("#fw-sum").textContent = "Quedarán abiertos desde afuera: " + (p.keep_ports.join(", ") || "ninguno") + (f.ssh.ports.length ? " · SSH de este equipo: " + f.ssh.ports.join(", ") : " · este equipo no sirve SSH (tus despliegues por SSH hacia otros servidores no se tocan)") + " · foto de " + when(Date.parse(f.time) / 1000);
     p.remove.forEach((r) => row("−", "Se cerrará: " + r.label, r.comment || "Permite entrar a cualquiera", "aviso"));
     p.missing.forEach((m) => row("+", "Se abrirá el puerto " + m, "Lo pediste en los ajustes (o es el SSH de este equipo)", "info"));
+    (p.missing_from || []).forEach(([po, src]) => row("+", "Se abrirá el puerto " + po + " solo desde " + src, "Limitado a ese origen", "info"));
     p.review.forEach((r) => row("?", "Revisar a mano: " + r.label, "Permite a un equipo concreto (" + r.from + "): no se toca solo", "info"));
     if (f.ssh.sessions.length) row("✓", "Sesiones SSH abiertas ahora", f.ssh.sessions.join(", ") + " (se mantienen)", "ok");
     if (!n && !p.review.length) row("✓", "El firewall ya está como lo pediste", "", "ok");
@@ -432,8 +433,8 @@
     const ru = $("#fw-rules"); clear(ru);
     f.rules.forEach((r) => { const li = el("li"); li.appendChild(el("div", "ic " + (r.action === "ALLOW" ? "ok" : "info"), r.action === "ALLOW" ? "✓" : "×")); const m = el("div"); m.appendChild(el("h4", null, r.label)); m.appendChild(el("p", null, r.action + " desde " + r.from + (r.comment ? " · " + r.comment : ""))); li.appendChild(m); li.appendChild(el("span")); ru.appendChild(li); });
     if (!ru.firstChild) ru.appendChild(el("li", "empty", "Sin reglas de entrada."));
-    if (document.activeElement && !["fw-tcp", "fw-udp", "fw-ssh", "fw-backend"].includes(document.activeElement.id)) {
-      $("#fw-tcp").value = f.conf.allow_tcp.join(","); $("#fw-udp").value = f.conf.allow_udp.join(","); $("#fw-ssh").value = f.conf.keep_ssh ? "yes" : "no"; $("#fw-backend").value = f.conf.backend;
+    if (document.activeElement && !["fw-tcp", "fw-udp", "fw-ssh", "fw-backend", "fw-profile", "fw-restrict", "fw-sshlimit"].includes(document.activeElement.id)) {
+      $("#fw-tcp").value = f.conf.allow_tcp.join(","); $("#fw-udp").value = f.conf.allow_udp.join(","); $("#fw-ssh").value = f.conf.keep_ssh ? "yes" : "no"; $("#fw-backend").value = f.conf.backend; $("#fw-profile").value = f.conf.profile || "custom"; $("#fw-sshlimit").value = f.conf.ssh_limit ? "yes" : "no"; $("#fw-restrict").value = Object.entries(f.conf.restrict || {}).map(([p, s]) => p + "=" + s.join("|")).join(", ");
     }
   }
 
@@ -453,7 +454,7 @@
   });
   $("#fw-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    for (const [k, id] of [["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["keep_ssh", "fw-ssh"], ["backend", "fw-backend"]]) { const r = await runAction("fw_config", { clave: k, valor: $("#" + id).value.trim() }); if (!r || !r.ok) return; }
+    for (const [k, id] of [["profile", "fw-profile"], ["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["restrict", "fw-restrict"], ["keep_ssh", "fw-ssh"], ["ssh_limit", "fw-sshlimit"], ["backend", "fw-backend"]]) { const r = await runAction("fw_config", { clave: k, valor: $("#" + id).value.trim() }); if (!r || !r.ok) return; }
     toast("Ajustes guardados. Pulsa «Actualizar» en Puertos para ver el plan nuevo."); loadFirewall();
   });
   $("#f-hours").addEventListener("change", loadEvents);

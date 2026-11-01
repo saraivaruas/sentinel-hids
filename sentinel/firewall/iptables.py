@@ -70,11 +70,13 @@ def files() -> list[str]:
     return []
 
 
-def allow(port: int, proto: str = "tcp") -> tuple[int, str]:
+def allow(port: int, proto: str = "tcp", src: str | None = None, limit: bool = False) -> tuple[int, str]:
     worst = (0, "")
     for fam, tool in TOOLS:
         if shutil.which(tool):
-            rc, o = core.run([tool, "-I", "INPUT", "1", "-p", proto, "--dport", str(port), "-m", "comment", "--comment", COMMENT, "-j", "ACCEPT"])
+            if src and (":" in src) != (fam == "6"):
+                continue                      # el origen es de la otra familia (IPv4/IPv6)
+            rc, o = core.run([tool, "-I", "INPUT", "1", *(["-s", src] if src else []), "-p", proto, "--dport", str(port), "-m", "comment", "--comment", COMMENT, "-j", "ACCEPT"])
             if rc != 0:
                 worst = (rc, o)
     return worst
