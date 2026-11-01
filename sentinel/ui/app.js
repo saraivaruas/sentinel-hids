@@ -419,8 +419,11 @@
     $("#fw-note").textContent = f.needs_harden ? "iptables acepta todo por defecto: al aplicar se pondrá la política de entrada en DROP (dejando pasar lo local y lo ya iniciado)." : "Antes de aplicar se guarda una copia de las reglas.";
     const nb = $("#nav-fw"); nb.hidden = !n; nb.textContent = String(n);
     const lb = $("#fw-listen"); clear(lb);
+    const ST = { docker: ["critical", "Sí, salta el firewall (Docker)"], abierto: ["medium", "Sí, abierto"], bloqueado: ["low", "No, bloqueado"], privada: ["info", "Solo red privada"] };
     f.listening.filter((l) => !l.local).forEach((l) => {
-      const tr = el("tr"); tr.appendChild(el("td", null, l.proto + "/" + l.port)); tr.appendChild(el("td", null, l.addr)); const t = el("td"); t.appendChild(el("span", "badge sev-" + (l.allowed ? "high" : "low"), l.allowed ? "abierto" : "bloqueado")); tr.appendChild(t); lb.appendChild(tr);
+      const tr = el("tr"); tr.appendChild(el("td", null, l.proto + "/" + l.port));
+      const pr = el("td", null, l.proc || "—"); pr.appendChild(el("div", "hint", l.addr)); tr.appendChild(pr);
+      const t = el("td"); const s = ST[l.status] || ["info", l.status]; t.appendChild(el("span", "badge sev-" + s[0], s[1])); if (l.advice) t.appendChild(el("div", "hint", l.advice)); tr.appendChild(t); lb.appendChild(tr);
     });
     if (!lb.firstChild) lb.appendChild(el("tr")).appendChild(el("td", "empty", "Nada escucha hacia afuera."));
     const ru = $("#fw-rules"); clear(ru);

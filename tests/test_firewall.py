@@ -5,7 +5,7 @@ from unittest import mock
 
 from helpers import core
 from sentinel import firewall
-from sentinel.firewall import iptables, ufw
+from sentinel.firewall import exposure, iptables, ufw
 
 UFW = """Estado: activo
 
@@ -111,6 +111,30 @@ class FirewallTests(unittest.TestCase):
             for k, v in (("allow_tcp", "80;rm"), ("allow_tcp", "70000"), ("backend", "x"), ("zzz", "1")):
                 with self.assertRaises(ValueError):
                     firewall.set_config(k, v, p)
+
+    SS = """tcp LISTEN 0 4096 0.0.0.0:443 0.0.0.0:* users:(("nginx",pid=1,fd=6))
+tcp LISTEN 0 4096 0.0.0.0:9200 0.0.0.0:* users:(("java",pid=2,fd=6))
+tcp LISTEN 0 4096 0.0.0.0:8080 0.0.0.0:* users:(("docker-proxy",pid=3,fd=4))
+tcp LISTEN 0 4096 127.0.0.1:3306 0.0.0.0:*
+tcp LISTEN 0 4096 100.71.15.101%tailscale0:52047 0.0.0.0:*
+udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
+"""
+    DOCKER = "web\t0.0.0.0:8080->80/tcp, :::8080->80/tcp\ndb\t33060/tcp, 127.0.0.1:3307->3306/tcp\napi\t0.0.0.0:9000->9000/tcp\n"
+
+    def test_docker_publicado(self):
+        d = exposure.parse_docker(self.DOCKER)
+        self.assertEqual([(x["name"], x["port"], x["all"]) for x in d], [("web", 8080, True), ("web", 8080, True), ("db", 3307, False), ("api", 9000, True)])
+
+    def test_exposicion_real(self):
+        res = exposure.analyze(self.SS, {443}, exposure.parse_docker(self.DOCKER))
+        st = {(r["proto"], r["port"]): r["status"] for r in res}
+        self.assertEqual(st[("tcp", 8080)], "docker"); self.assertEqual(st[("tcp", 9000)], "docker")      # Docker salta el firewall (aunque no haya proceso que escuche)
+        self.assertEqual(st[("tcp", 443)], "abierto"); self.assertEqual(st[("tcp", 9200)], "bloqueado")
+        self.assertEqual(st[("tcp", 3306)], "local"); self.assertEqual(st[("tcp", 52047)], "privada"); self.assertEqual(st[("udp", 53)], "local")
+        self.assertEqual(res[0]["status"], "docker")                                                        # lo más grave primero
+        self.assertIn("127.0.0.1", next(r for r in res if r["port"] == 9200)["advice"])
+        self.assertIn("web", next(r for r in res if r["port"] == 8080)["advice"])
+        self.assertEqual(exposure.analyze(self.SS, {443}, exposure.parse_docker(self.DOCKER), True)[0]["status"] != "docker", True)   # con DROP en DOCKER-USER ya no se marca
 
 
 if __name__ == "__main__":

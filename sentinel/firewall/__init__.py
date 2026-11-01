@@ -9,7 +9,7 @@ import shutil
 import time
 
 from .. import core
-from . import iptables, ufw
+from . import exposure, iptables, ufw
 
 BACKENDS = {"ufw": ufw, "iptables": iptables}
 
@@ -94,14 +94,14 @@ def state(cfg=None) -> dict:
         return {"ok": False, "error": err, "backend": be.NAME, "conf": conf, "time": core.iso()}
     ssh = ssh_ports()
     p = plan(rules, conf, ssh, be.outgoing_allowed())
-    rc, ss = core.run(["ss", "-tulnH"])
-    listening = sorted({(f[0], int(f[4].rsplit(":", 1)[-1]), f[4].rsplit(":", 1)[0]) for f in (l.split() for l in ss.splitlines()) if len(f) >= 5 and f[4].rsplit(":", 1)[-1].isdigit()})
+    rc, ss = core.run(["ss", "-tulnpH"])
     open_now = {r["port"] for r in rules if r["action"] == "ALLOW" and r["from"].lower().startswith("anywhere") and r["port"]}
-    exposed = [{"proto": pr, "port": po, "addr": ad, "local": ad.startswith(("127.", "[::1]", "::1")) or ad.startswith("127.0.0.53"), "allowed": po in open_now} for pr, po, ad in listening]
+    docker, dprot = exposure.docker_published()
+    expo = exposure.analyze(ss, open_now, docker, dprot)
     ser = lambda rs: [{k: r[k] for k in ("label", "port", "action", "from", "comment", "v6")} for r in rs]
     return {"ok": True, "backend": be.NAME, "conf": conf, "ssh": ssh, "time": core.iso(), "needs_harden": be.NAME == "iptables" and be.policy() == "ACCEPT", "safe": p["safe"],
             "plan": {"remove": ser(p["remove"]), "review": ser(p["review"]), "missing": p["missing"], "keep_ports": p["keep_ports"]},
-            "rules": ser(rules), "listening": exposed, "text": describe(p, be.NAME)}
+            "rules": ser(rules), "listening": expo, "docker": docker, "docker_protected": dprot, "exposed_count": sum(1 for e in expo if e["status"] in ("docker", "abierto")), "text": describe(p, be.NAME)}
 
 
 def snapshot_path() -> str:
