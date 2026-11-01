@@ -19,7 +19,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.6.0"
+VERSION = "2.6.1"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -85,7 +85,7 @@ interval_seconds = 300
 suspicious_ports = 4444,1337,31337,6667,6697,3333,5555,9050,14444
 miner_names = xmrig,minerd,cpuminer,kdevtmpfsi,kinsing,ccminer,ethminer,nbminer
 exec_dirs = /tmp,/var/tmp,/dev/shm,/run/user
-input_ok = Xorg,Xwayland,gnome-shell,gnome-session-b,systemd-logind,systemd,upowerd,libinput,gsd-power,gsd-media-keys,gsd-sharing,mutter,kwin_wayland,kwin_x11,evsieve,xdotool,rustdesk,sunshine
+input_ok = acpid,gdm-x-session,gdm-wayland-ses,Xorg,Xwayland,gnome-shell,gnome-session-b,systemd-logind,systemd,upowerd,libinput,gsd-power,gsd-media-keys,gsd-sharing,mutter,kwin_wayland,kwin_x11,evsieve,xdotool,rustdesk,sunshine
 check_usb = yes
 check_modules = yes
 ; revisión de archivos SUID/SGID nuevos (solo en la revisión profunda diaria)

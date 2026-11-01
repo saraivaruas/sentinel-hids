@@ -179,6 +179,18 @@ def suspicious_connections(ports: set[int], skip: set[str]) -> list[dict]:
     return res
 
 
+EPHEMERAL = 32768
+
+
+def norm_listener(k: str, v: dict) -> tuple:
+    """Clave para comparar puertos: los puertos UDP altos (efímeros) cambian solos en cada arranque (syncthing, chrome, timesyncd…),
+    así que se comparan por programa y alcance, no por número."""
+    proto = k.split("/")[0]
+    if proto == "udp" and v.get("port", 0) >= EPHEMERAL:
+        return ("udp-efimero", v.get("proc", ""), v.get("scope", ""))
+    return (k, v.get("proc", ""), v.get("scope", ""))
+
+
 class HostCheck:
     def __init__(self, cfg, alerter: core.Alerter, allow: core.Allow):
         self.cfg, self.alerter, self.allow = cfg, alerter, allow
@@ -206,12 +218,16 @@ class HostCheck:
             emit("info", "host", "referencia", "Referencia del equipo creada (puertos, USB, módulos, cuentas, SUID)", key="host:ref")
             base = core.read_json(self.path)
         # puertos
+        known = {norm_listener(k, v) for k, v in base["listeners"].items()}
         for k, v in cur["listeners"].items():
             if v["port"] in self.allow.ports or v["proc"] in self.allow.procs:
                 continue
             b = base["listeners"].get(k)
+            if b is None and norm_listener(k, v) in known:
+                continue                   # mismo programa con otro puerto efímero (UDP alto): no es un puerto nuevo de verdad
             if b is None:
-                sev = "high" if v["scope"] == "todas las interfaces" else "medium"
+                local = v["scope"] == "solo local"
+                sev = "low" if local else "high" if v["scope"] == "todas las interfaces" else "medium"     # solo local = nadie de afuera lo alcanza
                 emit(sev, "host", "puerto_nuevo", f"Nuevo puerto en escucha {k} ({v['proc']}, {v['scope']})", key=f"host:port:{k}:{v['proc']}")
             elif b["scope"] != "todas las interfaces" and v["scope"] == "todas las interfaces":
                 emit("high", "host", "puerto_expuesto", f"El puerto {k} ({v['proc']}) pasó de local a todas las interfaces", key=f"host:expo:{k}")

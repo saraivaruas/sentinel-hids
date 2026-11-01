@@ -25,7 +25,11 @@ if [ "$1" = "configure" ]; then
     [ -f /var/lib/sentinel/fim_baseline.json ] || /usr/bin/sentinel baseline init || true
     systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || true
     # la actualización de Sentinel mismo no es un cambio sospechoso: se acepta como nueva referencia
-    [ -f /var/lib/sentinel/fim_baseline.json ] && /usr/bin/sentinel baseline accept /opt/sentinel /etc/sentinel >/dev/null 2>&1 || true
+    [ -f /var/lib/sentinel/fim_baseline.json ] && /usr/bin/sentinel baseline accept /opt/sentinel /etc/sentinel \
+      /etc/systemd/system/sentinel-monitor.service /etc/systemd/system/sentinel-honeypot.service /etc/systemd/system/sentinel-scan.service /etc/systemd/system/sentinel-scan.timer \
+      /etc/systemd/system/sentinel-report.service /etc/systemd/system/sentinel-report.timer /etc/systemd/system/multi-user.target.wants/sentinel-monitor.service \
+      /etc/systemd/system/multi-user.target.wants/sentinel-honeypot.service /etc/systemd/system/timers.target.wants/sentinel-scan.timer /etc/systemd/system/timers.target.wants/sentinel-report.timer \
+      >/dev/null 2>&1 || true
     # Sentinel NO abre puertos: apaga los señuelos y retira las reglas de cortafuegos que dejaron versiones anteriores
     systemctl disable --now sentinel-honeypot.service 2>/dev/null || true
     # con PIN configurado, el reinicio del servicio por la actualización pide el PIN (si no hay forma de preguntarlo, se reinicia igual tras 20 s con una alerta)

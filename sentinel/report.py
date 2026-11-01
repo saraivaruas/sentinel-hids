@@ -23,10 +23,39 @@ def lynis_index(run_lynis: bool = False) -> int | None:
     return hist[-1]["index"] if hist else None
 
 
+def relevant(events: list[dict]) -> list[dict]:
+    """Quita lo que no es un hallazgo: pruebas de alerta, arranques y paradas del monitor y avisos informativos."""
+    return [e for e in events if e["source"] not in ("test", "monitor") and core.SEV[e["sev"]] >= 1]
+
+
+def group_events(events: list[dict], min_group: int = 3) -> list[dict]:
+    """Junta eventos repetidos del mismo tipo en la misma carpeta (p. ej. 6 «eliminado» en /etc/systemd/system) en una sola fila explicada."""
+    groups: dict = {}
+    order: list = []
+    for e in events:
+        path = e["msg"].split(":", 1)[0]
+        key = (e["source"], e["kind"], os.path.dirname(path)) if e["source"] == "fim" and path.startswith("/") else ("uno", id(e))
+        if key not in groups:
+            groups[key] = []; order.append(key)
+        groups[key].append(e)
+    out = []
+    for k in order:
+        g = groups[k]
+        if k[0] == "uno" or len(g) < min_group:
+            out += g; continue
+        names = sorted({os.path.basename(e["msg"].split(":", 1)[0]) for e in g})
+        veces = len(g)
+        what = {"removed": "archivos eliminados", "added": "archivos nuevos", "modified": "archivos modificados"}.get(k[1], "cambios")
+        out.append({**g[-1], "msg": f"{len(names)} {what} en {k[2]} ({', '.join(names[:4])}{'…' if len(names) > 4 else ''})" + (f" — avisado {veces} veces" if veces > len(names) else ""), "grouped": veces})
+    return out
+
+
 def build(days: int = 7, run_lynis: bool = False, cfg=None) -> str:
     cfg = cfg or core.load_config()
     since = core.now() - days * 86400
-    ev = core.read_events(since)
+    todos = core.read_events(since)
+    ev = relevant(todos)                       # el informe cuenta solo lo que de verdad pasó (sin pruebas ni avisos informativos)
+    ocultos = len(todos) - len(ev)
     au = audit.run_audit(cfg)
     by_sev = collections.Counter(e["sev"] for e in ev)
     by_kind = collections.Counter(f"{e['source']}/{e['kind']}" for e in ev)
@@ -36,15 +65,15 @@ def build(days: int = 7, run_lynis: bool = False, cfg=None) -> str:
     esc = html.escape
     rows = lambda c, n=10: "".join(f"<tr><td>{esc(str(k))}</td><td>{v}</td></tr>" for k, v in c.most_common(n)) or "<tr><td colspan=2>sin datos</td></tr>"
     audit_rows = "".join(f"<tr class='{r['status']}'><td>{esc(r['title'])}</td><td>{r['status']}</td><td>{esc(r['detail'])}<br><small>{esc(r['fix'])}</small></td></tr>" for r in au["checks"])
-    top = [e for e in ev if core.SEV[e["sev"]] >= 3][-15:]
+    top = group_events([e for e in ev if core.SEV[e["sev"]] >= 3])[-15:]
     top_rows = "".join(f"<tr class='{e['sev']}'><td>{e['ts'][:16]}</td><td>{core.SEV_ES[e['sev']]}</td><td>{esc(e['msg'])}</td></tr>" for e in reversed(top)) or "<tr><td colspan=3>Sin eventos de gravedad alta en el período</td></tr>"
     return f"""<!doctype html><meta charset=utf-8><title>Informe Sentinel</title><style>
 body{{font:15px system-ui,sans-serif;max-width:980px;margin:2rem auto;padding:0 1rem;color:#1d1d1b}}h1{{color:#00629b}}table{{border-collapse:collapse;width:100%;margin:.5rem 0 1.5rem}}
 td,th{{border-bottom:1px solid #e8eaed;padding:.4rem .6rem;text-align:left;vertical-align:top}}.k{{display:flex;gap:1rem;flex-wrap:wrap}}.k div{{flex:1;min-width:130px;background:#f0f8fd;border-radius:12px;padding:.8rem}}
 .k b{{display:block;font-size:1.8rem;color:#00629b}}tr.fallo td,tr.critical td{{background:#fdecea}}tr.aviso td,tr.high td{{background:#fff6e8}}small{{color:#4a5568}}</style>
 <h1>Informe de Sentinel · últimos {days} días</h1><p>Generado el {core.iso()} · versión {core.VERSION}</p>
-<div class=k><div><b>{len(ev)}</b>eventos</div><div><b>{by_sev.get('critical', 0) + by_sev.get('high', 0)}</b>alta o crítica</div><div><b>{au['score']}/100</b>postura de seguridad</div><div><b>{li if li is not None else '—'}</b>índice Lynis</div></div>
-<h2>Eventos graves recientes</h2><table>{top_rows}</table>
+<div class=k><div><b>{len(ev)}</b>hallazgos reales</div><div><b>{by_sev.get('critical', 0) + by_sev.get('high', 0)}</b>alta o crítica</div><div><b>{au['score']}/100</b>postura de seguridad</div><div><b>{li if li is not None else '—'}</b>índice Lynis</div></div>
+<h2>Eventos graves recientes</h2><p><small>El informe muestra solo hallazgos reales; se dejaron fuera {ocultos} registro(s) informativos (pruebas, arranques y paradas de Sentinel). Los eventos repetidos de una misma carpeta se muestran en una sola fila. «Eliminado» significa que el archivo ya no existe: lo borró un programa, una actualización o una persona; Sentinel no borra ni cambia tus archivos.</small></p><table>{top_rows}</table>
 <h2>Por tipo</h2><table>{rows(by_kind)}</table><h2>IPs más activas</h2><table>{rows(ips)}</table><h2>Por día</h2><table>{rows(day, 14)}</table>
 <h2>Postura de seguridad</h2><table>{audit_rows}</table>"""
 
