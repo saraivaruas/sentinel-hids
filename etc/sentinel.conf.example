@@ -6,6 +6,11 @@
 desktop_user =
 ; Gravedad mínima por canal: info, low, medium, high, critical
 notify_min = medium
+; Segundos que se ve el aviso en la esquina de la pantalla (se cierra solo)
+notify_seconds = 8
+notify_seconds_critical = 15
+; Ventana grande con botón «Abrir panel» (never = no usar; o info/low/medium/high/critical)
+popup_min = never
 ; Correo para alertas graves (requiere el comando «mail» configurado)
 email_to =
 ; Aviso al celular con ntfy (https://ntfy.sh/tu-tema-secreto): gratis y sin cuenta

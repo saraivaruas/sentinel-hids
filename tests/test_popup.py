@@ -39,9 +39,21 @@ class PopupTests(unittest.TestCase):
             medium = core.Event("medium", "host", "x", "m")
             self.a._channels  # noqa: B018
         al = core.Alerter(self.e.cfg, quiet=False)
+        with mock.patch.object(al, "popup") as pop, mock.patch.object(al, "desktop") as desk:
+            al._channels(core.Event("high", "host", "x", "m")); self.assertFalse(pop.called)        # por defecto no hay ventana grande...
+            self.assertTrue(desk.called)                                                           # ...solo el aviso de esquina
+        self.e.cfg.set("general", "popup_min", "high")
         with mock.patch.object(al, "popup") as pop, mock.patch.object(al, "desktop"):
-            al._channels(core.Event("medium", "host", "x", "m")); self.assertFalse(pop.called)      # media: solo notificación
+            al._channels(core.Event("medium", "host", "x", "m")); self.assertFalse(pop.called)      # si se activa: media = solo notificación
             al._channels(core.Event("high", "host", "x", "m")); self.assertTrue(pop.called)         # alta: ventana
+
+    def test_aviso_de_esquina_se_cierra_solo(self):
+        calls = []
+        with mock.patch.object(core.shutil, "which", return_value="/usr/bin/notify-send"), mock.patch.object(core.Alerter, "desktop_target", return_value=("ana", 1000)), \
+             mock.patch.object(core, "is_root", return_value=False), mock.patch.object(core.subprocess, "run", side_effect=lambda c, **k: calls.append(c)):
+            self.a.desktop(core.Event("medium", "host", "x", "m")); self.a.desktop(core.Event("critical", "host", "x", "m"))
+        t = lambda c: int(c[c.index("-t") + 1])
+        self.assertEqual(t(calls[0]), 8000); self.assertEqual(t(calls[1]), 15000)
 
     def test_sin_zenity_o_sin_sesion_no_falla(self):
         with mock.patch.object(core.shutil, "which", return_value=None):

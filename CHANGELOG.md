@@ -4,6 +4,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [2.2.0] - 2026-11-01
 
+### Cambiado
+- **Avisos menos molestos**: las alertas salen como notificación en la esquina de la pantalla y se cierran solas (8 s; las graves 15 s, configurable con `notify_seconds`). La ventana grande ya no aparece por defecto (`popup_min = never`; se puede activar).
+
 ### Agregado
 - **Módulo Firewall**, separado de la detección: deja abiertos desde afuera solo los puertos que configures (por defecto 80 y 443) y cierra el resto, con **ufw** o **iptables** (`sentinel firewall estado|plan|aplicar|config`). Mantiene el puerto de SSH si el equipo sirve SSH (tus conexiones ssh de despliegue hacia otros servidores son salientes y no se tocan), nunca cierra nada si el tráfico saliente no está permitido y guarda una copia de las reglas antes de cambiar.
 - El panel del firewall se recarga solo cada 5 s, muestra la antigüedad de la información (en rojo si pasa de 3 min), tiene botón **↻ Recargar** y el monitor lee el firewall cada 60 s (`refresh_seconds`).
