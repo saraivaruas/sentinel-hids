@@ -33,7 +33,7 @@ if [ "$1" = "configure" ]; then
     # Sentinel NO abre puertos: apaga los señuelos y retira las reglas de cortafuegos que dejaron versiones anteriores
     systemctl disable --now sentinel-honeypot.service 2>/dev/null || true
     # con PIN configurado, el reinicio del servicio por la actualización pide el PIN (si no hay forma de preguntarlo, se reinicia igual tras 20 s con una alerta)
-    /usr/bin/sentinel pin autorizar >/dev/null 2>&1 || true
+    timeout 120 /usr/bin/sentinel pin autorizar || true
     systemctl try-restart sentinel-monitor.service || true
     ufw status numbered 2>/dev/null | grep -q sentinel-senuelo && for p in $(ufw status numbered | grep sentinel-senuelo | awk -F'[][]' '{print $2}' | sort -rn); do yes | ufw delete "$p" >/dev/null; done || true
     # alerta de prueba en pantalla (si hay una sesión gráfica abierta)
