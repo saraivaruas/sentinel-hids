@@ -158,7 +158,8 @@
   function renderSparks(o) {
     [["sp-crit", "critical"], ["sp-high", "high"], ["sp-med", "medium"]].forEach(([id, sev]) => {
       const s = $("#" + id); clear(s);
-      const v = o.days.map((d) => d.c[sev]), max = Math.max(1, ...v), n = v.length - 1;
+      const v = (o.days || []).map((d) => d.c[sev]), max = Math.max(1, ...v), n = v.length - 1;
+      if (v.length < 2) return;
       const pts = v.map((y, i) => [(i / n) * 100, 26 - (y / max) * 22]);
       const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
       s.appendChild(svg("path", { d: line + " L100 28 L0 28 Z", fill: SEV_COL[sev], "fill-opacity": ".16", stroke: "none" }));
@@ -191,7 +192,7 @@
   // Barras horizontales: eventos por módulo (un solo color: aquí importa la cantidad, no la gravedad)
   function renderMods(o) {
     const ul = $("#mods"); clear(ul);
-    if (!o.modules.length) { ul.appendChild(el("li", "empty", "Sin eventos relevantes en las últimas 24 horas.")); return; }
+    if (!(o.modules || []).length) { ul.appendChild(el("li", "empty", "Sin eventos relevantes en las últimas 24 horas.")); return; }
     const NAMES = { fim: "Archivos", auth: "Accesos", host: "Equipo", ban: "Bloqueos", decoy: "Señuelos", packets: "Paquetes", monitor: "Monitor", firewall: "Firewall", pin: "PIN", update: "Actualización", test: "Prueba" };
     const m = o.modules[0].n;
     o.modules.forEach((x) => {
