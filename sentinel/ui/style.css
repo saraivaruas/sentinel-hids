@@ -157,6 +157,7 @@ select,input{height:38px;border-radius:10px}.form input,.form select{height:40px
 }
 @media(max-width:640px){.c4,.c6{grid-column:span 12}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.donut-w{flex-direction:column;align-items:flex-start}}
 [hidden]{display:none!important}
+.ev-more{margin-top:.5rem;display:grid;gap:.5rem;justify-items:start}.ev-more pre{margin:0;width:100%}
 #view-ajustes .grid2,#view-fw-reglas .grid2,#view-bloqueos .grid2{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
 @media(max-width:1180px){#view-ajustes .grid2,#view-fw-reglas .grid2,#view-bloqueos .grid2{grid-template-columns:minmax(0,1fr)}}
 #view-ajustes .grid2{display:block;columns:2 380px;column-gap:var(--gap)}#view-ajustes .grid2>.card{break-inside:avoid;margin-bottom:var(--gap);display:block}
