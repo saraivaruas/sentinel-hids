@@ -21,6 +21,8 @@
 | **Host** | New listening ports (or ports that become public), processes running from `/tmp`, deleted binaries, crypto-miners, unexpected keyboard readers, USB devices, kernel modules, new/UID 0/passwordless accounts, hidden processes, new SUID files. |
 | **Posture audit** | `sentinel audit`: 16 configuration checks with the fix for each (firewall, SSH, web permissions, kernel parameters, updates, exposed credentials…). |
 
+**PIN protection:** set a PIN in *Settings*; without it Sentinel cannot be stopped, uninstalled, reconfigured, allow-listed or have its integrity baseline accepted. Hashed with PBKDF2, locks out after 5 failures, alerts on every attempt, and keeps watching if someone tries to stop it without the PIN (root can still `kill -9` anything; the PIN closes the normal paths and leaves a trail).
+
 **Response:** attackers are blocked **temporarily** (24 h) with CrowdSec, firewalld, ufw or iptables — never your LAN, loopback or Tailscale. Sentinel **never kills processes or touches your files**.
 **Alerts:** private JSONL log, journald, a toast in the bottom-right corner of the screen that closes by itself (optionally a big pop-up window), optional e-mail or phone (ntfy).
 
