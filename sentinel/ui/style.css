@@ -157,6 +157,7 @@ select,input{height:38px;border-radius:10px}.form input,.form select{height:40px
 }
 @media(max-width:640px){.c4,.c6{grid-column:span 12}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.donut-w{flex-direction:column;align-items:flex-start}}
 [hidden]{display:none!important}
+.srv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--gap)}.srv{border:1px solid var(--line);border-radius:12px;padding:1rem;display:grid;gap:.5rem;align-content:start;background:var(--card2)}.srv-h{display:flex;justify-content:space-between;align-items:center;gap:.5rem}.srv p{margin:.2rem 0}.srv-k{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}.srv-k div{display:grid;text-align:center}.srv-k b{font-size:1.3rem}.srv-k span{font-size:.75rem;color:var(--mu)}.srv-err{color:var(--s-high)}.srv .btn{justify-self:start}.srv-form{grid-template-columns:1fr 2fr auto;align-items:end}@media(max-width:900px){.srv-form{grid-template-columns:1fr}}
 .chk{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;color:var(--mu)}.chk input{height:auto}.tbl tr.done td{opacity:.5}
 .ev-more{margin-top:.5rem;display:grid;gap:.5rem;justify-items:start}.ev-more pre{margin:0;width:100%}
 #view-ajustes .grid2,#view-fw-reglas .grid2,#view-bloqueos .grid2{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
