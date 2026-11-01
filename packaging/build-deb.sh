@@ -10,6 +10,7 @@ mkdir -p "$OUT" "$P/DEBIAN" "$P/opt/sentinel" "$P/usr/bin" "$P/lib/systemd/syste
 cp -a "$AQUI/sentinel" "$AQUI/bin" "$AQUI/README.md" "$P/opt/sentinel/"
 find "$P/opt/sentinel" -name __pycache__ -prune -exec rm -rf {} +
 ln -s /opt/sentinel/bin/sentinel "$P/usr/bin/sentinel"
+[ -f "$AQUI/packaging/release-key.asc" ] && cp "$AQUI/packaging/release-key.asc" "$P/opt/sentinel/release-key.asc"
 cp "$AQUI/packaging/polkit/org.sentinel.policy" "$P/usr/share/polkit-1/actions/org.sentinel.policy"
 cp "$AQUI"/systemd/*.service "$AQUI"/systemd/*.timer "$P/lib/systemd/system/"
 install -m 644 "$AQUI/desktop/sentinel.desktop" "$P/usr/share/applications/sentinel.desktop"

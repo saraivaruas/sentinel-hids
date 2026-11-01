@@ -126,7 +126,20 @@ def install(cfg=None, log=print) -> tuple[bool, str]:
         path = os.path.join(tmp, name)
         with open(path, "wb") as f:
             f.write(_get(urls[name], 60, MAX_BYTES))
-        sums = _get(urls[sums_name]).decode("utf-8", "replace")
+        sums_raw = _get(urls[sums_name])
+        sums = sums_raw.decode("utf-8", "replace")
+        from . import sigcheck
+        need = sigcheck.policy(cfg) == "yes" or (sigcheck.policy(cfg) == "auto" and os.path.exists(sigcheck.key_path()))
+        if need:
+            sig_url = urls.get(sums_name + ".asc")
+            if not sig_url or not sig_url.startswith(prefix):
+                return False, "Esta publicación no trae la firma (SHA256SUMS.asc) y este equipo exige firma. No se instaló nada."
+            ok, why = sigcheck.verify(sums_raw, _get(sig_url), None)
+            if not ok:
+                return False, f"La firma de la publicación no es válida: {why}. No se instaló nada."
+            log("Firma verificada ✔")
+        else:
+            log("Aviso: esta instalación no exige firma; solo se verifica la huella SHA-256.")
         want, got = expected_hash(sums, name), _sha256(path)
         if not want or want != got:
             return False, "La huella SHA-256 NO coincide: el archivo descargado no es el publicado. No se instaló nada."

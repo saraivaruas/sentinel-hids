@@ -8,3 +8,8 @@ VER="$(python3 -c "import sys;sys.path.insert(0,'.');from sentinel import core;p
 rm -f "dist/sentinel-$VER.tar.gz"
 tar --exclude=dist --exclude=.git --exclude=__pycache__ --exclude=docs -czf "dist/sentinel-$VER.tar.gz" --transform "s,^\.,sentinel-$VER," .
 (cd dist && sha256sum "sentinel_${VER}_all.deb" "sentinel-$VER.tar.gz" > SHA256SUMS && cat SHA256SUMS)
+# firma (opcional): SENTINEL_SIGN_KEY=<huella de tu clave GPG> ./packaging/make-release.sh  → dist/SHA256SUMS.asc
+if [ -n "${SENTINEL_SIGN_KEY:-}" ]; then
+  rm -f dist/SHA256SUMS.asc
+  gpg --batch --yes --armor --detach-sign --local-user "$SENTINEL_SIGN_KEY" -o dist/SHA256SUMS.asc dist/SHA256SUMS && echo "Firmado: dist/SHA256SUMS.asc"
+fi

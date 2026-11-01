@@ -120,6 +120,8 @@ ban_on_scan = yes
 ; buscar versiones nuevas en GitHub (solo consulta; instalar siempre lo decides tú). check = no para no consultar nada
 check = yes
 repo = saraivaruas/sentinel-hids
+; auto = exigir la firma (SHA256SUMS.asc) si este equipo trae la clave pública de Sentinel; yes = siempre; no = solo la huella SHA-256
+require_signature = auto
 
 [intel]
 ; de dónde sale la ubicación del atacante: auto (archivo local si existe, si no RIPEstat/RDAP), offline (solo archivo local), online, off
