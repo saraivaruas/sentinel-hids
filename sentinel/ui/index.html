@@ -19,6 +19,7 @@
       <button class="nav" data-view="atacantes"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.600-7 8-7s8 3 8 7"/><path d="m17 3 4 4m0-4-4 4"/></svg><span>Atacantes</span><i class="count" id="nav-att" hidden></i></button>
       <button class="nav" data-view="paquetes"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="m3 8 9 6 9-6"/></svg><span>Paquetes</span></button>
       <button class="nav" data-view="postura"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.400 8 8 9 4.600-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>Postura</span></button>
+      <button class="nav" data-view="ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M5.600 18.400l2.100-2.100M16.300 7.700l2.100-2.100"/></svg><span>Ajustes</span></button>
       <p class="nav-h">Firewall · puertos</p>
       <button class="nav" data-view="fw-puertos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M9 5v5M15 10v9M9 15v4"/></svg><span>Puertos</span><i class="count" id="nav-fw" hidden></i></button>
       <button class="nav" data-view="fw-reglas"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Reglas y ajustes</span></button>
@@ -81,6 +82,7 @@
         <div class="filters">
           <div class="chips" id="sev-chips" role="group" aria-label="Gravedad mínima"></div>
           <select id="f-hours" aria-label="Período"><option value="1">Última hora</option><option value="24" selected>Últimas 24 horas</option><option value="168">Últimos 7 días</option><option value="720">Últimos 30 días</option></select>
+          <select id="f-mod" aria-label="Módulo"><option value="">Todos los módulos</option></select>
           <input id="f-q" type="search" placeholder="Buscar: IP, ruta, usuario…" aria-label="Buscar">
         </div>
         <div class="tbl-wrap"><table class="tbl" id="ev-tbl"><thead><tr><th>Hora</th><th>Gravedad</th><th>Módulo</th><th>Detalle</th></tr></thead><tbody id="ev-body"></tbody></table></div>
@@ -148,6 +150,30 @@
         <article class="card"><div class="card-h"><h3>Revisiones</h3><div class="chips" id="au-filter"></div></div><ul class="audit" id="audit"></ul></article>
       </div>
     </section>
+    <section class="view" id="view-ajustes" hidden>
+      <div class="grid2">
+        <article class="card">
+          <div class="card-h"><h3>Señuelos</h3><span class="badge" id="st-hp">—</span></div>
+          <p class="hint">Los señuelos son puertos falsos que atraen a quien explora tu equipo y lo dejan registrado. <b>Abren puertos</b> en este equipo (<span id="st-hp-ports">2222, 2323…</span>); el firewall los mantiene cerrados hacia afuera. Por defecto están apagados.</p>
+          <div class="fix-row"><button class="btn primary" id="st-hp-btn">Activar señuelos</button></div>
+        </article>
+        <article class="card">
+          <div class="card-h"><h3>Avisos y notificaciones</h3></div>
+          <p class="hint">Cómo y cuándo te avisa Sentinel en la pantalla. Guardar pide tu clave de administrador.</p>
+          <form id="st-form" class="form">
+            <label>Avisos de escritorio<select id="st-desk"><option value="yes">Activados</option><option value="no">Apagados</option></select></label>
+            <label>Avisar desde la gravedad<select id="st-min"><option value="info">Todo</option><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Solo críticas</option></select></label>
+            <label>Dónde aparecen<select id="st-style"><option value="corner">Esquina inferior derecha (se cierra solo)</option><option value="system">Notificación del sistema</option></select></label>
+            <label>Segundos visibles<input id="st-secs" type="number" min="2" max="120"></label>
+            <label>Segundos visibles (graves)<input id="st-secs-c" type="number" min="2" max="120"></label>
+            <label>Ventana grande con botón «Abrir panel»<select id="st-popup"><option value="never">Nunca</option><option value="critical">Solo críticas</option><option value="high">Desde alta</option><option value="medium">Desde media</option></select></label>
+            <button class="btn primary" type="submit">Guardar</button>
+          </form>
+          <p class="hint" id="st-note"></p>
+        </article>
+      </div>
+    </section>
+
     <section class="view" id="view-fw-puertos" hidden>
       <article class="card fw-pending" id="fw-pending" hidden>
         <div class="card-h"><h3>Cambios aplicados a prueba</h3><b id="fw-count">—</b></div>

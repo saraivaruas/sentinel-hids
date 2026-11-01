@@ -292,6 +292,39 @@ def cmd_firewall(a) -> int:
     return 0
 
 
+def cmd_config(a) -> int:
+    changed = 0
+    for pair in a.pares:
+        key, _, value = pair.partition("=")
+        sec, _, k = key.partition(".")
+        try:
+            core.set_setting(sec, k, value.strip())
+        except (ValueError, OSError) as e:
+            print("No se cambió:", e); return 1
+        changed += 1
+    print(f"Guardado ({changed} ajuste{'s' if changed != 1 else ''}). Los avisos nuevos usan los valores de inmediato; el monitor los lee al reiniciar: sudo systemctl restart sentinel-monitor")
+    if core.is_root() and shutil.which("systemctl"):
+        core.run(["systemctl", "try-restart", "sentinel-monitor.service"], 20)
+    return 0
+
+
+def cmd_senuelos(a) -> int:
+    if a.accion == "estado":
+        on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 5)[1].strip() == "active"
+        print("Señuelos:", "activos" if on else "apagados"); return 0
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel senuelos " + a.accion); return 1
+    cmd = ["systemctl", "enable", "--now", "sentinel-honeypot.service"] if a.accion == "activar" else ["systemctl", "disable", "--now", "sentinel-honeypot.service"]
+    rc, out = core.run(cmd, 30)
+    print(("Señuelos activados: abren los puertos " + ", ".join(core.csv(core.load_config().get("honeypot", "ports", fallback=""))) + " en este equipo (el firewall los mantiene cerrados hacia afuera salvo que los abras tú)." if a.accion == "activar" else "Señuelos apagados: sus puertos se cerraron.") if rc == 0 else out.strip())
+    return 0 if rc == 0 else 1
+
+
+def cmd_toast(a) -> int:
+    from . import toast
+    return toast.show(a.titulo[:120], a.mensaje[:400], a.sev, a.seg)
+
+
 def cmd_ui(a) -> int:
     from . import ui
     return ui.run_ui(a.port, not a.sin_abrir)
@@ -341,6 +374,9 @@ def main(argv=None) -> int:
     s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config", "confirmar", "restaurar"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")
     s.add_argument("--json", action="store_true"); s.add_argument("--guardar", action="store_true", help="guarda la foto para el panel"); s.add_argument("--endurecer", action="store_true", help="iptables: política de entrada DROP")
     s.add_argument("--probar", type=int, default=0, metavar="SEG", help="aplica a prueba: si no confirmas en SEG segundos, vuelve atrás solo"); s.add_argument("--pendiente", action="store_true", help="restaurar: la copia de los cambios a prueba"); s.set_defaults(fn=cmd_firewall)
+    s = sub.add_parser("config", help="cambia ajustes de avisos (usado por el panel): sentinel config general.notify_min=high ..."); s.add_argument("pares", nargs="+", metavar="seccion.clave=valor"); s.set_defaults(fn=cmd_config)
+    s = sub.add_parser("senuelos", help="activa o apaga los señuelos (puertos falsos)"); s.add_argument("accion", choices=["activar", "desactivar", "estado"]); s.set_defaults(fn=cmd_senuelos)
+    s = sub.add_parser("toast", help="muestra un aviso en la esquina de la pantalla (lo usa Sentinel)"); s.add_argument("mensaje"); s.add_argument("--sev", default="medium", choices=list(core.SEV)); s.add_argument("--seg", type=int, default=8); s.add_argument("--titulo", default="Sentinel"); s.set_defaults(fn=cmd_toast)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)
     sub.add_parser("honeypot", help="servicio de señuelos (lo lanza systemd)").set_defaults(fn=cmd_honeypot)

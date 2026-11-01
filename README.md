@@ -40,7 +40,7 @@ Por defecto solo quedan abiertos el **80 y el 443**, más el puerto de SSH si es
 **Respuesta.** Los atacantes se bloquean de forma **temporal** (24 h) con CrowdSec o ufw; nunca la red local, Tailscale ni la lista blanca. A diferencia de la v1, **no detiene procesos ni modifica tus archivos**.
 **Avisos.** Registro JSONL privado, journal, notificación de escritorio, **ventana emergente de alerta** y, opcionalmente, correo o celular (ntfy). No repite el mismo aviso en una hora.
 
-**Avisos de alerta.** Los avisos salen como notificación en la esquina de tu pantalla y se cierran solos a los pocos segundos (`notify_seconds`, 8 por defecto; las graves 15), así no molestan. Quedan en el historial de notificaciones de tu escritorio. Si prefieres una ventana grande con el botón **Abrir panel**, actívala con `popup_min = high`. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
+**Avisos de alerta.** Los avisos salen en la **esquina inferior derecha** de tu pantalla y se cierran solos a los pocos segundos (`notify_seconds`, 8 por defecto; las graves 15), así no molestan. Quedan en el historial de notificaciones de tu escritorio. Si prefieres una ventana grande con el botón **Abrir panel**, actívala con `popup_min = high`. Funciona desde el servicio (root) hacia tu sesión gráfica, X11 o Wayland. Prueba con `sentinel test`.
 
 ## Expedientes de atacantes y paquetes
 

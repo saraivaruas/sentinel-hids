@@ -111,6 +111,18 @@ class UiTests(unittest.TestCase):
         self.assertEqual(json.loads(self.req("GET", "/api/firewall")[2])["backend"], "ufw")
         self.assertEqual(self.req("GET", "/api/firewall", cookie=False)[0], 403)
 
+    def test_ajustes_validados(self):
+        self.assertEqual(ui.build_action({"name": "ajustes", "pares": {"general.notify_min": "high", "general.notify_seconds": "10"}}), ["config", "general.notify_min=high", "general.notify_seconds=10"])
+        self.assertEqual(ui.build_action({"name": "senuelos", "on": True}), ["senuelos", "activar"]); self.assertEqual(ui.build_action({"name": "senuelos", "on": "si"}), ["senuelos", "desactivar"])
+        for malo in ({"general.notify_min": "ultra"}, {"general.email_to": "x@y"}, {"ban.ttl_seconds": "1"}, {"general.notify_seconds": "9999"}, {}, "texto"):
+            with self.assertRaises((ValueError, TypeError)):
+                ui.build_action({"name": "ajustes", "pares": malo})
+
+    def test_api_ajustes(self):
+        code, _, data = self.req("GET", "/api/settings")
+        r = json.loads(data); self.assertEqual(code, 200)
+        self.assertIn("general.notify_min", r["values"]); self.assertIn("active", r["honeypot"]); self.assertEqual(self.req("GET", "/api/settings", cookie=False)[0], 403)
+
     def test_la_llave_es_privada(self):
         import stat
         self.assertEqual(stat.S_IMODE(os.stat(ui.token_path()).st_mode), 0o600); self.assertGreaterEqual(len(self.token), 40)

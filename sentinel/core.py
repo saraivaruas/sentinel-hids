@@ -11,6 +11,7 @@ import ipaddress
 import json
 import os
 import pwd
+import re
 import shutil
 import subprocess
 import threading
@@ -18,7 +19,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -28,6 +29,8 @@ desktop_user =
 notify_min = medium
 ; aviso en la esquina de la pantalla (se cierra solo): segundos visible; las críticas un poco más
 notify_seconds = 8
+; corner = aviso propio en la esquina inferior derecha; system = notificación normal del escritorio
+notify_style = corner
 notify_seconds_critical = 15
 ; ventana emergente grande (con botón «Abrir panel») desde esta gravedad (never = nunca, solo avisos de esquina); máximo por minuto; segundos abierta
 popup_min = never
@@ -150,6 +153,39 @@ def load_config(path: str | None = None) -> configparser.ConfigParser:
     if os.path.exists(p):
         cfg.read(p, encoding="utf-8")
     return cfg
+
+
+SEVS = ("info", "low", "medium", "high", "critical")
+# Ajustes que el panel puede cambiar: (sección, clave) -> validador. Todo lo demás se edita a mano en sentinel.conf.
+EDITABLE = {
+    ("general", "enable_desktop"): lambda v: v in ("yes", "no"),
+    ("general", "notify_min"): lambda v: v in SEVS,
+    ("general", "popup_min"): lambda v: v in SEVS or v == "never",
+    ("general", "notify_seconds"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
+    ("general", "notify_seconds_critical"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
+    ("general", "notify_style"): lambda v: v in ("corner", "system"),
+}
+
+
+def set_setting(section: str, key: str, value: str, path: str | None = None) -> None:
+    """Cambia un valor de sentinel.conf (solo los de EDITABLE, validados) sin tocar el resto del archivo."""
+    ok = EDITABLE.get((section, key))
+    if ok is None or not ok(value):
+        raise ValueError(f"ajuste no permitido: {section}.{key} = {value!r}")
+    path = path or conf_path()
+    txt = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    m = re.search(rf"^\[{section}\]\s*$", txt, re.M)
+    if not m:
+        txt = txt.rstrip("\n") + f"\n\n[{section}]\n{key} = {value}\n"
+    else:
+        end = re.search(r"^\[", txt[m.end():], re.M)
+        stop = m.end() + end.start() if end else len(txt)
+        sec = txt[m.end():stop]
+        k = re.search(rf"^{key}\s*=.*$", sec, re.M)
+        sec = sec[:k.start()] + f"{key} = {value}" + sec[k.end():] if k else sec.rstrip("\n") + f"\n{key} = {value}\n" + ("\n" if end else "")
+        txt = txt[:m.end()] + sec + txt[stop:]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(txt)
 
 
 def csv(value: str) -> list[str]:
@@ -421,13 +457,27 @@ class Alerter:
             except OSError:
                 pass
 
+    def toast_cmd(self, ev: Event, user: str, uid: int, root: bool) -> list[str]:
+        secs = self.cfg.getint("general", "notify_seconds_critical" if ev.sev in ("high", "critical") else "notify_seconds", fallback=8)
+        t = ["sentinel", "toast", "--sev", ev.sev, "--seg", str(max(2, secs)), "--titulo", f"Sentinel · {SEV_ES[ev.sev]}", ev.msg[:300]]
+        env = [f"{k}={v}" for k, v in self.desktop_env(uid).items()]
+        return ["runuser", "-u", user, "--", "env", *env, *t] if root else ["env", *env, *t]
+
     def desktop(self, ev: Event) -> None:
-        if not shutil.which("notify-send"):
-            return
         tgt = self.desktop_target()
         if not tgt:
             return
         user, uid = tgt
+        if self.cfg.get("general", "notify_style", fallback="corner") == "corner" and shutil.which("sentinel"):
+            from . import toast                     # aviso propio en la esquina inferior derecha (se cierra solo)
+            if toast.available():
+                try:
+                    subprocess.Popen(self.toast_cmd(ev, user, uid, is_root()), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                    return
+                except OSError:
+                    pass
+        if not shutil.which("notify-send"):
+            return
         secs = self.cfg.getint("general", "notify_seconds_critical" if ev.sev in ("high", "critical") else "notify_seconds", fallback=8)
         # -t: milisegundos visible (el aviso se cierra solo); queda en el historial de notificaciones del escritorio
         base = ["notify-send", "-a", "Sentinel", "-t", str(max(2, secs) * 1000), "-i", "dialog-warning" if ev.sev in ("high", "critical") else "security-medium",

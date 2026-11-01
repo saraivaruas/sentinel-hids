@@ -66,7 +66,7 @@
   // ---------- navegación
   const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
-    "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
+    ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
     st.view = v;
@@ -75,6 +75,7 @@
     $("#title").textContent = TITLES[v][0]; $("#subtitle").textContent = TITLES[v][1];
     if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
     if (v.startsWith("fw-")) loadFirewall();
+    if (v === "ajustes") loadSettings();
     if (v === "eventos") loadEvents();
     if (v === "postura") loadAudit();
     if (v === "atacantes") loadAttackers();
@@ -215,18 +216,31 @@
   }
 
   // ---------- Eventos
+  const SEVN = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
   function chips() {
     const c = $("#sev-chips"); clear(c);
+    const all = st.evAll || [], mod = $("#f-mod").value;
     [["info", "Todo"], ["low", "Baja+"], ["medium", "Media+"], ["high", "Alta+"], ["critical", "Crítica"]].forEach(([k, l]) => {
-      const b = el("button", "chip", l, { "aria-pressed": String(st.minSev === k) });
-      b.addEventListener("click", () => { st.minSev = k; chips(); loadEvents(); });
+      const n = all.filter((e) => SEVN[e.sev] >= SEVN[k] && (!mod || e.source === mod)).length;
+      const b = el("button", "chip", l + " · " + n, { "aria-pressed": String(st.minSev === k) });
+      b.addEventListener("click", () => { st.minSev = k; renderEvents(); });
       c.appendChild(b);
     });
   }
   let evTimer = 0;
   async function loadEvents() {
-    const q = new URLSearchParams({ hours: $("#f-hours").value, min: st.minSev, q: $("#f-q").value, limit: 300 });
-    const list = await api("/api/events?" + q);
+    const q = new URLSearchParams({ hours: $("#f-hours").value, min: "info", q: $("#f-q").value, limit: 500 });
+    st.evAll = await api("/api/events?" + q);
+    const sel = $("#f-mod"), cur = sel.value, mods = [...new Set(st.evAll.map((e) => e.source))].sort();
+    clear(sel); sel.appendChild(el("option", null, "Todos los módulos", { value: "" }));
+    mods.forEach((m) => sel.appendChild(el("option", null, m, { value: m })));
+    sel.value = mods.includes(cur) ? cur : "";
+    renderEvents();
+  }
+  function renderEvents() {
+    chips();
+    const mod = $("#f-mod").value;
+    const list = (st.evAll || []).filter((e) => SEVN[e.sev] >= SEVN[st.minSev] && (!mod || e.source === mod));
     const body = $("#ev-body"); clear(body);
     $("#ev-empty").hidden = list.length > 0;
     list.forEach((e) => {
@@ -239,6 +253,17 @@
       tr.addEventListener("click", () => { if (pre) { pre.remove(); pre = null; } else { pre = el("pre", null, JSON.stringify(e.data || {}, null, 2) + "\nclave: " + e.key); d.appendChild(pre); } });
       body.appendChild(tr);
     });
+  }
+
+  // ---------- Ajustes
+  async function loadSettings() {
+    const s = await api("/api/settings"), v = s.values;
+    $("#st-desk").value = v["general.enable_desktop"] === "no" ? "no" : "yes"; $("#st-min").value = v["general.notify_min"]; $("#st-style").value = v["general.notify_style"] || "corner";
+    $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"];
+    const on = s.honeypot.active;
+    $("#st-hp").textContent = on ? "activos" : "apagados"; $("#st-hp").className = "badge sev-" + (on ? "high" : "low");
+    $("#st-hp-ports").textContent = s.honeypot.ports.join(", "); $("#st-hp-btn").textContent = on ? "Apagar señuelos" : "Activar señuelos"; $("#st-hp-btn").dataset.on = on ? "1" : "";
+    $("#st-note").textContent = s.toast_available ? "" : "Falta GTK para el aviso de esquina (paquete python3-gi): se usará la notificación del sistema.";
   }
 
   // ---------- Postura
@@ -456,6 +481,17 @@
     e.preventDefault();
     for (const [k, id] of [["profile", "fw-profile"], ["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["restrict", "fw-restrict"], ["keep_ssh", "fw-ssh"], ["ssh_limit", "fw-sshlimit"], ["backend", "fw-backend"]]) { const r = await runAction("fw_config", { clave: k, valor: $("#" + id).value.trim() }); if (!r || !r.ok) return; }
     toast("Ajustes guardados. Pulsa «Actualizar» en Puertos para ver el plan nuevo."); loadFirewall();
+  });
+  $("#f-mod").addEventListener("change", renderEvents);
+  $("#st-hp-btn").addEventListener("click", async (e) => {
+    const on = !e.currentTarget.dataset.on;
+    if (on && !(await confirmDlg("Activar los señuelos", "Se abrirán puertos falsos en este equipo (el firewall los mantiene cerrados hacia afuera). ¿Seguro?", "Activar"))) return;
+    await runAction("senuelos", { on }, e.currentTarget); loadSettings();
+  });
+  $("#st-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await runAction("ajustes", { pares: { "general.enable_desktop": $("#st-desk").value, "general.notify_min": $("#st-min").value, "general.notify_style": $("#st-style").value, "general.notify_seconds": $("#st-secs").value, "general.notify_seconds_critical": $("#st-secs-c").value, "general.popup_min": $("#st-popup").value } });
+    if (r && r.ok) loadSettings();
   });
   $("#f-hours").addEventListener("change", loadEvents);
   $("#att-q").addEventListener("input", () => { clearTimeout(attTimer); attTimer = setTimeout(loadAttackers, 300); });
