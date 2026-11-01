@@ -348,6 +348,8 @@ def gate(a) -> int | None:
     """None = puede seguir. Si hay PIN y no se demuestra, devuelve el código de salida."""
     if not core.is_root() or not pin.required() or not _protected(a):
         return None
+    if a.fn.__name__ == "cmd_baseline" and a.action == "accept" and pin.stop_authorized():
+        return None                          # la actualización del paquete ya verificó el PIN hace un momento: no se pregunta dos veces
     given = pin.next_stdin_line() if a.pin_stdin else pin.ask()
     _last_given[0] = given or ""
     if given is None:

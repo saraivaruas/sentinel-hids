@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.6.3] - 2026-11-01
+
+### Corregido
+- Al actualizar con `apt` teniendo un PIN, el PIN se pregunta **una sola vez** (antes salía «PIN de Sentinel:» dos veces y la primera, sin explicación, parecía un cuelgue). Si se omite con Enter, no se vuelve a preguntar.
+
 ## [2.6.2] - 2026-11-01
 
 ### Corregido

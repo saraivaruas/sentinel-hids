@@ -94,6 +94,15 @@ class GateTests(unittest.TestCase):
         code, _ = self.run_cli(["--pin-stdin", "pin", "establecer"], "secreto-1\nnuevo-pin-9\n")
         self.assertEqual(code, 0); self.assertTrue(pin.verify("nuevo-pin-9")[0])
 
+    def test_un_solo_pin_al_actualizar(self):
+        pin.authorize_stop()                                  # el postinst ya verificó el PIN con «pin autorizar»
+        self.assertEqual(self.run_cli(["--pin-stdin", "baseline", "accept", "/opt/sentinel"], "")[0], 0)      # accept ya no vuelve a preguntar
+        pin.revoke_stop()
+        self.assertEqual(self.run_cli(["--pin-stdin", "baseline", "accept", "/opt/sentinel"], "")[0], 2)      # sin permiso vigente sí lo exige
+        pin.authorize_stop()
+        self.assertEqual(self.run_cli(["--pin-stdin", "baseline", "init"], "")[0], 2)                         # el permiso temporal no abre otros comandos
+        self.assertEqual(self.run_cli(["--pin-stdin", "config", "general.notify_min=high"], "")[0], 2)
+
     def test_verificar_y_autorizar_para_desinstalar(self):
         self.assertEqual(self.run_cli(["--pin-stdin", "pin", "verificar"], "mal\n")[0], 1); self.assertFalse(pin.stop_authorized())
         self.assertEqual(self.run_cli(["--pin-stdin", "pin", "verificar"], "secreto-1\n")[0], 0); self.assertTrue(pin.stop_authorized())
