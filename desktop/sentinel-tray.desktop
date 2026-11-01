@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Sentinel (ícono de estado)
+Comment=Muestra en la barra del sistema si el equipo está protegido
+Exec=sentinel tray
+Icon=sentinel
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+Categories=System;Security;
