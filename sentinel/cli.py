@@ -376,8 +376,10 @@ def cmd_pin(a) -> int:
     if a.accion == "autorizar":                # la actualización del paquete pide permiso para reiniciar el servicio
         if not was or pin.stop_authorized():
             return 0
-        given = pin.ask("PIN de Sentinel (para actualizar): ")
-        ok, msg = pin.verify(given or "", core.Alerter(cfg)) if given is not None else (False, "No pude preguntar el PIN.")
+        given = pin.ask("\nSentinel está protegido con PIN. Escríbelo para actualizar y pulsa Enter (o solo Enter para omitir): ")
+        if not given:
+            print("Sin PIN: la actualización sigue, pero el monitor tardará unos 20 segundos en reiniciarse y se registrará una alerta.", file=sys.stderr); return 1
+        ok, msg = pin.verify(given, core.Alerter(cfg))
         if ok:
             pin.authorize_stop()
         else:

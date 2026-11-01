@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.6.2] - 2026-11-01
+
+### Corregido
+- Al actualizar con `apt` teniendo un PIN, la pregunta del PIN ahora se ve claramente en la terminal, se puede omitir con Enter y no espera más de 2 minutos (antes quedaba esperando sin explicar y la instalación parecía colgada).
+
 ## [2.6.1] - 2026-11-01
 
 ### Corregido
