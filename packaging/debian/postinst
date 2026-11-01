@@ -17,6 +17,10 @@ if [ "$1" = "configure" ]; then
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q /usr/share/applications || true
   command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q /usr/share/icons/hicolor || true
   if [ -d /run/systemd/system ]; then
+    # copias viejas dejadas por install.sh en /etc/systemd/system: tapan las del paquete (y la antigua hacía que el monitor encendiera los señuelos)
+    for f in /etc/systemd/system/sentinel-*.service /etc/systemd/system/sentinel-*.timer; do
+      [ -f "$f" ] && grep -q "Sentinel" "$f" && rm -f "$f" || true
+    done
     systemctl daemon-reload
     [ -f /var/lib/sentinel/fim_baseline.json ] || /usr/bin/sentinel baseline init || true
     systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || true

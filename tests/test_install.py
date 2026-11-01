@@ -65,6 +65,13 @@ class DebTests(unittest.TestCase):
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
+    def test_el_paquete_no_enciende_los_senuelos(self):
+        post = open(os.path.join(ROOT, "packaging", "debian", "postinst")).read()
+        self.assertIn("disable --now sentinel-honeypot", post); self.assertNotIn("enable --now sentinel-honeypot", post)
+        self.assertIn("/etc/systemd/system/sentinel-*.service", post)       # retira copias viejas que tapan las del paquete
+        self.assertLess(post.index("rm -f"), post.index("daemon-reload"))
+        self.assertNotIn("honeypot", open(os.path.join(ROOT, "systemd", "sentinel-monitor.service")).read())     # el monitor no los arrastra
+
 
 if __name__ == "__main__":
     unittest.main()
