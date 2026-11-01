@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, update
+from . import authwatch, core, weblogs, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, update
 
 
 class Monitor:
@@ -24,6 +24,7 @@ class Monitor:
         self.host = hostcheck.HostCheck(self.cfg, self.alerter, self.allow)
         self.auth = authwatch.AuthWatch(self.cfg, self.alerter, self.allow, self.banner, self.intel)
         self.pkts = packets.PacketWatcher(self.cfg, self.alerter, self.allow, self.banner, self.intel)
+        self.web = weblogs.WebWatch(self.cfg, self.alerter, self.allow, self.banner, self.intel)
         self.stop = threading.Event()
         self.q: queue.Queue = queue.Queue()
         self.threads: list[threading.Thread] = []
@@ -118,6 +119,8 @@ class Monitor:
             self.alerter.emit("info", "monitor", "primera_vez", f"Creando referencias de integridad ({self.fim.init()} elementos)", key="mon:init")
         live = self.live_fim()
         jobs = [("autenticacion", lambda: self.auth.follow(self.stop.is_set)), ("senuelos", lambda: honeypot.follow_log(self.on_decoy, stop=self.stop.is_set))]
+        if self.web.paths() and self.cfg.getboolean("weblog", "enabled", fallback=True):
+            jobs.append(("web", lambda: self.web.follow(self.stop.is_set)))
         if self.cfg.getboolean("packets", "enabled", fallback=True) and core.is_root():
             jobs.append(("paquetes", lambda: self.pkts.run(self.stop.is_set)))
         for name, fn in jobs:

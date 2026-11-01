@@ -23,6 +23,42 @@ TIPOS = {
         "nino": "Imagina un edificio con miles de puertas numeradas. Esta persona va tocando una por una para ver cuáles están abiertas. Eso es un «escaneo de puertos»: busca por dónde se puede entrar.",
         "sirve": "Cada servicio de tu equipo (web, correo, SSH…) vive detrás de una puerta con número, llamada «puerto». Escanear sirve para saber qué servicios hay.",
         "peligro": "Medio: no entró, solo miró. Pero casi siempre es el primer paso de un ataque."},
+    "web_rce": {"nombre": "Intento de ejecutar comandos en tu sitio web", "nivel": "alto",
+        "nino": "Es como alguien que, en vez de pedir una página, le susurra una orden al conserje para que abra la bodega por él. Intenta que tu sitio ejecute comandos que él escribió.",
+        "sirve": "Para el atacante sirve para tomar el control del servidor. Los sitios web normales nunca reciben órdenes escondidas en la dirección.",
+        "peligro": "Muy peligroso si el sitio es vulnerable: podría quedar bajo su control. Si tu sitio está al día casi siempre falla, pero conviene revisar que no respondió con éxito."},
+    "web_sqli": {"nombre": "Inyección SQL (engañar a la base de datos)", "nivel": "alto",
+        "nino": "Es como escribir en el formulario de un colegio, en vez de tu nombre, una frase que engaña a la secretaria para que te entregue todas las fichas de los alumnos.",
+        "sirve": "Sirve para leer o robar los datos de la base de datos del sitio.",
+        "peligro": "Alto: si el sitio no se protege bien, puede filtrar datos. Un robot suele probar cientos de sitios seguidos."},
+    "web_traversal": {"nombre": "Intento de salir de la carpeta del sitio (../)", "nivel": "alto",
+        "nino": "Es como pedir un libro en la biblioteca y escribir «sube dos pisos y abre el cuarto de la dirección». Quiere llegar a archivos del servidor que no son del sitio.",
+        "sirve": "Sirve para leer archivos como contraseñas del sistema.",
+        "peligro": "Alto si lo logra; los sitios bien hechos lo bloquean solos."},
+    "web_xss": {"nombre": "Intento de meter scripts (XSS)", "nivel": "medio",
+        "nino": "Es como dejar una nota con una trampa pegada en el tablero de anuncios, para que quien la lea sin querer haga algo que no quiere.",
+        "sirve": "Sirve para robar sesiones de otros visitantes del sitio.",
+        "peligro": "Medio: depende de si el sitio muestra lo que recibe sin limpiarlo."},
+    "web_secretos": {"nombre": "Búsqueda de archivos secretos", "nivel": "medio",
+        "nino": "Es como un ladrón que va probando debajo del felpudo, la maceta y el buzón por si dejaste una llave: busca archivos como .env, .git o copias de seguridad donde a veces quedan contraseñas.",
+        "sirve": "Esos archivos suelen tener claves de bases de datos y servicios.",
+        "peligro": "Peligroso solo si alguno existe y se puede descargar. Revisa que tu sitio no sirva esos archivos."},
+    "web_escaner": {"nombre": "Escáner de vulnerabilidades", "nivel": "alto",
+        "nino": "Es una máquina que recorre tu casa tocando todas las puertas y ventanas para anotar cuáles están mal cerradas, y se anuncia con un nombre conocido (sqlmap, nikto…).",
+        "sirve": "Lo usan tanto auditores como atacantes para encontrar fallas.",
+        "peligro": "Medio-alto: si no lo pediste tú, alguien está buscando fallas en tu sitio."},
+    "web_sondeo": {"nombre": "Búsqueda de paneles de administración", "nivel": "medio",
+        "nino": "Es como andar por un edificio preguntando por la oficina del administrador en cada piso: prueba direcciones como wp-login o phpmyadmin para ver cuáles existen.",
+        "sirve": "Sirve para encontrar la puerta de entrada de administradores y probar contraseñas ahí.",
+        "peligro": "Medio: no entra por sí mismo, pero prepara un ataque de contraseñas."},
+    "web_login": {"nombre": "Fuerza bruta en el inicio de sesión web", "nivel": "alto",
+        "nino": "Es como alguien que prueba contraseñas una tras otra en la puerta de tu sitio, miles de veces, esperando acertar.",
+        "sirve": "Sirve para entrar a cuentas de usuarios o administradores.",
+        "peligro": "Alto si las contraseñas son débiles. Conviene límite de intentos y verificación en dos pasos."},
+    "web_404": {"nombre": "Ráfaga de páginas inexistentes", "nivel": "medio",
+        "nino": "Pidió decenas de páginas que no existen en pocos segundos, como quien toca todas las puertas de un pasillo para ver cuáles abren.",
+        "sirve": "Es la forma de descubrir qué hay en un sitio.",
+        "peligro": "Medio: busca puntos débiles."},
     "escaneo_syn": {"nombre": "Escaneo de puertos (toc-toc rápido)", "nivel": "medio",
         "nino": "Tocó el timbre de muchísimas puertas en pocos segundos y salió corriendo sin esperar que abrieran. Así averigua cuáles puertas existen sin dejar mucho rastro.",
         "sirve": "Es la forma más común y rápida de descubrir qué servicios tiene un equipo.",
@@ -113,7 +149,7 @@ def clasificar_paquete(proto: str, flags: str | None, dport: int | None = None) 
 
 
 def puntaje(by_kind: dict, ports: int = 0, packets: int = 0) -> tuple[int, str]:
-    peso = {"ssh_clave": 2.5, "ssh_usuario_invalido": 1.5, "ssh_llave": 2.0, "escaneo_puertos": 18, "escaneo_syn": 22, "escaneo_sigiloso": 40, "escaneo_udp": 16, "inundacion_syn": 55, "ping_masivo": 15, "senuelo": 45}
+    peso = {"ssh_clave": 2.5, "ssh_usuario_invalido": 1.5, "ssh_llave": 2.0, "web_rce": 40, "web_sqli": 12, "web_traversal": 10, "web_xss": 4, "web_secretos": 5, "web_escaner": 20, "web_sondeo": 3, "web_login": 3, "web_404": 15, "escaneo_puertos": 18, "escaneo_syn": 22, "escaneo_sigiloso": 40, "escaneo_udp": 16, "inundacion_syn": 55, "ping_masivo": 15, "senuelo": 45}
     tope = {"ssh_clave": 45, "ssh_usuario_invalido": 25, "ssh_llave": 25}
     s = 0.0
     for k, n in by_kind.items():
