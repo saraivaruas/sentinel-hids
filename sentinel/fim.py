@@ -168,10 +168,13 @@ def scan_content(path: str, exts: list[str], limit: int = 2_000_000) -> list[str
 
 # Los archivos de Sentinel mismo: si cambian durante una actualización de paquetes es la propia actualización, no un ataque.
 SELF_DIRS = ("/opt/sentinel", "/etc/sentinel")
-SELF_FILES = ("/usr/bin/sentinel", "/usr/local/bin/sentinel", "/usr/share/applications/sentinel", "/usr/share/icons/hicolor/scalable/apps/sentinel")
+SELF_FILES = ("/usr/bin/sentinel", "/usr/local/bin/sentinel", "/usr/share/applications/sentinel", "/usr/share/icons/hicolor/scalable/apps/sentinel",
+              "/etc/systemd/system/sentinel-", "/lib/systemd/system/sentinel-", "/usr/lib/systemd/system/sentinel-", "/etc/logrotate.d/sentinel")
 
 
 def es_de_sentinel(path: str) -> bool:
+    if re.match(r"^/etc/systemd/system/[\w.-]+\.wants/sentinel-", path):       # enlaces que crea systemctl enable
+        return True
     return any(path == d or path.startswith(d + "/") for d in SELF_DIRS) or path.startswith(SELF_FILES)
 
 

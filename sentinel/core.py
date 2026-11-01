@@ -28,6 +28,8 @@ desktop_user =
 notify_min = medium
 ; aviso en la esquina de la pantalla (se cierra solo): segundos visible; las críticas un poco más
 notify_seconds = 8
+; corner = aviso propio en la esquina inferior derecha; system = notificación normal del escritorio
+notify_style = corner
 notify_seconds_critical = 15
 ; ventana emergente grande (con botón «Abrir panel») desde esta gravedad (never = nunca, solo avisos de esquina); máximo por minuto; segundos abierta
 popup_min = never
@@ -421,13 +423,27 @@ class Alerter:
             except OSError:
                 pass
 
+    def toast_cmd(self, ev: Event, user: str, uid: int, root: bool) -> list[str]:
+        secs = self.cfg.getint("general", "notify_seconds_critical" if ev.sev in ("high", "critical") else "notify_seconds", fallback=8)
+        t = ["sentinel", "toast", "--sev", ev.sev, "--seg", str(max(2, secs)), "--titulo", f"Sentinel · {SEV_ES[ev.sev]}", ev.msg[:300]]
+        env = [f"{k}={v}" for k, v in self.desktop_env(uid).items()]
+        return ["runuser", "-u", user, "--", "env", *env, *t] if root else ["env", *env, *t]
+
     def desktop(self, ev: Event) -> None:
-        if not shutil.which("notify-send"):
-            return
         tgt = self.desktop_target()
         if not tgt:
             return
         user, uid = tgt
+        if self.cfg.get("general", "notify_style", fallback="corner") == "corner" and shutil.which("sentinel"):
+            from . import toast                     # aviso propio en la esquina inferior derecha (se cierra solo)
+            if toast.available():
+                try:
+                    subprocess.Popen(self.toast_cmd(ev, user, uid, is_root()), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                    return
+                except OSError:
+                    pass
+        if not shutil.which("notify-send"):
+            return
         secs = self.cfg.getint("general", "notify_seconds_critical" if ev.sev in ("high", "critical") else "notify_seconds", fallback=8)
         # -t: milisegundos visible (el aviso se cierra solo); queda en el historial de notificaciones del escritorio
         base = ["notify-send", "-a", "Sentinel", "-t", str(max(2, secs) * 1000), "-i", "dialog-warning" if ev.sev in ("high", "critical") else "security-medium",

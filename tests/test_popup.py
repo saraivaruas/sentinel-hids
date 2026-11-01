@@ -49,11 +49,31 @@ class PopupTests(unittest.TestCase):
 
     def test_aviso_de_esquina_se_cierra_solo(self):
         calls = []
+        self.e.cfg.set("general", "notify_style", "system")
         with mock.patch.object(core.shutil, "which", return_value="/usr/bin/notify-send"), mock.patch.object(core.Alerter, "desktop_target", return_value=("ana", 1000)), \
              mock.patch.object(core, "is_root", return_value=False), mock.patch.object(core.subprocess, "run", side_effect=lambda c, **k: calls.append(c)):
             self.a.desktop(core.Event("medium", "host", "x", "m")); self.a.desktop(core.Event("critical", "host", "x", "m"))
         t = lambda c: int(c[c.index("-t") + 1])
         self.assertEqual(t(calls[0]), 8000); self.assertEqual(t(calls[1]), 15000)
+
+    def test_aviso_de_esquina_por_defecto(self):
+        from sentinel import toast
+        popen = []
+        with mock.patch.object(core.shutil, "which", return_value="/usr/bin/sentinel"), mock.patch.object(core.Alerter, "desktop_target", return_value=("ana", 1000)), \
+             mock.patch.object(toast, "available", return_value=True), mock.patch.object(core, "is_root", return_value=True), \
+             mock.patch.object(core.subprocess, "Popen", side_effect=lambda c, **k: popen.append(c)):
+            self.a.desktop(core.Event("high", "host", "x", "algo pasó"))
+        c = popen[0]
+        self.assertEqual(c[:4], ["runuser", "-u", "ana", "--"]); i = c.index("toast")
+        self.assertEqual(c[i - 1], "sentinel"); self.assertIn("--seg", c); self.assertEqual(c[c.index("--seg") + 1], "15"); self.assertEqual(c[-1], "algo pasó")
+
+    def test_sin_gtk_cae_a_notify_send(self):
+        from sentinel import toast
+        calls = []
+        with mock.patch.object(core.shutil, "which", return_value="/usr/bin/x"), mock.patch.object(core.Alerter, "desktop_target", return_value=("ana", 1000)), \
+             mock.patch.object(toast, "available", return_value=False), mock.patch.object(core, "is_root", return_value=False), mock.patch.object(core.subprocess, "run", side_effect=lambda c, **k: calls.append(c)):
+            self.a.desktop(core.Event("medium", "host", "x", "m"))
+        self.assertEqual(calls[0][0], "notify-send")
 
     def test_sin_zenity_o_sin_sesion_no_falla(self):
         with mock.patch.object(core.shutil, "which", return_value=None):

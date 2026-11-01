@@ -39,7 +39,7 @@ Architecture: all
 Installed-Size: $SIZE
 Maintainer: Jorge Luis Saraiva Ruas <28052181+saraivaruas@users.noreply.github.com>
 Depends: python3 (>= 3.8), systemd, procps, iproute2, util-linux, coreutils
-Recommends: inotify-tools, libnotify-bin, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
+Recommends: inotify-tools, libnotify-bin, python3-gi, gir1.2-gtk-3.0, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
 Suggests: crowdsec, crowdsec-firewall-bouncer-iptables, lynis, mailutils
 Description: Sentinel: detector de intrusiones y cambios para Linux
  Vigila la integridad de archivos críticos, detecta puertas traseras web,
