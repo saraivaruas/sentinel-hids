@@ -9,7 +9,7 @@ import re
 import stat
 import time
 
-from . import core, malware
+from . import core, malware, pkgcheck
 
 CRITICAL = [r"^/etc/(passwd|shadow|gshadow|group|sudoers)(\.|$)", r"^/etc/sudoers\.d/", r"/\.ssh/authorized_keys2?$", r"^/etc/ld\.so\.preload$", r"^/etc/pam\.d/", r"^/root/\.ssh/"]
 HIGH = [r"^/etc/ssh/", r"^/usr/local/(s)?bin/", r"^/etc/systemd/system/", r"^/etc/cron", r"^/etc/rc\.local$", r"^/opt/sentinel", r"^/etc/profile", r"^/etc/environment$",
@@ -188,8 +188,10 @@ def package_activity(window: int = 300, log: str = "/var/log/dpkg.log") -> bool:
         return False
 
 
-def reclassify(path: str, kind: str, sev: str, detail: str, pkg: bool, sigs: list) -> tuple[str, str]:
+def reclassify(path: str, kind: str, sev: str, detail: str, pkg: bool, sigs: list, pristine: bool = False) -> tuple[str, str]:
     """Baja la gravedad de cambios que son esperables (la propia actualización de Sentinel, el firewall, apt) para que el informe solo muestre lo real."""
+    if pristine and not sigs and kind in ("modified", "added"):
+        return "info", detail + " — coincide con el archivo oficial del paquete (no hay nada raro)"
     if pkg and not sigs and es_de_sentinel(path):
         return "info", detail + " (actualización de Sentinel)"
     if kind in ("removed", "link", "type") and es_de_sentinel(path) and path.startswith("/etc/systemd/system/"):
@@ -259,7 +261,8 @@ class Fim:
                     sev, detail = "critical", f"posible puerta trasera: {', '.join(sigs)}"
                 elif f["kind"] == "added" and os.path.splitext(f["path"])[1].lstrip(".").lower() in self.exts:
                     sev = "high"; detail = "archivo ejecutable nuevo en carpeta web"
-            sev, detail = reclassify(f["path"], f["kind"], sev, detail, pkg, sigs)
+            pristine = f["kind"] in ("modified", "added") and not sigs and pkgcheck.is_pristine(f["path"])
+            sev, detail = reclassify(f["path"], f["kind"], sev, detail, pkg, sigs, pristine)
             f2 = dict(f, sev=sev, detail=detail)
             results.append(f2)
             self.alerter.emit(sev, "fim", f["kind"], f"{f['path']}: {detail}", key=f"fim:{f['kind']}:{f['path']}:{f.get('sha', '')}", path=f["path"], detail=detail, signatures=sigs)
