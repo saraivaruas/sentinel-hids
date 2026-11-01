@@ -59,6 +59,14 @@ Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te a
 
 **Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Quien ya es root puede apagar cualquier programa a la fuerza (por ejemplo `kill -9`): el PIN cierra las vías normales, avisa y deja rastro, pero no es una barrera absoluta. Si el monitor deja de latir, un temporizador aparte te avisa.
 
+## Novedades de la 2.7
+
+- **«Esto es normal» y modo aprendizaje**: aceptas un aviso con un botón (pide tu PIN) y, al instalar programas nuevos, `sentinel aprender 3` acepta los puertos, USB y módulos nuevos sin avisar durante 3 días. Los ataques nunca se «aceptan».
+- **Registros web**: si tienes nginx o apache, Sentinel lee sus registros de acceso (`[weblog]`) y bloquea 24 h a quien ejecuta comandos, inyecta SQL, busca `.env`/`.git`, usa escáneres o prueba contraseñas en tu login.
+- **Latido externo** (`[alerts] heartbeat_url`): un servicio como healthchecks.io te avisa si Sentinel deja de latir, aunque lo apaguen a la fuerza.
+- **Actualizaciones firmadas**: crea tu clave con `tools/crear-clave-de-publicacion.sh`; los equipos que traen su clave pública solo aceptan publicaciones firmadas.
+- **Antivirus y YARA** opcionales, verificación contra el paquete oficial, **horas de silencio**, eventos **resueltos**, **ícono en la barra del sistema** y página **Servidores** para ver otros Sentinel por SSH (solo lectura).
+
 ## Qué detecta
 
 | Detector | Qué hace | Gravedad típica |
@@ -67,6 +75,7 @@ Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te a
 | **Puertas traseras web** | En carpetas web (`/var/www/html`) revisa los archivos nuevos o modificados contra firmas de webshells y shells inversas, **incluso ofuscadas**: reconstruye texto partido (`'ev'.'al'`), `chr()`, `\x65`, comentarios dentro de palabras y base64/gzip anidados, y puntúa señales de ofuscación. No es infalible ante código hecho a medida. | crítica |
 | **Ataques en vivo** | Lee el journal: fuerza bruta SSH/sudo/su, acceso exitoso tras intentos fallidos, root remoto y **escaneo de puertos** (bloqueos del cortafuegos). | alta / crítica |
 | **Señuelos** (opcionales) | Puertos falsos (2222, 2323, 3390, 5900, 60009) sin servicio real, en un proceso sin privilegios y aislado. **Vienen apagados** porque abren puertos; se activan desde *Ajustes* o con `sudo sentinel senuelos activar`. Quien se conecta queda registrado y bloqueado. | alta |
+| **Sitios web** | Lee los registros de nginx/apache: inyección SQL, ejecución de comandos, `../`, archivos secretos, escáneres, paneles de administración, ráfagas de 404 y fuerza bruta del login. Bloquea la IP. | alta |
 | **Equipo** | Puertos nuevos en escucha o que pasan de local a públicos, procesos que corren desde `/tmp`, con el ejecutable borrado o con nombre de minero, conexiones a puertos de troyanos, lectores de teclado no esperados, USB, módulos del kernel, cuentas nuevas, UID 0 duplicado, cuentas sin contraseña, procesos ocultos y SUID nuevos. | media / crítica |
 | **Postura** | `sentinel audit`: 16 revisiones de configuración con su arreglo (cortafuegos, SSH, permisos web, parámetros del kernel, actualizaciones, credenciales con permisos abiertos…). | — |
 
