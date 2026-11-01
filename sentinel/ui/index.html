@@ -149,7 +149,12 @@
       </div>
     </section>
     <section class="view" id="view-fw-puertos" hidden>
-      <div class="grid2">
+      <article class="card fw-pending" id="fw-pending" hidden>
+        <div class="card-h"><h3>Cambios aplicados a prueba</h3><b id="fw-count">—</b></div>
+        <p class="hint">Si todo funciona (tu conexión, tus despliegues), confirma. Si no confirmas a tiempo, el firewall vuelve solo a como estaba.</p>
+        <div class="fix-row"><button class="btn primary" id="fw-confirm">Confirmar cambios</button><button class="btn" id="fw-revert">Volver atrás ahora</button></div>
+      </article>
+      <div class="stack">
         <article class="card">
           <div class="card-h"><h3>Plan del firewall</h3><span class="fw-tools"><small class="fw-age" id="fw-age"></small><button class="btn sm fw-reload" title="Vuelve a leer la información más reciente (no pide clave)">↻ Recargar</button><span class="badge" id="fw-be">—</span></span></div>
           <p class="hint" id="fw-sum">Leyendo el firewall…</p>
@@ -159,7 +164,7 @@
         </article>
         <article class="card">
           <div class="card-h"><h3>Puertos que escuchan en este equipo</h3><button class="btn sm fw-reload">↻ Recargar</button></div>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Puerto</th><th>Dónde escucha</th><th>Desde afuera</th></tr></thead><tbody id="fw-listen"></tbody></table></div>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Puerto</th><th>Programa</th><th>Alcanzable desde afuera</th></tr></thead><tbody id="fw-listen"></tbody></table></div>
         </article>
       </div>
     </section>
@@ -177,6 +182,9 @@
             <label>Puertos TCP abiertos<input id="fw-tcp" placeholder="80,443" autocomplete="off"></label>
             <label>Puertos UDP abiertos<input id="fw-udp" placeholder="(ninguno)" autocomplete="off"></label>
             <label>Mantener el SSH de este equipo<select id="fw-ssh"><option value="yes">Sí (recomendado)</option><option value="no">No</option></select></label>
+            <label>Perfil<select id="fw-profile"><option value="custom">Personalizado (usa los puertos de abajo)</option><option value="estacion">Estación de trabajo (nada abierto)</option><option value="web">Servidor web (80 y 443)</option><option value="servidor">Servidor (80, 443 y su SSH)</option></select></label>
+            <label>Puertos solo para ciertos orígenes<input id="fw-restrict" placeholder="22=100.64.0.0/10|203.0.113.7, 9200=10.0.0.0/8" autocomplete="off"></label>
+            <label>Limitar intentos al SSH (frena fuerza bruta)<select id="fw-sshlimit"><option value="no">No</option><option value="yes">Sí</option></select></label>
             <label>Motor<select id="fw-backend"><option value="auto">Automático</option><option value="ufw">ufw</option><option value="iptables">iptables</option></select></label>
             <button class="btn primary" type="submit">Guardar ajustes</button>
           </form>

@@ -395,8 +395,11 @@
 
   // ---------- ciclo
   // ---------- Firewall (módulo aparte de la detección)
+  let fwDeadline = 0;
+  setInterval(() => { const b = $("#fw-pending"); if (!fwDeadline || b.hidden) return; const s = Math.round(fwDeadline - Date.now() / 1000); $("#fw-count").textContent = s > 0 ? s + " s" : "revirtiendo…"; if (s < -3) loadFirewall(); }, 1000);
   async function loadFirewall() {
     const f = await api("/api/firewall");
+    fwDeadline = f && f.pending ? f.pending.deadline : 0; $("#fw-pending").hidden = !fwDeadline;
     const ok = f && f.ok;
     const age = ok ? Math.max(0, Date.now() / 1000 - Date.parse(f.time) / 1000) : null;
     document.querySelectorAll(".fw-age").forEach((e) => { e.textContent = age == null ? "" : "Información " + ago(age); e.classList.toggle("old", age != null && age > 180); });
@@ -407,10 +410,11 @@
       $("#fw-sum").textContent = (f && f.error) ? "No pude leer el firewall: " + f.error : "Aún no hay datos: el monitor guarda una foto del firewall cada 5 minutos. Pulsa «Actualizar».";
       $("#fw-apply").disabled = true; $("#nav-fw").hidden = true; clear($("#fw-listen")); clear($("#fw-rules")); return;
     }
-    const p = f.plan, n = p.remove.length + p.missing.length;
+    const p = f.plan, n = p.remove.length + p.missing.length + (p.missing_from || []).length;
     $("#fw-sum").textContent = "Quedarán abiertos desde afuera: " + (p.keep_ports.join(", ") || "ninguno") + (f.ssh.ports.length ? " · SSH de este equipo: " + f.ssh.ports.join(", ") : " · este equipo no sirve SSH (tus despliegues por SSH hacia otros servidores no se tocan)") + " · foto de " + when(Date.parse(f.time) / 1000);
     p.remove.forEach((r) => row("−", "Se cerrará: " + r.label, r.comment || "Permite entrar a cualquiera", "aviso"));
     p.missing.forEach((m) => row("+", "Se abrirá el puerto " + m, "Lo pediste en los ajustes (o es el SSH de este equipo)", "info"));
+    (p.missing_from || []).forEach(([po, src]) => row("+", "Se abrirá el puerto " + po + " solo desde " + src, "Limitado a ese origen", "info"));
     p.review.forEach((r) => row("?", "Revisar a mano: " + r.label, "Permite a un equipo concreto (" + r.from + "): no se toca solo", "info"));
     if (f.ssh.sessions.length) row("✓", "Sesiones SSH abiertas ahora", f.ssh.sessions.join(", ") + " (se mantienen)", "ok");
     if (!n && !p.review.length) row("✓", "El firewall ya está como lo pediste", "", "ok");
@@ -419,15 +423,18 @@
     $("#fw-note").textContent = f.needs_harden ? "iptables acepta todo por defecto: al aplicar se pondrá la política de entrada en DROP (dejando pasar lo local y lo ya iniciado)." : "Antes de aplicar se guarda una copia de las reglas.";
     const nb = $("#nav-fw"); nb.hidden = !n; nb.textContent = String(n);
     const lb = $("#fw-listen"); clear(lb);
+    const ST = { docker: ["critical", "Sí, salta el firewall (Docker)"], abierto: ["medium", "Sí, abierto"], bloqueado: ["low", "No, bloqueado"], privada: ["info", "Solo red privada"] };
     f.listening.filter((l) => !l.local).forEach((l) => {
-      const tr = el("tr"); tr.appendChild(el("td", null, l.proto + "/" + l.port)); tr.appendChild(el("td", null, l.addr)); const t = el("td"); t.appendChild(el("span", "badge sev-" + (l.allowed ? "high" : "low"), l.allowed ? "abierto" : "bloqueado")); tr.appendChild(t); lb.appendChild(tr);
+      const tr = el("tr"); tr.appendChild(el("td", null, l.proto + "/" + l.port));
+      const pr = el("td", null, l.proc || "—"); pr.appendChild(el("div", "hint", l.addr)); tr.appendChild(pr);
+      const t = el("td"); const s = ST[l.status] || ["info", l.status]; t.appendChild(el("span", "badge sev-" + s[0], s[1])); if (l.advice) t.appendChild(el("div", "hint", l.advice)); tr.appendChild(t); lb.appendChild(tr);
     });
     if (!lb.firstChild) lb.appendChild(el("tr")).appendChild(el("td", "empty", "Nada escucha hacia afuera."));
     const ru = $("#fw-rules"); clear(ru);
     f.rules.forEach((r) => { const li = el("li"); li.appendChild(el("div", "ic " + (r.action === "ALLOW" ? "ok" : "info"), r.action === "ALLOW" ? "✓" : "×")); const m = el("div"); m.appendChild(el("h4", null, r.label)); m.appendChild(el("p", null, r.action + " desde " + r.from + (r.comment ? " · " + r.comment : ""))); li.appendChild(m); li.appendChild(el("span")); ru.appendChild(li); });
     if (!ru.firstChild) ru.appendChild(el("li", "empty", "Sin reglas de entrada."));
-    if (document.activeElement && !["fw-tcp", "fw-udp", "fw-ssh", "fw-backend"].includes(document.activeElement.id)) {
-      $("#fw-tcp").value = f.conf.allow_tcp.join(","); $("#fw-udp").value = f.conf.allow_udp.join(","); $("#fw-ssh").value = f.conf.keep_ssh ? "yes" : "no"; $("#fw-backend").value = f.conf.backend;
+    if (document.activeElement && !["fw-tcp", "fw-udp", "fw-ssh", "fw-backend", "fw-profile", "fw-restrict", "fw-sshlimit"].includes(document.activeElement.id)) {
+      $("#fw-tcp").value = f.conf.allow_tcp.join(","); $("#fw-udp").value = f.conf.allow_udp.join(","); $("#fw-ssh").value = f.conf.keep_ssh ? "yes" : "no"; $("#fw-backend").value = f.conf.backend; $("#fw-profile").value = f.conf.profile || "custom"; $("#fw-sshlimit").value = f.conf.ssh_limit ? "yes" : "no"; $("#fw-restrict").value = Object.entries(f.conf.restrict || {}).map(([p, s]) => p + "=" + s.join("|")).join(", ");
     }
   }
 
@@ -438,14 +445,16 @@
   document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => go(b.dataset.goto)));
   document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => runAction(b.dataset.action, null, b)));
   document.querySelectorAll(".fw-reload").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { await loadFirewall(); toast("Información recargada"); } finally { b.disabled = false; } }));
+  $("#fw-confirm").addEventListener("click", async (e) => { await runAction("fw_confirmar", null, e.currentTarget); fwDeadline = 0; loadFirewall(); });
+  $("#fw-revert").addEventListener("click", async (e) => { await runAction("fw_revertir", null, e.currentTarget); fwDeadline = 0; loadFirewall(); });
   $("#fw-refresh").addEventListener("click", async (e) => { await runAction("fw_estado", null, e.currentTarget); loadFirewall(); });
   $("#fw-apply").addEventListener("click", async (e) => {
-    if (!(await confirmDlg("Aplicar el plan del firewall", "Se cerrarán los puertos indicados y quedará abierto solo lo que elegiste. Antes se guarda una copia de las reglas y se mantiene tu SSH.", "Aplicar"))) return;
+    if (!(await confirmDlg("Aplicar el plan del firewall", "Se cerrarán los puertos indicados y quedará abierto solo lo que elegiste. Se aplica A PRUEBA: tendrás 90 segundos para confirmar; si no confirmas, vuelve solo a como estaba. Tu SSH se mantiene.", "Aplicar"))) return;
     const f = await api("/api/firewall"); await runAction("fw_aplicar", { endurecer: !!(f && f.needs_harden) }, e.currentTarget); loadFirewall();
   });
   $("#fw-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    for (const [k, id] of [["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["keep_ssh", "fw-ssh"], ["backend", "fw-backend"]]) { const r = await runAction("fw_config", { clave: k, valor: $("#" + id).value.trim() }); if (!r || !r.ok) return; }
+    for (const [k, id] of [["profile", "fw-profile"], ["allow_tcp", "fw-tcp"], ["allow_udp", "fw-udp"], ["restrict", "fw-restrict"], ["keep_ssh", "fw-ssh"], ["ssh_limit", "fw-sshlimit"], ["backend", "fw-backend"]]) { const r = await runAction("fw_config", { clave: k, valor: $("#" + id).value.trim() }); if (!r || !r.ok) return; }
     toast("Ajustes guardados. Pulsa «Actualizar» en Puertos para ver el plan nuevo."); loadFirewall();
   });
   $("#f-hours").addEventListener("change", loadEvents);

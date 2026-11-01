@@ -18,7 +18,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -62,6 +62,9 @@ backend = auto
 allow_tcp = 80,443
 allow_udp =
 keep_ssh = yes
+profile = custom
+restrict =
+ssh_limit = no
 refresh_seconds = 60
 
 [fim]

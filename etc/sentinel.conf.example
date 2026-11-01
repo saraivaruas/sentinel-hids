@@ -46,6 +46,12 @@ allow_tcp = 80,443
 allow_udp =
 ; Si este equipo sirve SSH (sshd), mantener su puerto abierto para no quedarte sin acceso
 keep_ssh = yes
+; Perfil listo: estacion (nada abierto), web (80 y 443), servidor (80, 443 y su SSH) o custom (usa allow_tcp)
+profile = custom
+; Puertos abiertos solo para ciertos orígenes. Ejemplo: restrict = 22=100.64.0.0/10|203.0.113.7, 9200=10.0.0.0/8
+restrict =
+; Limitar los intentos de conexión al SSH del equipo (ufw limit: frena las contraseñas probadas a la fuerza)
+ssh_limit = no
 ; Cada cuántos segundos el monitor vuelve a leer el firewall para el panel
 refresh_seconds = 60
 

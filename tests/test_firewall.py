@@ -5,7 +5,7 @@ from unittest import mock
 
 from helpers import core
 from sentinel import firewall
-from sentinel.firewall import iptables, ufw
+from sentinel.firewall import exposure, iptables, ufw
 
 UFW = """Estado: activo
 
@@ -111,6 +111,131 @@ class FirewallTests(unittest.TestCase):
             for k, v in (("allow_tcp", "80;rm"), ("allow_tcp", "70000"), ("backend", "x"), ("zzz", "1")):
                 with self.assertRaises(ValueError):
                     firewall.set_config(k, v, p)
+
+    SS = """tcp LISTEN 0 4096 0.0.0.0:443 0.0.0.0:* users:(("nginx",pid=1,fd=6))
+tcp LISTEN 0 4096 0.0.0.0:9200 0.0.0.0:* users:(("java",pid=2,fd=6))
+tcp LISTEN 0 4096 0.0.0.0:8080 0.0.0.0:* users:(("docker-proxy",pid=3,fd=4))
+tcp LISTEN 0 4096 127.0.0.1:3306 0.0.0.0:*
+tcp LISTEN 0 4096 100.71.15.101%tailscale0:52047 0.0.0.0:*
+udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
+"""
+    DOCKER = "web\t0.0.0.0:8080->80/tcp, :::8080->80/tcp\ndb\t33060/tcp, 127.0.0.1:3307->3306/tcp\napi\t0.0.0.0:9000->9000/tcp\n"
+
+    def test_docker_publicado(self):
+        d = exposure.parse_docker(self.DOCKER)
+        self.assertEqual([(x["name"], x["port"], x["all"]) for x in d], [("web", 8080, True), ("web", 8080, True), ("db", 3307, False), ("api", 9000, True)])
+
+    def test_exposicion_real(self):
+        res = exposure.analyze(self.SS, {443}, exposure.parse_docker(self.DOCKER))
+        st = {(r["proto"], r["port"]): r["status"] for r in res}
+        self.assertEqual(st[("tcp", 8080)], "docker"); self.assertEqual(st[("tcp", 9000)], "docker")      # Docker salta el firewall (aunque no haya proceso que escuche)
+        self.assertEqual(st[("tcp", 443)], "abierto"); self.assertEqual(st[("tcp", 9200)], "bloqueado")
+        self.assertEqual(st[("tcp", 3306)], "local"); self.assertEqual(st[("tcp", 52047)], "privada"); self.assertEqual(st[("udp", 53)], "local")
+        self.assertEqual(res[0]["status"], "docker")                                                        # lo más grave primero
+        self.assertIn("127.0.0.1", next(r for r in res if r["port"] == 9200)["advice"])
+        self.assertIn("web", next(r for r in res if r["port"] == 8080)["advice"])
+        self.assertEqual(exposure.analyze(self.SS, {443}, exposure.parse_docker(self.DOCKER), True)[0]["status"] != "docker", True)   # con DROP en DOCKER-USER ya no se marca
+
+    def _apply_prueba(self, d, run_rc=0):
+        calls = []
+        def run(cmd, timeout=20):
+            calls.append(cmd); return (run_rc if cmd[0] == "systemd-run" else 0), UFW if cmd[:3] == ["ufw", "status", "numbered"] else ""
+        f = os.path.join(d, "user.rules"); open(f, "w").write("x")
+        env = {"SENTINEL_STATE": d}
+        with mock.patch.dict(os.environ, env), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", side_effect=run), \
+             mock.patch.object(firewall, "pick", return_value=ufw), mock.patch.object(ufw, "outgoing_allowed", return_value=True), \
+             mock.patch.object(firewall.shutil, "which", return_value="/usr/bin/x"), mock.patch.object(os.path, "isdir", return_value=True):
+            log = firewall.apply(core.load_config(), state_dir=d, conf_dirs=[f], probar=60)
+        return log, calls
+
+    def test_aplicar_a_prueba_programa_la_reversion(self):
+        with tempfile.TemporaryDirectory() as d:
+            log, calls = self._apply_prueba(d)
+            sr = next(c for c in calls if c[0] == "systemd-run")
+            self.assertIn("--on-active", sr); self.assertIn("60s", sr); self.assertEqual(sr[-3:], ["firewall", "restaurar", "--pendiente"])
+            with mock.patch.dict(os.environ, {"SENTINEL_STATE": d}):
+                pend = firewall.pending()
+            self.assertTrue(pend and pend["seconds"] == 60 and os.path.isdir(pend["copy"])); self.assertTrue(any("A PRUEBA" in l for l in log))
+
+    def test_si_no_se_puede_programar_la_reversion_se_deshace(self):
+        with tempfile.TemporaryDirectory() as d:
+            restored = []
+            with mock.patch.object(ufw, "restore", side_effect=lambda x: restored.append(x) or ["ok"]):
+                log, calls = self._apply_prueba(d, run_rc=1)
+            self.assertTrue(restored); self.assertTrue(any("deshago" in l for l in log))
+
+    def test_confirmar_cancela_la_reversion(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"SENTINEL_STATE": d}):
+            core.atomic_write_json(firewall.pending_path(), {"copy": d, "deadline": core.now() + 50, "seconds": 60})
+            calls = []
+            with mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+                self.assertIn("confirmados", firewall.confirm()[0])
+            self.assertIn(["systemctl", "stop", "sentinel-fw-revert.timer"], calls); self.assertIsNone(firewall.pending())
+
+    def test_restaurar_usa_la_copia_pendiente(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"SENTINEL_STATE": d}):
+            c = os.path.join(d, "firewall-copia-1"); os.makedirs(c)
+            core.atomic_write_json(firewall.pending_path(), {"copy": c, "deadline": core.now() + 50, "seconds": 60})
+            got = []
+            with mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", return_value=(0, "")), mock.patch.object(firewall, "pick", return_value=ufw), \
+                 mock.patch.object(ufw, "restore", side_effect=lambda x: got.append(x) or ["ufw recargado"]):
+                log = firewall.restore(use_pending=True)
+            self.assertEqual(got, [c]); self.assertIsNone(firewall.pending())
+
+    def test_puertos_por_origen(self):
+        txt = UFW.replace("[ 8] 9200/tcp                   ALLOW IN    10.0.0.7", "[ 8] 9200/tcp                   ALLOW IN    10.0.0.0/8") + "[11] 22/tcp                     ALLOW IN    Anywhere\n"
+        conf = dict(CONF, restrict=firewall.parse_restrict("22=100.64.0.0/10|203.0.113.7, 9200=10.0.0.0/8"))
+        p = firewall.plan(ufw.parse_rules(txt), conf, {"ports": [], "sessions": []})
+        self.assertIn(11, [r["id"] for r in p["remove"]])                       # 22 abierto a cualquiera sobra
+        self.assertIn(8, [r["id"] for r in p["keep"]]); self.assertEqual(p["review"], [])      # 9200 desde 10.0.0.0/8 es lo pedido
+        self.assertEqual(p["missing_from"], [(22, "100.64.0.0/10"), (22, "203.0.113.7/32")])
+        self.assertNotIn(22, p["missing"]); self.assertTrue(any("solo desde 203.0.113.7/32" in l for l in firewall.describe(p, "ufw")))
+        calls = []
+        with mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+            ufw.allow(22, "tcp", "100.64.0.0/10")
+        self.assertEqual(calls[0], ["ufw", "allow", "from", "100.64.0.0/10", "to", "any", "port", "22", "proto", "tcp"])
+
+    def test_perfiles_y_validacion(self):
+        cfg = core.load_config(); cfg.set("firewall", "profile", "estacion")
+        self.assertEqual(firewall.settings(cfg)["allow_tcp"], [])
+        cfg.set("firewall", "profile", "web"); self.assertEqual(firewall.settings(cfg)["allow_tcp"], [80, 443])
+        self.assertEqual(firewall.parse_restrict("22=bad|10.0.0.1, x=1, 80="), {22: ["10.0.0.1/32"]})
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "s.conf"); open(p, "w").write("[fim]\nwww = /x\n")
+            firewall.set_config("restrict", "22=100.64.0.0/10|203.0.113.7", p); firewall.set_config("profile", "web", p); firewall.set_config("ssh_limit", "yes", p)
+            self.assertEqual(firewall.settings(core.load_config(p))["restrict"], {22: ["100.64.0.0/10", "203.0.113.7/32"]})
+            for k, v in (("restrict", "22=nada"), ("restrict", "22=10.0.0.1|zzz"), ("profile", "x"), ("ssh_limit", "tal vez")):
+                with self.assertRaises(ValueError):
+                    firewall.set_config(k, v, p)
+
+    def test_ssh_con_limite_de_intentos(self):
+        calls = []
+        with mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+            ufw.allow(22, "tcp", limit=True); ufw.allow(80, "tcp")
+        self.assertEqual(calls, [["ufw", "limit", "22/tcp"], ["ufw", "allow", "80/tcp"]])
+
+    def _snap(self, rules, docker=()):
+        return {"ok": True, "rules": [{"label": l, "action": a, "from": f, "comment": "", "port": 0, "v6": False} for l, a, f in rules],
+                "listening": [{"proto": "tcp", "port": p, "status": "docker"} for p in docker]}
+
+    def test_aviso_si_cambian_el_firewall_por_fuera(self):
+        emitted = []
+        al = mock.Mock(); al.emit = lambda *a, **k: emitted.append(a)
+        old = self._snap([("[ 1] 80/tcp", "ALLOW", "Anywhere")])
+        new = self._snap([("[ 1] 80/tcp", "ALLOW", "Anywhere"), ("[ 2] 4444/tcp", "ALLOW", "Anywhere")], docker=[8080])
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"SENTINEL_STATE": d}), mock.patch.object(firewall, "save_snapshot", return_value=new):
+            core.atomic_write_json(firewall.snapshot_path(), old)
+            firewall.watch(core.load_config(), al)
+            kinds = [(a[0], a[2]) for a in emitted]
+            self.assertIn(("high", "regla_nueva"), kinds); self.assertIn(("high", "docker_expuesto"), kinds)
+            emitted.clear(); firewall.mark_applied()
+            core.atomic_write_json(firewall.snapshot_path(), old); firewall.watch(core.load_config(), al)
+            self.assertEqual(emitted, [])                                        # lo cambió Sentinel: no se avisa
+
+    def test_diff_ignora_la_numeracion(self):
+        a = self._snap([("[ 1] 80/tcp", "ALLOW", "Anywhere"), ("[ 2] 443/tcp", "ALLOW", "Anywhere")])
+        b = self._snap([("[ 1] 443/tcp", "ALLOW", "Anywhere"), ("[ 2] 80/tcp", "ALLOW", "Anywhere")])
+        d = firewall.diff_snapshots(a, b); self.assertEqual((d["added"], d["removed"]), ([], []))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 """Cortafuegos ufw: lee las reglas numeradas, abre y cierra puertos. Lo usa el módulo firewall; Sentinel (detección) no lo conoce."""
 from __future__ import annotations
 
+import os
 import re
 import shutil
 
@@ -48,8 +49,10 @@ def files() -> list[str]:
     return ["/etc/ufw/user.rules", "/etc/ufw/user6.rules"]
 
 
-def allow(port: int, proto: str = "tcp") -> tuple[int, str]:
-    return core.run(["ufw", "allow", f"{port}/{proto}"])
+def allow(port: int, proto: str = "tcp", src: str | None = None, limit: bool = False) -> tuple[int, str]:
+    if src:
+        return core.run(["ufw", "allow", "from", src, "to", "any", "port", str(port), "proto", proto])
+    return core.run(["ufw", "limit" if limit else "allow", f"{port}/{proto}"])
 
 
 def delete_all(rs: list[dict]) -> list[tuple[dict, int, str]]:
@@ -62,6 +65,16 @@ def delete_all(rs: list[dict]) -> list[tuple[dict, int, str]]:
 
 def harden() -> list[str]:
     rc, o = core.run(["ufw", "default", "deny", "incoming"]); return ["ufw: entrantes denegados por defecto" if rc == 0 else o.strip()]
+
+
+def restore(d: str) -> list[str]:
+    log = []
+    for f in ("user.rules", "user6.rules"):
+        src = os.path.join(d, f)
+        if os.path.exists(src):
+            shutil.copy2(src, "/etc/ufw/" + f); log.append(f"restaurado {f}")
+    rc, o = core.run(["ufw", "reload"]); log.append("ufw recargado" if rc == 0 else o.strip())
+    return log
 
 
 def save() -> str:
