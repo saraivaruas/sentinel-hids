@@ -17,17 +17,27 @@
 | **File integrity (FIM)** | SHA-256 baseline + permissions + owner of `/etc/passwd`, `shadow`, `sudoers`, SSH, PAM, cron, systemd units, `/usr/local/bin`, `authorized_keys`… New/changed/removed files, redirected symlinks, opened permissions and **new SUID/SGID**. Real-time (inotify) watching of whole directories, so it catches the rename-replace used by `useradd`/`vipw`. |
 | **Web shells** | New or modified files in web roots (e.g. `/var/www/html`) are scanned for web-shell and reverse-shell signatures (`eval(base64_decode(...))`, `system($_POST…)`, `/dev/tcp/…`, `curl \| sh`). |
 | **Live attacks** | Reads the systemd journal: SSH/sudo/su brute force, successful login after failures, remote root and **port scans** (firewall drops). |
-| **Honeypots** | Decoy ports (SSH 2222, Telnet 2323, RDP 3390, VNC 5900, 60009) in an unprivileged, sandboxed process. Whoever connects is logged and blocked. |
+| **Honeypots** (optional) | Decoy ports (SSH 2222, Telnet 2323, RDP 3390, VNC 5900, 60009) in an unprivileged, sandboxed process. **Off by default** because they open ports; enable them in *Settings* or with `sudo sentinel senuelos activar`. Whoever connects is logged and blocked. |
 | **Host** | New listening ports (or ports that become public), processes running from `/tmp`, deleted binaries, crypto-miners, unexpected keyboard readers, USB devices, kernel modules, new/UID 0/passwordless accounts, hidden processes, new SUID files. |
 | **Posture audit** | `sentinel audit`: 16 configuration checks with the fix for each (firewall, SSH, web permissions, kernel parameters, updates, exposed credentials…). |
 
 **Response:** attackers are blocked **temporarily** (24 h) with CrowdSec, firewalld, ufw or iptables — never your LAN, loopback or Tailscale. Sentinel **never kills processes or touches your files**.
-**Alerts:** private JSONL log, journald, desktop notification, **pop-up window** with an *Open dashboard* button, optional e-mail or phone (ntfy).
+**Alerts:** private JSONL log, journald, a toast in the bottom-right corner of the screen that closes by itself (optionally a big pop-up window), optional e-mail or phone (ntfy).
+
+## What it blocks and what it only reports
+
+Sentinel **blocks IP addresses, nothing else**. Everything else is detected and reported; it never kills processes or touches your files.
+
+**Blocks an IP for 24 h** (CrowdSec, firewalld, ufw or iptables) after: 5 failed logins in 10 min (SSH/sudo/su), a port scan (12 ports in 60 s from the firewall log, or SYN/UDP/stealth scans seen by packet capture), a SYN flood (>300 attempts in 10 s) or ping flood (>100 in 10 s), or touching a honeypot. Thresholds live in `[auth]` and `[packets]`. It never blocks your LAN, loopback, Tailscale or the allow-list.
+
+**Only reports:** changed/new/deleted system files and new SUID, web shells, remote root or login after many failures, processes from `/tmp` / deleted binaries / miners / trojan ports, new listening ports, keyboard readers, USB, kernel modules, new accounts, firewall changes made outside Sentinel, and Docker-published ports that bypass the firewall.
+
+**Closing ports** is done by the separate **Firewall module** (`sentinel firewall plan | aplicar`, ufw or iptables): it keeps only the ports you configure open (80/443 by default, plus the SSH this host serves), applies changes on trial with automatic rollback, and shows the real exposure in the dashboard.
 
 ## Install (dependencies are installed for you)
 
 ```bash
-sudo apt install ./sentinel_2.0.0_all.deb     # Debian/Ubuntu: apt pulls every dependency
+sudo apt install ./sentinel_2.4.0_all.deb     # Debian/Ubuntu: apt pulls every dependency
 sudo ./install.sh                             # Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE (add --dry-run to preview)
 ./install-gui.sh                              # guided installer with windows (asks for admin authorization in a dialog)
 ```
