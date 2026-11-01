@@ -348,7 +348,7 @@
   async function loadSettings() {
     const s = await api("/api/settings"), v = s.values;
     $("#st-desk").value = v["general.enable_desktop"] === "no" ? "no" : "yes"; $("#st-min").value = v["general.notify_min"]; $("#st-style").value = v["general.notify_style"] || "corner";
-    $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"];
+    $("#st-secs").value = v["general.notify_seconds"]; $("#st-secs-c").value = v["general.notify_seconds_critical"]; $("#st-popup").value = v["general.popup_min"]; $("#st-hb").value = v["alerts.heartbeat_url"] || ""; $("#st-ntfy").value = v["general.ntfy_url"] || ""; $("#st-mail").value = v["general.email_to"] || "";
     st.pinSet = !!s.pin.enabled; $("#pin-st").textContent = st.pinSet ? "activo" : "sin PIN"; $("#pin-st").className = "badge sev-" + (st.pinSet ? "low" : "medium");
     $("#pin-old-l").hidden = !st.pinSet; $("#pin-clear").hidden = !st.pinSet; $("#pin-save").textContent = st.pinSet ? "Cambiar PIN" : "Activar PIN";
     const lr = $("#st-learn"); if (lr) { lr.textContent = s.learning ? "activo hasta " + new Date(s.learning * 1000).toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "apagado"; lr.className = "badge sev-" + (s.learning ? "medium" : "info"); $("#st-learn-btn").textContent = s.learning ? "Terminar aprendizaje" : "Aprender por 3 días"; $("#st-learn-btn").dataset.on = s.learning ? "1" : ""; }
@@ -594,7 +594,7 @@
   });
   $("#st-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const r = await runAction("ajustes", { pares: { "general.enable_desktop": $("#st-desk").value, "general.notify_min": $("#st-min").value, "general.notify_style": $("#st-style").value, "general.notify_seconds": $("#st-secs").value, "general.notify_seconds_critical": $("#st-secs-c").value, "general.popup_min": $("#st-popup").value } });
+    const r = await runAction("ajustes", { pares: { "general.enable_desktop": $("#st-desk").value, "general.notify_min": $("#st-min").value, "general.notify_style": $("#st-style").value, "general.notify_seconds": $("#st-secs").value, "general.notify_seconds_critical": $("#st-secs-c").value, "general.popup_min": $("#st-popup").value, "alerts.heartbeat_url": $("#st-hb").value.trim(), "general.ntfy_url": $("#st-ntfy").value.trim(), "general.email_to": $("#st-mail").value.trim() } });
     if (r && r.ok) loadSettings();
   });
   $("#f-hours").addEventListener("change", loadEvents);

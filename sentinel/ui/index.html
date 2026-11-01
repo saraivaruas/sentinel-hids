@@ -192,6 +192,9 @@
             <label>Dónde aparecen<select id="st-style"><option value="corner">Esquina inferior derecha (se cierra solo)</option><option value="system">Notificación del sistema</option></select></label>
             <label>Segundos visibles<input id="st-secs" type="number" min="2" max="120"></label>
             <label>Segundos visibles (graves)<input id="st-secs-c" type="number" min="2" max="120"></label>
+            <label>Latido externo (https, p. ej. healthchecks.io)<input id="st-hb" type="url" placeholder="https://hc-ping.com/tu-código" autocomplete="off"></label>
+            <label>Aviso al celular (ntfy)<input id="st-ntfy" type="url" placeholder="https://ntfy.sh/tu-tema-secreto" autocomplete="off"></label>
+            <label>Correo para alertas graves<input id="st-mail" type="email" placeholder="tu@correo.cl" autocomplete="off"></label>
             <label>Ventana grande con botón «Abrir panel»<select id="st-popup"><option value="never">Nunca</option><option value="critical">Solo críticas</option><option value="high">Desde alta</option><option value="medium">Desde media</option></select></label>
             <button class="btn primary" type="submit">Guardar</button>
           </form>
