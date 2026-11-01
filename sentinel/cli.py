@@ -256,6 +256,21 @@ def cmd_test(a) -> int:
     return 0
 
 
+def cmd_puertos(a) -> int:
+    from . import ports
+    if not shutil.which("ufw"):
+        print("Por ahora el cierre de puertos solo funciona con ufw (no está instalado)."); return 1
+    rc, out = core.run(["ufw", "status", "numbered"])
+    if rc != 0:
+        print("No pude leer el cortafuegos (¿falta sudo?):", out.strip()); return 1
+    rc, vb = core.run(["ufw", "status", "verbose"])
+    p = ports.plan(ports.parse_rules(out), ports.ssh_ports(), "allow (outgoing)" in vb.lower() or "allow (salientes)" in vb.lower())
+    print("\n".join(ports.describe(p)))
+    if not a.aplicar:
+        print("\nSolo es el plan. Para aplicarlo:  sudo sentinel puertos --aplicar"); return 0
+    print("\n".join(ports.apply(p))); return 0
+
+
 def cmd_ui(a) -> int:
     from . import ui
     return ui.run_ui(a.port, not a.sin_abrir)
@@ -302,6 +317,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
+    s = sub.add_parser("puertos", help="cierra puertos: deja solo 80, 443 y el SSH que usas (muestra el plan)"); s.add_argument("--aplicar", action="store_true"); s.set_defaults(fn=cmd_puertos)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)
     sub.add_parser("honeypot", help="servicio de señuelos (lo lanza systemd)").set_defaults(fn=cmd_honeypot)

@@ -5,7 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [2.1.1] - 2026-10-30
 
 ### Seguridad
-- **Los señuelos (honeypot) ya no se activan solos**: la instalación no abre ningún puerto nuevo. Se activan a propósito con `sudo systemctl enable --now sentinel-honeypot` o `./install.sh --exponer-senuelos`. Si ya estaban activos, la actualización no los toca.
+- **Sentinel ya no abre puertos**: se eliminó la opción `--exponer-senuelos` y la regla de cortafuegos que permitía los puertos señuelo. La instalación y la actualización apagan los señuelos y borran las reglas `sentinel-senuelo` que dejaron versiones anteriores.
 
 ### Corregido
 - Los cambios en los archivos de Sentinel durante su propia actualización ya no se muestran como alertas (quedan como informativos) y la nueva versión se acepta como referencia de integridad.
