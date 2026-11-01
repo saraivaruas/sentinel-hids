@@ -29,3 +29,8 @@ Responderemos en un plazo de **7 días** y buscaremos publicar la corrección y 
 ## Límites conocidos (no son vulnerabilidades)
 
 Están descritos en el README: un atacante que ya tiene `root` puede detener Sentinel; las firmas de puertas traseras cubren patrones comunes y no ofuscación avanzada.
+
+
+## Publicaciones firmadas
+
+Las versiones se publican con `SHA256SUMS` y, cuando el autor lo firma, `SHA256SUMS.asc` (GPG). Un equipo que ya trae la clave pública del autor en `/opt/sentinel/release-key.asc` **solo instala** actualizaciones cuya firma sea válida con esa clave (`[update] require_signature = auto`). La clave pública sale del paquete que ya tienes instalado, no de la descarga: aunque alguien tomara la cuenta de GitHub, no podría publicar una actualización que se instale.

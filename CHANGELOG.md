@@ -2,6 +2,19 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.7.0] - 2026-11-01
+
+### Agregado
+- **«Esto es normal»**: botón en cada evento que lo acepta (lista blanca o referencia nueva) en vez de editar archivos; nunca se ofrece para ataques ni posibles puertas traseras. Con **modo aprendizaje** (`sentinel aprender 3`, o desde Ajustes) los puertos, USB y módulos nuevos se aceptan sin avisar durante unos días.
+- **Vigilancia de los registros web** (nginx y apache): inyección SQL, ejecución de comandos (log4shell, `eval`, `<?php`), salida de carpeta (`../`), archivos secretos (`.env`, `.git`), escáneres, paneles de administración, ráfagas de 404 y fuerza bruta de inicio de sesión; con bloqueo temporal y explicación para niños de cada tipo.
+- **Latido externo**: Sentinel avisa cada 5 min a un servicio de tu elección (healthchecks.io u otro, solo `https`) que sigue vivo; si se apaga a la fuerza, ese servicio te avisa al correo o al celular. También se configuran el correo y ntfy desde Ajustes.
+- **Publicaciones firmadas con GPG**: el actualizador exige la firma de `SHA256SUMS` cuando el equipo trae la clave pública del autor (que viene en el paquete ya instalado, no en la descarga). `tools/crear-clave-de-publicacion.sh` crea la clave y `SENTINEL_SIGN_KEY=… packaging/make-release.sh` firma.
+- **ClamAV y reglas YARA** opcionales para las carpetas web (si ya están instalados), con tope de archivos por revisión; se incluyen reglas YARA básicas.
+- **Verificación contra el paquete oficial** (como `debsums`): un archivo del sistema que coincide con el de su paquete baja a informativo.
+- **Horas de silencio** (sin avisos en pantalla de noche, salvo críticos) y eventos **«resueltos»** que dejan de contar en el resumen y los informes.
+- **Ícono en la barra del sistema** (AppIndicator) con el color del estado; se inicia solo.
+- **Varios servidores en un panel**: página *Servidores* que consulta por SSH, con tus llaves y solo en lectura, el resumen de otros Sentinel (`sentinel resumen --json`).
+
 ## [2.6.3] - 2026-11-01
 
 ### Corregido
