@@ -6,6 +6,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 - **Módulo Firewall**, separado de la detección: deja abiertos desde afuera solo los puertos que configures (por defecto 80 y 443) y cierra el resto, con **ufw** o **iptables** (`sentinel firewall estado|plan|aplicar|config`). Mantiene el puerto de SSH si el equipo sirve SSH (tus conexiones ssh de despliegue hacia otros servidores son salientes y no se tocan), nunca cierra nada si el tráfico saliente no está permitido y guarda una copia de las reglas antes de cambiar.
+- El panel del firewall se recarga solo cada 5 s, muestra la antigüedad de la información (en rojo si pasa de 3 min), tiene botón **↻ Recargar** y el monitor lee el firewall cada 60 s (`refresh_seconds`).
 - Panel: menú lateral en dos grupos, **Sentinel · detección** y **Firewall · puertos** (páginas *Puertos* y *Reglas y ajustes*, con plan, aplicar y configuración).
 
 ### Seguridad

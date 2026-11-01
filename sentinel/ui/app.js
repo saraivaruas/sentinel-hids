@@ -398,6 +398,8 @@
   async function loadFirewall() {
     const f = await api("/api/firewall");
     const ok = f && f.ok;
+    const age = ok ? Math.max(0, Date.now() / 1000 - Date.parse(f.time) / 1000) : null;
+    document.querySelectorAll(".fw-age").forEach((e) => { e.textContent = age == null ? "" : "Información " + ago(age); e.classList.toggle("old", age != null && age > 180); });
     $("#fw-be").textContent = ok ? f.backend : "sin datos"; $("#fw-be").className = "badge sev-" + (ok ? "low" : "medium");
     const ul = $("#fw-plan"); clear(ul);
     const row = (ic, t, d, cls) => { const li = el("li"); li.appendChild(el("div", "ic " + cls, ic)); const m = el("div"); m.appendChild(el("h4", null, t)); if (d) m.appendChild(el("p", null, d)); li.appendChild(m); li.appendChild(el("span")); ul.appendChild(li); };
@@ -435,6 +437,7 @@
   document.querySelectorAll(".nav").forEach((b) => b.addEventListener("click", () => go(b.dataset.view)));
   document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => go(b.dataset.goto)));
   document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => runAction(b.dataset.action, null, b)));
+  document.querySelectorAll(".fw-reload").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { await loadFirewall(); toast("Información recargada"); } finally { b.disabled = false; } }));
   $("#fw-refresh").addEventListener("click", async (e) => { await runAction("fw_estado", null, e.currentTarget); loadFirewall(); });
   $("#fw-apply").addEventListener("click", async (e) => {
     if (!(await confirmDlg("Aplicar el plan del firewall", "Se cerrarán los puertos indicados y quedará abierto solo lo que elegiste. Antes se guarda una copia de las reglas y se mantiene tu SSH.", "Aplicar"))) return;
@@ -458,5 +461,6 @@
   refresh();
   loadUpdate(false); setTimeout(() => loadUpdate(false), 4000); setInterval(() => loadUpdate(false), 600000);
   setInterval(() => { if (!document.hidden) { refresh(); if (st.view === "eventos" && !$("#f-q").value) loadEvents(); if (st.view === "atacantes" && !$("#att-q").value) loadAttackers(); if (st.view === "paquetes") loadPackets(); } }, 3000);
+  setInterval(() => { if (!document.hidden && st.view.startsWith("fw-")) loadFirewall(); }, 5000);
   setInterval(() => ($("#clock").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false })), 15000);
 })();

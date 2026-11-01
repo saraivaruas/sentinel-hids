@@ -114,7 +114,7 @@ class Monitor:
             t.start(); self.threads.append(t)
         self.alerter.emit("info", "monitor", "inicio", f"Sentinel {core.VERSION} iniciado (vigilancia en vivo de archivos: {'sí' if live else 'no, revisión periódica'})", key=f"mon:start:{int(core.now())}")
         every = self.cfg.getint("hostcheck", "interval_seconds", fallback=300)
-        last_host = last_fim = 0.0
+        last_host = last_fim = last_fw = 0.0
         last_deep = core.now()
         while not self.stop.is_set():
             t = core.now()
@@ -134,11 +134,16 @@ class Monitor:
                     self.intel.store.prune(self.cfg.getint("intel", "retention_days", fallback=90))
                 except Exception:
                     pass
+            if t - last_fw >= self.cfg.getint("firewall", "refresh_seconds", fallback=60):
+                last_fw = t
+                try:
+                    firewall.save_snapshot(self.cfg)       # foto para el panel: así nunca queda con información vieja
+                except Exception as e:
+                    self.alerter.emit("low", "monitor", "error", f"No pude leer el firewall ({type(e).__name__})", key="mon:err:fw")
             if t - last_host >= every:
                 last_host = t
                 try:
                     self.host.run(deep=False)
-                    firewall.save_snapshot(self.cfg)
                 except Exception as e:
                     self.alerter.emit("low", "monitor", "error", f"Revisión del equipo falló ({type(e).__name__})", key="mon:err:host")
             if t - last_fim >= 900:

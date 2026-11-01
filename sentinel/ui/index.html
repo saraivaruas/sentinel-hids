@@ -151,14 +151,14 @@
     <section class="view" id="view-fw-puertos" hidden>
       <div class="grid2">
         <article class="card">
-          <div class="card-h"><h3>Plan del firewall</h3><span class="badge" id="fw-be">—</span></div>
+          <div class="card-h"><h3>Plan del firewall</h3><span class="fw-tools"><small class="fw-age" id="fw-age"></small><button class="btn sm fw-reload" title="Vuelve a leer la información más reciente (no pide clave)">↻ Recargar</button><span class="badge" id="fw-be">—</span></span></div>
           <p class="hint" id="fw-sum">Leyendo el firewall…</p>
           <ul class="audit" id="fw-plan"></ul>
           <div class="fix-row"><button class="btn" id="fw-refresh">Actualizar (pide clave)</button><button class="btn primary" id="fw-apply" disabled>Aplicar plan</button></div>
           <p class="hint" id="fw-note"></p>
         </article>
         <article class="card">
-          <div class="card-h"><h3>Puertos que escuchan en este equipo</h3></div>
+          <div class="card-h"><h3>Puertos que escuchan en este equipo</h3><button class="btn sm fw-reload">↻ Recargar</button></div>
           <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Puerto</th><th>Dónde escucha</th><th>Desde afuera</th></tr></thead><tbody id="fw-listen"></tbody></table></div>
         </article>
       </div>
@@ -167,7 +167,7 @@
     <section class="view" id="view-fw-reglas" hidden>
       <div class="grid2">
         <article class="card">
-          <div class="card-h"><h3>Reglas actuales</h3></div>
+          <div class="card-h"><h3>Reglas actuales</h3><span class="fw-tools"><small class="fw-age fw-age2"></small><button class="btn sm fw-reload">↻ Recargar</button></span></div>
           <ul class="audit" id="fw-rules"></ul>
         </article>
         <article class="card">

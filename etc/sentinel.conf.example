@@ -41,6 +41,8 @@ allow_tcp = 80,443
 allow_udp =
 ; Si este equipo sirve SSH (sshd), mantener su puerto abierto para no quedarte sin acceso
 keep_ssh = yes
+; Cada cuántos segundos el monitor vuelve a leer el firewall para el panel
+refresh_seconds = 60
 
 [honeypot]
 ports = 2222,2323,3390,5900,60009

@@ -59,6 +59,7 @@ backend = auto
 allow_tcp = 80,443
 allow_udp =
 keep_ssh = yes
+refresh_seconds = 60
 
 [fim]
 ; rutas críticas (archivos o carpetas; admite comodines)
