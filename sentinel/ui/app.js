@@ -96,7 +96,7 @@
   // ---------- navegación
   const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
-    ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
+    ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], servidores: ["Servidores", "El estado de Sentinel en tus otros servidores"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
     st.view = v;
@@ -107,6 +107,7 @@
     if (narrow()) setSidebar(false);
     if (v.startsWith("fw-")) loadFirewall();
     if (v === "ajustes") loadSettings();
+    if (v === "servidores") loadServers();
     if (v === "eventos") loadEvents();
     if (v === "postura") loadAudit();
     if (v === "atacantes") loadAttackers();
@@ -349,6 +350,35 @@
       body.appendChild(tr);
     });
   }
+
+  // ---------- Servidores (varios Sentinel en un panel)
+  async function loadServers() {
+    const g = $("#srv-grid"); let r;
+    try { r = await api("/api/servers"); } catch (e) { return; }
+    clear(g); $("#srv-empty").hidden = r.servers.length > 0;
+    const bad = r.servers.filter((s) => !s.ok || (s.data && (s.data.level === "peligro" || s.data.level === "atencion"))).length; const nb = $("#nav-srv"); nb.hidden = !bad; nb.textContent = String(bad);
+    r.servers.forEach((s) => {
+      const lv = s.ok ? s.data.level : "desconocido", c = el("div", "srv hero-" + lv);
+      const h = el("div", "srv-h"); h.appendChild(el("b", null, s.name));
+      h.appendChild(el("span", "badge sev-" + (lv === "protegido" ? "low" : lv === "revision" ? "medium" : lv === "desconocido" ? "info" : "critical"), s.ok ? TXT[lv] || lv : "Sin respuesta"));
+      c.appendChild(h); c.appendChild(el("small", "mu", s.target));
+      if (s.ok) {
+        const d = s.data; c.appendChild(el("p", null, d.why));
+        const k = el("div", "srv-k");
+        [["Críticas", d.counts24.critical], ["Altas", d.counts24.high], ["Medias", d.counts24.medium], ["Bloqueadas", d.bans]].forEach(([l, n]) => { const x = el("div"); x.appendChild(el("b", null, nf.format(n))); x.appendChild(el("span", null, l)); k.appendChild(x); });
+        c.appendChild(k);
+        c.appendChild(el("small", "mu", (d.hostname || "") + " · Sentinel " + d.version + (d.heartbeat_age != null ? " · latido " + ago(d.heartbeat_age) : "") + (d.firewall && d.firewall.pendientes ? " · firewall: " + d.firewall.pendientes + " cambio(s) pendientes" : "")));
+      } else c.appendChild(el("p", "srv-err", s.error));
+      const b = el("button", "btn sm", "Quitar"); b.addEventListener("click", async () => { if (!(await confirmDlg("Quitar el servidor", "Se quita de esta lista; no se toca el servidor.", "Quitar"))) return; await api("/api/servers", { op: "remove", target: s.target }); loadServers(); });
+      c.appendChild(b); g.appendChild(c);
+    });
+  }
+  $("#srv-reload").addEventListener("click", loadServers);
+  $("#srv-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r = await api("/api/servers", { op: "add", name: $("#srv-name").value, target: $("#srv-target").value });
+    toast((r.ok ? "✔ " : "✖ ") + r.out, !r.ok); if (r.ok) { $("#srv-form").reset(); loadServers(); }
+  });
 
   // ---------- Ajustes
   async function loadSettings() {

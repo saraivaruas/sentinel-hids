@@ -421,6 +421,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             hours = max(1, min(720, int((q.get("hours") or ["24"])[0] or 24)))
             sev = (q.get("min") or ["info"])[0]
             return self._json(d.events(hours, sev if sev in core.SEV else "info", (q.get("q") or [""])[0][:100], max(1, min(500, int((q.get("limit") or ["200"])[0] or 200)))))
+        if u.path == "/api/servers":
+            from . import remote
+            return self._json({"servers": remote.poll_all(), "max": remote.MAX_SERVERS})
         if u.path == "/api/settings":
             return self._json(d.settings())
         if u.path == "/api/firewall":
@@ -463,6 +466,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(self.server.data.update_info(force=True))
         if self.path == "/api/audit/refresh":
             return self._json(self.server.data.audit(force=True))
+        if self.path == "/api/servers":
+            from . import remote
+            if body.get("op") == "add":
+                ok, msg = remote.add(str(body.get("name", ""))[:80], str(body.get("target", ""))[:160])
+            elif body.get("op") == "remove":
+                ok, msg = remote.remove(str(body.get("target", ""))[:160]), "Servidor quitado."
+            else:
+                return self._json({"ok": False, "out": "Operación desconocida"}, 400)
+            return self._json({"ok": ok, "out": msg})
         if self.path == "/api/action":
             res = run_action(body)
             if body.get("name") == "update" and res.get("ok"):
