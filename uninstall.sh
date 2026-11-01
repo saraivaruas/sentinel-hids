@@ -2,6 +2,9 @@
 # Desinstala Sentinel v2. Uso: sudo ./uninstall.sh [--todo]   (--todo borra también registros, referencias y el usuario sentinel)
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo"; exit 1; }
+# con PIN configurado, desinstalar Sentinel exige el PIN
+SB="$(command -v sentinel || true)"
+if [ -n "$SB" ] && ! "$SB" pin verificar; then echo "Sentinel está protegido con PIN: no se desinstala sin el PIN correcto." >&2; exit 1; fi
 systemctl disable --now sentinel-monitor.service sentinel-honeypot.service sentinel-scan.timer sentinel-report.timer 2>/dev/null || true
 rm -f /etc/systemd/system/sentinel-*.service /etc/systemd/system/sentinel-*.timer /usr/local/bin/sentinel /etc/logrotate.d/sentinel
 rm -rf /opt/sentinel

@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+  # con PIN configurado, quitar Sentinel exige el PIN (se pide en la terminal o en una ventana)
+  if [ -x /usr/bin/sentinel ] && ! /usr/bin/sentinel pin verificar; then
+    echo "Sentinel está protegido con PIN: no se desinstala sin el PIN correcto." >&2
+    exit 1
+  fi
   if [ -d /run/systemd/system ]; then
     systemctl disable --now sentinel-monitor.service sentinel-honeypot.service sentinel-scan.timer sentinel-report.timer 2>/dev/null || true
   fi

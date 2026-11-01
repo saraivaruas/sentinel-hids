@@ -158,6 +158,16 @@
           <div class="fix-row"><button class="btn primary" id="st-hp-btn">Activar señuelos</button></div>
         </article>
         <article class="card">
+          <div class="card-h"><h3>PIN de protección</h3><span class="badge" id="pin-st">—</span></div>
+          <p class="hint">Con un PIN, nadie puede detener Sentinel, desinstalarlo, cambiar sus ajustes, ampliar la lista blanca ni aplicar cambios al firewall sin escribirlo. Cada intento sin PIN deja una alerta. No protege contra alguien con control total del equipo que lo apague a la fuerza, pero cierra las vías normales y deja rastro.</p>
+          <form id="pin-form" class="form">
+            <label id="pin-old-l">PIN actual<input id="pin-old" type="password" autocomplete="off"></label>
+            <label>PIN nuevo (mínimo 6 caracteres)<input id="pin-new" type="password" minlength="6" autocomplete="new-password" required></label>
+            <label>Repite el PIN nuevo<input id="pin-new2" type="password" minlength="6" autocomplete="new-password" required></label>
+            <div class="fix-row"><button class="btn primary" type="submit" id="pin-save">Guardar PIN</button><button class="btn" type="button" id="pin-clear" hidden>Quitar PIN</button></div>
+          </form>
+        </article>
+        <article class="card">
           <div class="card-h"><h3>Avisos y notificaciones</h3></div>
           <p class="hint">Cómo y cuándo te avisa Sentinel en la pantalla. Guardar pide tu clave de administrador.</p>
           <form id="st-form" class="form">
@@ -185,7 +195,7 @@
           <div class="card-h"><h3>Plan del firewall</h3><span class="fw-tools"><small class="fw-age" id="fw-age"></small><button class="btn sm fw-reload" title="Vuelve a leer la información más reciente (no pide clave)">↻ Recargar</button><span class="badge" id="fw-be">—</span></span></div>
           <p class="hint" id="fw-sum">Leyendo el firewall…</p>
           <ul class="audit" id="fw-plan"></ul>
-          <div class="fix-row"><button class="btn" id="fw-refresh">Actualizar (pide clave)</button><button class="btn primary" id="fw-apply" disabled>Aplicar plan</button></div>
+          <div class="fix-row"><button class="btn primary" id="fw-apply" disabled>Aplicar plan</button></div>
           <p class="hint" id="fw-note"></p>
         </article>
         <article class="card">
@@ -221,6 +231,7 @@
 </div>
 <div class="overlay" id="busy" hidden><div class="spin"></div><b id="busy-t">Actualizando…</b><span id="busy-s">No cierres esta ventana: el panel se reiniciará solo.</span></div>
 <div id="toasts" aria-live="polite"></div>
+<dialog id="pin-dlg"><form method="dialog"><h3>PIN de Sentinel</h3><p id="pin-dlg-p">Escribe el PIN para continuar.</p><input id="pin-dlg-in" type="password" autocomplete="off" autofocus><div class="dlg-a"><button class="btn" value="no">Cancelar</button><button class="btn primary" value="si">Continuar</button></div></form></dialog>
 <dialog id="dlg"><form method="dialog"><h3 id="dlg-t"></h3><p id="dlg-p"></p><div class="dlg-a"><button class="btn" value="no">Cancelar</button><button class="btn primary" value="si" id="dlg-ok">Confirmar</button></div></form></dialog>
 <script src="/static/app.js"></script>
 </body>

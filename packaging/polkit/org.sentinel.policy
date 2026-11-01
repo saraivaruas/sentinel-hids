@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Sentinel</vendor>
+  <vendor_url>https://github.com/saraivaruas/sentinel-hids</vendor_url>
+  <action id="org.sentinel.administrar">
+    <description>Administrar Sentinel</description>
+    <message>Sentinel necesita permisos de administrador para esta acción</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/opt/sentinel/bin/sentinel</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">false</annotate>
+  </action>
+  <action id="org.sentinel.administrar-script">
+    <description>Administrar Sentinel</description>
+    <message>Sentinel necesita permisos de administrador para esta acción</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/env</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">/opt/sentinel/bin/sentinel</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">false</annotate>
+  </action>
+</policyconfig>

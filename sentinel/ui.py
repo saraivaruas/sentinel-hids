@@ -21,6 +21,7 @@ import time
 import urllib.parse
 import webbrowser
 
+from . import pin
 from . import audit, core, explain, geoip, incidents, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
@@ -75,7 +76,8 @@ class Data:
         vals = {f"{s}.{k}": cfg.get(s, k, fallback="") for (s, k) in core.EDITABLE}
         from . import toast
         on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 4)[1].strip().split("\n")[-1] == "active"
-        return {"values": vals, "honeypot": {"active": on, "ports": core.csv(cfg.get("honeypot", "ports", fallback=""))}, "toast_available": toast.available()}
+        st = core.read_json(os.path.join(core.state_dir(), "pin_state.json"), {}) or {}
+        return {"values": vals, "pin": {"enabled": bool(st.get("enabled")), "locked": pin.locked_for()}, "honeypot": {"active": on, "ports": core.csv(cfg.get("honeypot", "ports", fallback=""))}, "toast_available": toast.available()}
 
     def audit(self, force: bool = False) -> dict:
         with self.lock:
@@ -244,6 +246,22 @@ def build_action(body: dict) -> list[str]:
         return out
     if name == "senuelos":
         return ["senuelos", "activar" if body.get("on") is True else "desactivar"]
+    if name == "pin_establecer":
+        if len(str(body.get("nuevo", ""))) < 6 or "\n" in str(body.get("nuevo", "")) or "\n" in str(body.get("pin", "")):
+            raise ValueError("el PIN nuevo debe tener al menos 6 caracteres y una sola línea")
+        return ["pin", "establecer"]
+    if name == "pin_quitar":
+        return ["pin", "quitar"]
+    if name == "fw_config_varios":
+        pares = body.get("pares")
+        if not isinstance(pares, dict) or not pares or len(pares) > 10:
+            raise ValueError("ajustes inválidos")
+        out = ["firewall", "config", "--pares"]
+        for k, v in pares.items():
+            if k not in ("allow_tcp", "allow_udp", "keep_ssh", "backend", "profile", "ssh_limit", "restrict") or not re.fullmatch(r"[\w,. =|/:-]{0,200}", str(v)):
+                raise ValueError("ajuste inválido")
+            out.append(f"{k}={v}")
+        return out
     if name == "fw_estado":
         return ["firewall", "estado", "--guardar"]
     if name == "fw_aplicar":
@@ -281,6 +299,10 @@ def build_action(body: dict) -> list[str]:
     raise ValueError("acción desconocida")
 
 
+def name_is_pin_change(body: dict) -> bool:
+    return body.get("name") == "pin_establecer"
+
+
 def run_action(body: dict) -> dict:
     try:
         args = build_action(body)
@@ -289,11 +311,16 @@ def run_action(body: dict) -> dict:
     binp = sentinel_bin()
     if not binp:
         return {"ok": False, "out": "Sentinel no está instalado en el sistema: ejecuta «sudo ./install.sh»."}
-    cmd = [binp, *args] if core.is_root() else ["pkexec", binp, *args]
+    pin_in = str(body.get("pin", ""))[:200]
+    pre = ["--pin-stdin"] if "pin" in body else []         # el PIN viaja por la entrada estándar, nunca en la lista de procesos
+    if name_is_pin_change(body):
+        pin_in = pin_in + "\n" + str(body.get("nuevo", ""))[:200]
+    real = os.path.realpath(binp)                    # la política de polkit (org.sentinel.policy) recuerda la clave unos minutos para esta ruta
+    cmd = [real, *pre, *args] if core.is_root() else ["pkexec", real, *pre, *args]
     if not core.is_root() and not shutil.which("pkexec"):
         return {"ok": False, "out": "Falta pkexec para pedir permisos de administrador."}
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False, input=(pin_in + "\n") if pre else None)
     except (OSError, subprocess.SubprocessError) as e:
         return {"ok": False, "out": str(e)}
     out = ((r.stdout or "") + (r.stderr or "")).strip()
