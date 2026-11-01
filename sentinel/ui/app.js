@@ -395,8 +395,11 @@
 
   // ---------- ciclo
   // ---------- Firewall (módulo aparte de la detección)
+  let fwDeadline = 0;
+  setInterval(() => { const b = $("#fw-pending"); if (!fwDeadline || b.hidden) return; const s = Math.round(fwDeadline - Date.now() / 1000); $("#fw-count").textContent = s > 0 ? s + " s" : "revirtiendo…"; if (s < -3) loadFirewall(); }, 1000);
   async function loadFirewall() {
     const f = await api("/api/firewall");
+    fwDeadline = f && f.pending ? f.pending.deadline : 0; $("#fw-pending").hidden = !fwDeadline;
     const ok = f && f.ok;
     const age = ok ? Math.max(0, Date.now() / 1000 - Date.parse(f.time) / 1000) : null;
     document.querySelectorAll(".fw-age").forEach((e) => { e.textContent = age == null ? "" : "Información " + ago(age); e.classList.toggle("old", age != null && age > 180); });
@@ -441,9 +444,11 @@
   document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => go(b.dataset.goto)));
   document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => runAction(b.dataset.action, null, b)));
   document.querySelectorAll(".fw-reload").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { await loadFirewall(); toast("Información recargada"); } finally { b.disabled = false; } }));
+  $("#fw-confirm").addEventListener("click", async (e) => { await runAction("fw_confirmar", null, e.currentTarget); fwDeadline = 0; loadFirewall(); });
+  $("#fw-revert").addEventListener("click", async (e) => { await runAction("fw_revertir", null, e.currentTarget); fwDeadline = 0; loadFirewall(); });
   $("#fw-refresh").addEventListener("click", async (e) => { await runAction("fw_estado", null, e.currentTarget); loadFirewall(); });
   $("#fw-apply").addEventListener("click", async (e) => {
-    if (!(await confirmDlg("Aplicar el plan del firewall", "Se cerrarán los puertos indicados y quedará abierto solo lo que elegiste. Antes se guarda una copia de las reglas y se mantiene tu SSH.", "Aplicar"))) return;
+    if (!(await confirmDlg("Aplicar el plan del firewall", "Se cerrarán los puertos indicados y quedará abierto solo lo que elegiste. Se aplica A PRUEBA: tendrás 90 segundos para confirmar; si no confirmas, vuelve solo a como estaba. Tu SSH se mantiene.", "Aplicar"))) return;
     const f = await api("/api/firewall"); await runAction("fw_aplicar", { endurecer: !!(f && f.needs_harden) }, e.currentTarget); loadFirewall();
   });
   $("#fw-form").addEventListener("submit", async (e) => {

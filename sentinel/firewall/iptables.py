@@ -1,9 +1,11 @@
 """Cortafuegos iptables/ip6tables (para equipos sin ufw). Mismo contrato que ufw.py."""
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import shutil
+import subprocess
 
 from .. import core
 
@@ -95,6 +97,19 @@ def harden() -> list[str]:
         core.run([tool, "-I", "INPUT", "1", "-i", "lo", "-m", "comment", "--comment", COMMENT, "-j", "ACCEPT"])
         core.run([tool, "-I", "INPUT", "2", "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-m", "comment", "--comment", COMMENT, "-j", "ACCEPT"])
         rc, o = core.run([tool, "-P", "INPUT", "DROP"]); log.append(f"{tool}: política de entrada = DROP" if rc == 0 else o.strip())
+    return log
+
+
+def restore(d: str) -> list[str]:
+    log = []
+    for fam, tool in TOOLS:
+        f = os.path.join(d, f"{tool}.rules")
+        if shutil.which(tool + "-restore") and os.path.exists(f):
+            try:
+                r = subprocess.run([tool + "-restore"], stdin=open(f), capture_output=True, text=True, timeout=30, check=False)
+                log.append(f"{tool}: restaurado" if r.returncode == 0 else r.stderr.strip())
+            except (OSError, subprocess.SubprocessError) as e:
+                log.append(str(e))
     return log
 
 

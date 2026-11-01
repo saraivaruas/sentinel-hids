@@ -136,6 +136,52 @@ udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
         self.assertIn("web", next(r for r in res if r["port"] == 8080)["advice"])
         self.assertEqual(exposure.analyze(self.SS, {443}, exposure.parse_docker(self.DOCKER), True)[0]["status"] != "docker", True)   # con DROP en DOCKER-USER ya no se marca
 
+    def _apply_prueba(self, d, run_rc=0):
+        calls = []
+        def run(cmd, timeout=20):
+            calls.append(cmd); return (run_rc if cmd[0] == "systemd-run" else 0), UFW if cmd[:3] == ["ufw", "status", "numbered"] else ""
+        f = os.path.join(d, "user.rules"); open(f, "w").write("x")
+        env = {"SENTINEL_STATE": d}
+        with mock.patch.dict(os.environ, env), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", side_effect=run), \
+             mock.patch.object(firewall, "pick", return_value=ufw), mock.patch.object(ufw, "outgoing_allowed", return_value=True), \
+             mock.patch.object(firewall.shutil, "which", return_value="/usr/bin/x"), mock.patch.object(os.path, "isdir", return_value=True):
+            log = firewall.apply(core.load_config(), state_dir=d, conf_dirs=[f], probar=60)
+        return log, calls
+
+    def test_aplicar_a_prueba_programa_la_reversion(self):
+        with tempfile.TemporaryDirectory() as d:
+            log, calls = self._apply_prueba(d)
+            sr = next(c for c in calls if c[0] == "systemd-run")
+            self.assertIn("--on-active", sr); self.assertIn("60s", sr); self.assertEqual(sr[-3:], ["firewall", "restaurar", "--pendiente"])
+            with mock.patch.dict(os.environ, {"SENTINEL_STATE": d}):
+                pend = firewall.pending()
+            self.assertTrue(pend and pend["seconds"] == 60 and os.path.isdir(pend["copy"])); self.assertTrue(any("A PRUEBA" in l for l in log))
+
+    def test_si_no_se_puede_programar_la_reversion_se_deshace(self):
+        with tempfile.TemporaryDirectory() as d:
+            restored = []
+            with mock.patch.object(ufw, "restore", side_effect=lambda x: restored.append(x) or ["ok"]):
+                log, calls = self._apply_prueba(d, run_rc=1)
+            self.assertTrue(restored); self.assertTrue(any("deshago" in l for l in log))
+
+    def test_confirmar_cancela_la_reversion(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"SENTINEL_STATE": d}):
+            core.atomic_write_json(firewall.pending_path(), {"copy": d, "deadline": core.now() + 50, "seconds": 60})
+            calls = []
+            with mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+                self.assertIn("confirmados", firewall.confirm()[0])
+            self.assertIn(["systemctl", "stop", "sentinel-fw-revert.timer"], calls); self.assertIsNone(firewall.pending())
+
+    def test_restaurar_usa_la_copia_pendiente(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"SENTINEL_STATE": d}):
+            c = os.path.join(d, "firewall-copia-1"); os.makedirs(c)
+            core.atomic_write_json(firewall.pending_path(), {"copy": c, "deadline": core.now() + 50, "seconds": 60})
+            got = []
+            with mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", return_value=(0, "")), mock.patch.object(firewall, "pick", return_value=ufw), \
+                 mock.patch.object(ufw, "restore", side_effect=lambda x: got.append(x) or ["ufw recargado"]):
+                log = firewall.restore(use_pending=True)
+            self.assertEqual(got, [c]); self.assertIsNone(firewall.pending())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -101,7 +101,7 @@ def state(cfg=None) -> dict:
     ser = lambda rs: [{k: r[k] for k in ("label", "port", "action", "from", "comment", "v6")} for r in rs]
     return {"ok": True, "backend": be.NAME, "conf": conf, "ssh": ssh, "time": core.iso(), "needs_harden": be.NAME == "iptables" and be.policy() == "ACCEPT", "safe": p["safe"],
             "plan": {"remove": ser(p["remove"]), "review": ser(p["review"]), "missing": p["missing"], "keep_ports": p["keep_ports"]},
-            "rules": ser(rules), "listening": expo, "docker": docker, "docker_protected": dprot, "exposed_count": sum(1 for e in expo if e["status"] in ("docker", "abierto")), "text": describe(p, be.NAME)}
+            "pending": pending(), "rules": ser(rules), "listening": expo, "docker": docker, "docker_protected": dprot, "exposed_count": sum(1 for e in expo if e["status"] in ("docker", "abierto")), "text": describe(p, be.NAME)}
 
 
 def snapshot_path() -> str:
@@ -114,7 +114,68 @@ def save_snapshot(cfg=None) -> dict:
     return s
 
 
-def apply(cfg=None, harden: bool = False, state_dir: str | None = None, conf_dirs: list[str] | None = None) -> list[str]:
+UNIT = "sentinel-fw-revert"
+
+
+def pending_path() -> str:
+    return os.path.join(core.state_dir(), "fw_pending.json")
+
+
+def pending() -> dict | None:
+    p = core.read_json(pending_path(), None)
+    return p if p and p.get("deadline", 0) > core.now() else None
+
+
+def _sentinel_bin() -> str:
+    return shutil.which("sentinel") or "/usr/bin/sentinel"
+
+
+def confirm() -> list[str]:
+    """Los cambios probados se aceptan: se cancela la reversión automática."""
+    p = core.read_json(pending_path(), None)
+    core.run(["systemctl", "stop", UNIT + ".timer"])
+    try:
+        os.remove(pending_path())
+    except OSError:
+        pass
+    return ["Cambios confirmados: ya no se revertirán."] if p else ["No había cambios pendientes de confirmar."]
+
+
+def restore(d: str | None = None, use_pending: bool = False, cfg=None) -> list[str]:
+    """Vuelve a las reglas de una copia (la pendiente, la que se indique o la más reciente)."""
+    if not core.is_root():
+        return ["Necesita administrador: ejecuta  sudo sentinel firewall restaurar"]
+    p = core.read_json(pending_path(), None)
+    if use_pending:
+        d = (p or {}).get("copy")
+    if not d:
+        base = core.state_dir()
+        copies = sorted(x for x in os.listdir(base) if x.startswith("firewall-copia-")) if os.path.isdir(base) else []
+        d = os.path.join(base, copies[-1]) if copies else None
+    if not d or not os.path.isdir(d):
+        return ["No encontré ninguna copia de las reglas para restaurar."]
+    be = pick(settings(cfg)["backend"])
+    if be is None:
+        return ["No hay ufw ni iptables instalado."]
+    log = [f"Restaurando desde {d}"] + be.restore(d)
+    core.run(["systemctl", "stop", UNIT + ".timer"])
+    try:
+        os.remove(pending_path())
+    except OSError:
+        pass
+    mark_applied()
+    return log
+
+
+def mark_applied() -> None:
+    """Anota que Sentinel mismo cambió el firewall (para no avisar de cambios propios)."""
+    try:
+        core.atomic_write_json(os.path.join(core.state_dir(), "fw_applied.json"), {"at": core.now()}, 0o640, share=True)
+    except OSError:
+        pass
+
+
+def apply(cfg=None, harden: bool = False, state_dir: str | None = None, conf_dirs: list[str] | None = None, probar: int = 0) -> list[str]:
     """Aplica el plan: copia de las reglas, abre lo que falta, cierra lo que sobra y comprueba que el SSH siga permitido."""
     if not core.is_root():
         return ["Necesita administrador: ejecuta  sudo sentinel firewall aplicar"]
@@ -129,6 +190,8 @@ def apply(cfg=None, harden: bool = False, state_dir: str | None = None, conf_dir
     p = plan(rules, conf, ssh, be.outgoing_allowed())
     if not p["safe"]:
         return ["No se aplicó nada (el tráfico saliente no está permitido: podría cortar tus despliegues por SSH)."]
+    if probar and not (shutil.which("systemd-run") and os.path.isdir("/run/systemd/system")):
+        return ["No se aplicó nada: para probar con reversión automática hace falta systemd (usa aplicar sin --probar)."]
     d = os.path.join(state_dir or core.state_dir(), "firewall-copia-" + time.strftime("%Y%m%d-%H%M%S"))
     log = []
     try:
@@ -156,9 +219,18 @@ def apply(cfg=None, harden: bool = False, state_dir: str | None = None, conf_dir
     for port in (ssh["ports"] if conf["keep_ssh"] else []):
         if port not in still:
             be.allow(port); log.append(f"SSH {port}/tcp se había perdido: restaurado")
-    sv = be.save()
+    sv = be.save() if not probar else ""
     if sv:
         log.append(sv)
+    mark_applied()
+    if probar:
+        deadline = core.now() + probar
+        core.atomic_write_json(pending_path(), {"copy": d, "deadline": deadline, "seconds": probar}, 0o640, share=True)
+        rc, o = core.run(["systemd-run", "--unit", UNIT, "--on-active", f"{probar}s", _sentinel_bin(), "firewall", "restaurar", "--pendiente"])
+        if rc != 0:                         # sin red de seguridad no se deja nada a medias: se deshace ya
+            log += ["No pude programar la reversión automática; deshago los cambios.", *restore(d, cfg=cfg)]
+        else:
+            log.append(f"Cambios aplicados A PRUEBA: confírmalos en {probar} s con  sudo sentinel firewall confirmar  o se revertirán solos.")
     return log
 
 

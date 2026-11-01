@@ -96,9 +96,10 @@ class UiTests(unittest.TestCase):
 
     def test_acciones_del_firewall(self):
         self.assertEqual(ui.build_action({"name": "fw_estado"}), ["firewall", "estado", "--guardar"])
-        self.assertEqual(ui.build_action({"name": "fw_aplicar"}), ["firewall", "aplicar"])
-        self.assertEqual(ui.build_action({"name": "fw_aplicar", "endurecer": True}), ["firewall", "aplicar", "--endurecer"])
-        self.assertEqual(ui.build_action({"name": "fw_aplicar", "endurecer": "--rm"}), ["firewall", "aplicar"])
+        self.assertEqual(ui.build_action({"name": "fw_aplicar"}), ["firewall", "aplicar", "--probar", "90"])
+        self.assertEqual(ui.build_action({"name": "fw_aplicar", "endurecer": True}), ["firewall", "aplicar", "--probar", "90", "--endurecer"])
+        self.assertEqual(ui.build_action({"name": "fw_aplicar", "endurecer": "--rm"}), ["firewall", "aplicar", "--probar", "90"])
+        self.assertEqual(ui.build_action({"name": "fw_confirmar"}), ["firewall", "confirmar"]); self.assertEqual(ui.build_action({"name": "fw_revertir"}), ["firewall", "restaurar", "--pendiente"])
         self.assertEqual(ui.build_action({"name": "fw_config", "clave": "allow_tcp", "valor": "80,443"}), ["firewall", "config", "allow_tcp", "80,443"])
         for b in ({"name": "fw_config", "clave": "x", "valor": "1"}, {"name": "fw_config", "clave": "allow_tcp", "valor": "80;reboot"}, {"name": "fw_config", "clave": "backend", "valor": "$(id)"}):
             self.assertFalse(self.req("POST", "/api/action", {"Content-Type": "application/json"}, json.dumps(b))[0] == 200 and json.loads(self.req("POST", "/api/action", {"Content-Type": "application/json"}, json.dumps(b))[2])["ok"], b)

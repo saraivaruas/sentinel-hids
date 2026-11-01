@@ -279,7 +279,14 @@ def cmd_firewall(a) -> int:
         if a.accion == "plan":
             print("\nSolo es el plan. Para aplicarlo:  sudo sentinel firewall aplicar")
         return 0
-    print("\n".join(firewall.apply(cfg, harden=a.endurecer)))
+    if a.accion == "confirmar":
+        print("\n".join(firewall.confirm())); firewall.save_snapshot(cfg) if core.is_root() else None; return 0
+    if a.accion == "restaurar":
+        print("\n".join(firewall.restore(a.clave or None, use_pending=a.pendiente, cfg=cfg)))
+        if core.is_root():
+            firewall.save_snapshot(cfg)
+        return 0
+    print("\n".join(firewall.apply(cfg, harden=a.endurecer, probar=a.probar)))
     if core.is_root():
         firewall.save_snapshot(cfg)
     return 0
@@ -331,8 +338,9 @@ def main(argv=None) -> int:
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
-    s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")
-    s.add_argument("--json", action="store_true"); s.add_argument("--guardar", action="store_true", help="guarda la foto para el panel"); s.add_argument("--endurecer", action="store_true", help="iptables: política de entrada DROP"); s.set_defaults(fn=cmd_firewall)
+    s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config", "confirmar", "restaurar"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")
+    s.add_argument("--json", action="store_true"); s.add_argument("--guardar", action="store_true", help="guarda la foto para el panel"); s.add_argument("--endurecer", action="store_true", help="iptables: política de entrada DROP")
+    s.add_argument("--probar", type=int, default=0, metavar="SEG", help="aplica a prueba: si no confirmas en SEG segundos, vuelve atrás solo"); s.add_argument("--pendiente", action="store_true", help="restaurar: la copia de los cambios a prueba"); s.set_defaults(fn=cmd_firewall)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)
     sub.add_parser("honeypot", help="servicio de señuelos (lo lanza systemd)").set_defaults(fn=cmd_honeypot)

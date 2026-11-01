@@ -1,6 +1,7 @@
 """Cortafuegos ufw: lee las reglas numeradas, abre y cierra puertos. Lo usa el módulo firewall; Sentinel (detección) no lo conoce."""
 from __future__ import annotations
 
+import os
 import re
 import shutil
 
@@ -62,6 +63,16 @@ def delete_all(rs: list[dict]) -> list[tuple[dict, int, str]]:
 
 def harden() -> list[str]:
     rc, o = core.run(["ufw", "default", "deny", "incoming"]); return ["ufw: entrantes denegados por defecto" if rc == 0 else o.strip()]
+
+
+def restore(d: str) -> list[str]:
+    log = []
+    for f in ("user.rules", "user6.rules"):
+        src = os.path.join(d, f)
+        if os.path.exists(src):
+            shutil.copy2(src, "/etc/ufw/" + f); log.append(f"restaurado {f}")
+    rc, o = core.run(["ufw", "reload"]); log.append("ufw recargado" if rc == 0 else o.strip())
+    return log
 
 
 def save() -> str:

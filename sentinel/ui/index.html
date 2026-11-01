@@ -149,6 +149,11 @@
       </div>
     </section>
     <section class="view" id="view-fw-puertos" hidden>
+      <article class="card fw-pending" id="fw-pending" hidden>
+        <div class="card-h"><h3>Cambios aplicados a prueba</h3><b id="fw-count">—</b></div>
+        <p class="hint">Si todo funciona (tu conexión, tus despliegues), confirma. Si no confirmas a tiempo, el firewall vuelve solo a como estaba.</p>
+        <div class="fix-row"><button class="btn primary" id="fw-confirm">Confirmar cambios</button><button class="btn" id="fw-revert">Volver atrás ahora</button></div>
+      </article>
       <div class="grid2">
         <article class="card">
           <div class="card-h"><h3>Plan del firewall</h3><span class="fw-tools"><small class="fw-age" id="fw-age"></small><button class="btn sm fw-reload" title="Vuelve a leer la información más reciente (no pide clave)">↻ Recargar</button><span class="badge" id="fw-be">—</span></span></div>
