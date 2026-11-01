@@ -29,6 +29,9 @@ desktop_user =
 notify_min = medium
 ; aviso en la esquina de la pantalla (se cierra solo): segundos visible; las críticas un poco más
 notify_seconds = 8
+; horas de silencio (HH:MM, hora local): sin avisos en la pantalla salvo las críticas. Vacío = sin silencio. Ejemplo: quiet_from = 22:00, quiet_to = 07:00
+quiet_from =
+quiet_to =
 ; corner = aviso propio en la esquina inferior derecha; system = notificación normal del escritorio
 notify_style = corner
 notify_seconds_critical = 15
@@ -189,6 +192,8 @@ EDITABLE = {
     ("general", "notify_seconds"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
     ("general", "notify_seconds_critical"): lambda v: v.isdigit() and 2 <= int(v) <= 120,
     ("general", "notify_style"): lambda v: v in ("corner", "system"),
+    ("general", "quiet_from"): lambda v: v == "" or bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v)),
+    ("general", "quiet_to"): lambda v: v == "" or bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v)),
     ("general", "email_to"): lambda v: v == "" or bool(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", v)),
     ("general", "ntfy_url"): lambda v: v == "" or bool(re.fullmatch(r"https://[\w.-]{1,120}(?::\d{2,5})?/[\w.~%/-]{1,120}", v)),
     ("alerts", "heartbeat_url"): lambda v: v == "" or __import__("sentinel.heartbeat", fromlist=["valid"]).valid(v),
@@ -214,6 +219,38 @@ def set_setting(section: str, key: str, value: str, path: str | None = None) -> 
         txt = txt[:m.end()] + sec + txt[stop:]
     with open(path, "w", encoding="utf-8") as f:
         f.write(txt)
+
+
+# ---- horas de silencio y eventos resueltos
+def in_quiet(cfg, ts: float | None = None) -> bool:
+    """¿Estamos dentro de las horas de silencio (hora local)? Aceptan cruzar la medianoche, p. ej. 22:00 → 07:00."""
+    a, b = cfg.get("general", "quiet_from", fallback=""), cfg.get("general", "quiet_to", fallback="")
+    try:
+        ma = int(a[:2]) * 60 + int(a[3:5]); mb = int(b[:2]) * 60 + int(b[3:5])
+    except ValueError:
+        return False
+    if not a or not b or ma == mb:
+        return False
+    lt = time.localtime(ts if ts is not None else now())
+    m = lt.tm_hour * 60 + lt.tm_min
+    return ma <= m < mb if ma < mb else (m >= ma or m < mb)
+
+
+def resolved_path() -> str:
+    return os.path.join(state_dir(), "resolved.json")
+
+
+def resolved_ids() -> set[str]:
+    return set((read_json(resolved_path(), {}) or {}).get("ids", []))
+
+
+def event_id(e: dict) -> str:
+    return f"{e.get('key')}@{int(e.get('epoch', 0))}"
+
+
+def resolve_event(key: str, epoch: float) -> None:
+    ids = sorted(resolved_ids() | {f"{key}@{int(epoch)}"})[-5000:]
+    atomic_write_json(resolved_path(), {"ids": ids}, 0o640, share=True)
 
 
 def csv(value: str) -> list[str]:
@@ -388,9 +425,10 @@ class Alerter:
         if self.cfg.getboolean("general", "enable_journal", fallback=True) and n >= self._min("journal_min") and shutil.which("logger"):
             prio = {"info": "info", "low": "notice", "medium": "warning", "high": "err", "critical": "crit"}[ev.sev]
             run(["logger", "-t", "sentinel", "-p", f"auth.{prio}", ev.line()], 5)
-        if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("notify_min"):
+        silencio = in_quiet(self.cfg) and ev.sev != "critical"          # de noche solo las críticas suenan en la pantalla (el registro, el correo y el celular siguen igual)
+        if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("notify_min") and not silencio:
             self.desktop(ev)
-        if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("popup_min"):
+        if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("popup_min") and not silencio:
             self.popup(ev)
         if n >= self._min("email_min") and self.cfg.get("general", "email_to", fallback="") and shutil.which("mail"):
             try:

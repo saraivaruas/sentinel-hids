@@ -341,7 +341,7 @@ def cmd_senuelos(a) -> int:
 def _protected(a) -> bool:
     """¿Este comando debilita o cambia la protección? Entonces exige el PIN (si hay uno)."""
     n = a.fn.__name__
-    if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender"):
+    if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender", "cmd_resolver"):
         return True
     return ((n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
@@ -426,6 +426,13 @@ def cmd_iniciar(a) -> int:
     print("Sentinel iniciado." if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 
 
+def cmd_resolver(a) -> int:
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel resolver CLAVE EPOCH", file=sys.stderr); return 1
+    core.resolve_event(a.clave, a.epoch)
+    print("Evento marcado como resuelto: ya no cuenta en el resumen ni en los informes (sigue en el historial)."); return 0
+
+
 def cmd_aprender(a) -> int:
     if not core.is_root():
         print("Necesita administrador: ejecuta  sudo sentinel aprender", file=sys.stderr); return 1
@@ -502,6 +509,7 @@ def main(argv=None) -> int:
     sub.add_parser("detener", help="detiene Sentinel (pide el PIN si hay uno)").set_defaults(fn=cmd_detener)
     sub.add_parser("iniciar", help="vuelve a encender Sentinel").set_defaults(fn=cmd_iniciar)
     s = sub.add_parser("aprender", help="modo aprendizaje: acepta como normales los puertos, USB y módulos nuevos durante N días (0 = terminar)"); s.add_argument("dias", type=int, nargs="?", default=3); s.set_defaults(fn=cmd_aprender)
+    s = sub.add_parser("resolver", help="marca un evento como resuelto (deja de contar en el resumen y los informes)"); s.add_argument("clave"); s.add_argument("epoch", type=float); s.set_defaults(fn=cmd_resolver)
     s = sub.add_parser("toast", help="muestra un aviso en la esquina de la pantalla (lo usa Sentinel)"); s.add_argument("mensaje"); s.add_argument("--sev", default="medium", choices=list(core.SEV)); s.add_argument("--seg", type=int, default=8); s.add_argument("--titulo", default="Sentinel"); s.set_defaults(fn=cmd_toast)
     s = sub.add_parser("ui", help="abre el panel gráfico"); s.add_argument("--port", type=int, default=8737); s.add_argument("--sin-abrir", action="store_true", help="no abrir la ventana"); s.set_defaults(fn=cmd_ui)
     sub.add_parser("monitor", help="servicio principal (lo lanza systemd)").set_defaults(fn=cmd_monitor)

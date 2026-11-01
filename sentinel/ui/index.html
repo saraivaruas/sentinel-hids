@@ -94,6 +94,7 @@
           <div class="chips" id="sev-chips" role="group" aria-label="Gravedad mínima"></div>
           <select id="f-hours" aria-label="Período"><option value="1">Última hora</option><option value="24" selected>Últimas 24 horas</option><option value="168">Últimos 7 días</option><option value="720">Últimos 30 días</option></select>
           <select id="f-mod" aria-label="Módulo"><option value="">Todos los módulos</option></select>
+          <label class="chk"><input type="checkbox" id="f-res"> Ver resueltos</label>
           <input id="f-q" type="search" placeholder="Buscar: IP, ruta, usuario…" aria-label="Buscar">
         </div>
         <div class="tbl-wrap"><table class="tbl" id="ev-tbl"><thead><tr><th>Hora</th><th>Gravedad</th><th>Módulo</th><th>Detalle</th></tr></thead><tbody id="ev-body"></tbody></table></div>
@@ -192,6 +193,8 @@
             <label>Dónde aparecen<select id="st-style"><option value="corner">Esquina inferior derecha (se cierra solo)</option><option value="system">Notificación del sistema</option></select></label>
             <label>Segundos visibles<input id="st-secs" type="number" min="2" max="120"></label>
             <label>Segundos visibles (graves)<input id="st-secs-c" type="number" min="2" max="120"></label>
+            <label>Silencio nocturno: desde<input id="st-qf" type="time"></label>
+            <label>Silencio nocturno: hasta<input id="st-qt" type="time"></label>
             <label>Latido externo (https, p. ej. healthchecks.io)<input id="st-hb" type="url" placeholder="https://hc-ping.com/tu-código" autocomplete="off"></label>
             <label>Aviso al celular (ntfy)<input id="st-ntfy" type="url" placeholder="https://ntfy.sh/tu-tema-secreto" autocomplete="off"></label>
             <label>Correo para alertas graves<input id="st-mail" type="email" placeholder="tu@correo.cl" autocomplete="off"></label>
