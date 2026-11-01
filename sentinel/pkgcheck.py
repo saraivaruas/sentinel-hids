@@ -39,6 +39,13 @@ def index(info_dir: str = INFO_DIR) -> dict[str, str]:
     return idx
 
 
+def _md5():
+    try:
+        return hashlib.md5(usedforsecurity=False)          # Python 3.9+
+    except TypeError:
+        return hashlib.md5()                               # Python 3.8
+
+
 def candidates(path: str) -> list[str]:
     """Rutas con que puede aparecer el archivo en la lista del paquete (con /usr unificado: /bin → /usr/bin, /lib → /usr/lib…)."""
     out = [path]
@@ -58,10 +65,10 @@ def is_pristine(path: str, info_dir: str = INFO_DIR) -> bool:
     if not want:
         return False
     try:
-        h = hashlib.md5(usedforsecurity=False)             # md5 solo porque es lo que publica dpkg; la comparación es con su lista oficial
+        h = _md5()                                         # md5 solo porque es lo que publica dpkg; la comparación es con su lista oficial
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 h.update(chunk)
-    except (OSError, TypeError):
+    except OSError:
         return False
     return h.hexdigest() == want
