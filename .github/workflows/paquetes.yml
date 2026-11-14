@@ -7,6 +7,7 @@ on:
     branches: [main]
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -89,7 +90,7 @@ jobs:
 
   repo-apt:
     name: Repositorio APT firmado
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     needs: [deb]
     runs-on: ubuntu-24.04
     permissions:
@@ -117,7 +118,7 @@ jobs:
           echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf; gpgconf --kill gpg-agent
           printf '%s' "$APT_GPG_PASSPHRASE" > ~/.gnupg/pp; chmod 600 ~/.gnupg/pp
           printf 'batch\npinentry-mode loopback\npassphrase-file %s/.gnupg/pp\n' "$HOME" > ~/.gnupg/gpg.conf
-          ./tools/crear-repo-apt.sh "$HUELLA" "$PWD/apt"
+          ./tools/crear-repo-apt.sh "$HUELLA" "$RUNNER_TEMP/apt"
           rm -f ~/.gnupg/pp ~/.gnupg/gpg.conf
       - name: Publicar en GitHub Pages
         if: steps.clave.outputs.hay == 'yes'
@@ -125,5 +126,5 @@ jobs:
           git config user.name "sentinel-release"; git config user.email "noreply@users.noreply.github.com"
           git fetch origin gh-pages 2>/dev/null && git checkout gh-pages || git checkout --orphan gh-pages
           git rm -rf . >/dev/null 2>&1 || true
-          cp -a apt ./apt; touch .nojekyll; git add apt .nojekyll
-          git commit -m "Repositorio APT ${{ github.event.release.tag_name }}" && git push origin gh-pages
+          cp -a "$RUNNER_TEMP/apt" ./apt; touch .nojekyll; git add apt .nojekyll
+          git commit -m "Repositorio APT ${{ github.event.release.tag_name || github.sha }}" && git push origin gh-pages
