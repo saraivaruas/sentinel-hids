@@ -142,7 +142,7 @@ def _es_de_sentinel(base: str) -> bool:
         cmd = open(f"{base}/cmdline", "rb").read()
     except OSError:
         return False
-    return b"-m\x00sentinel" in cmd or b"/opt/sentinel/" in cmd or cmd.split(b"\x00", 1)[0].endswith(b"/sentinel")
+    return b"-m\x00sentinel" in cmd or b"/opt/sentinel/" in cmd or b"from sentinel.cli import main" in cmd or cmd.split(b"\x00", 1)[0].endswith(b"/sentinel")
 
 
 def input_readers(skip: set[str]) -> list[dict]:

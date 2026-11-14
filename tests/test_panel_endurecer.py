@@ -43,5 +43,18 @@ class DatosTests(unittest.TestCase):
             e.close()
 
 
+class SoloLecturaTests(unittest.TestCase):
+    def test_en_flatpak_no_ejecuta_nada(self):
+        with mock.patch("os.path.exists", side_effect=lambda p: p == "/.flatpak-info"), mock.patch("subprocess.run") as run:
+            r = ui.run_action({"name": "scan"})
+        run.assert_not_called(); self.assertFalse(r["ok"]); self.assertIn("solo lectura", r["out"])
+
+    def test_el_monitor_reconoce_el_lanzador_como_propio(self):
+        from sentinel import hostcheck
+        con = mock.mock_open(read_data=b"python3\x00-I\x00-c\x00import sys; from sentinel.cli import main\x00/snap/sentinel-hids/1/opt/sentinel\x00ui\x00")
+        with mock.patch("builtins.open", con):
+            self.assertTrue(hostcheck._es_de_sentinel("/proc/1"))
+
+
 if __name__ == "__main__":
     unittest.main()

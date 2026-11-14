@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.saraivaruas.sentinel</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Sentinel</name>
+  <summary>Detector de intrusiones y cambios para tu equipo Linux</summary>
+  <developer_name>Jorge Luis Saraiva Ruas</developer_name>
+  <developer id="io.github.saraivaruas"><name>Jorge Luis Saraiva Ruas</name></developer>
+  <description>
+    <p>Sentinel vigila tu equipo y te avisa, en lenguaje claro, cuando alguien intenta entrar o algo cambia donde no debería.</p>
+    <ul>
+      <li>Detecta intentos de acceso por fuerza bruta, escaneos de puertos y procesos sospechosos.</li>
+      <li>Avisa si cambian archivos críticos del sistema y revisa que los paquetes no hayan sido alterados.</li>
+      <li>Bloquea temporalmente a quien ataca (con ufw, firewalld, iptables o CrowdSec).</li>
+      <li>Panel gráfico local con explicaciones fáciles: qué pasó, qué tan grave es y qué hacer.</li>
+      <li>Endurecimiento guiado y reversible: tú eliges cada medida, se guarda una copia y se puede deshacer.</li>
+      <li>Informe periódico por correo y asistente de IA opcional que solo explica (local o con tu propia clave).</li>
+    </ul>
+    <p>Sentinel no envía datos a ningún servicio por su cuenta y no tiene telemetría.</p>
+  </description>
+  <launchable type="desktop-id">sentinel.desktop</launchable>
+  <url type="homepage">https://github.com/saraivaruas/sentinel-hids</url>
+  <url type="bugtracker">https://github.com/saraivaruas/sentinel-hids/issues</url>
+  <categories><category>System</category><category>Security</category><category>Monitor</category></categories>
+  <keywords><keyword>seguridad</keyword><keyword>intrusiones</keyword><keyword>firewall</keyword><keyword>HIDS</keyword></keywords>
+  <provides><binary>sentinel</binary></provides>
+  <content_rating type="oars-1.1"/>
+  <screenshots>
+    <screenshot type="default"><caption>Resumen del estado de protección</caption><image>https://raw.githubusercontent.com/saraivaruas/sentinel-hids/main/docs/panel-resumen-claro.png</image></screenshot>
+    <screenshot><caption>Eventos detectados</caption><image>https://raw.githubusercontent.com/saraivaruas/sentinel-hids/main/docs/panel-eventos.png</image></screenshot>
+    <screenshot><caption>Atacantes y su expediente</caption><image>https://raw.githubusercontent.com/saraivaruas/sentinel-hids/main/docs/panel-atacantes.png</image></screenshot>
+  </screenshots>
+  <releases>
+    <release version="2.11.0" date="2026-11-14"><description><p>Páginas de Endurecimiento y Primeros pasos en el panel; asistente de IA opcional; correo e informes configurables.</p></description></release>
+  </releases>
+</component>

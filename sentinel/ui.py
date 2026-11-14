@@ -433,7 +433,14 @@ def name_is_pin_change(body: dict) -> bool:
     return body.get("name") == "pin_establecer"
 
 
+def solo_lectura() -> bool:
+    """Dentro de Flatpak el panel solo mira: el motor (root) vive en el equipo y el sandbox no puede cambiarlo."""
+    return os.path.exists("/.flatpak-info") and os.environ.get("SENTINEL_FORZAR_ESCRITURA") != "1"
+
+
 def run_action(body: dict) -> dict:
+    if solo_lectura():
+        return {"ok": False, "out": "Este panel de Flatpak es de solo lectura. Para cambiar ajustes, aplicar medidas o actualizar, usa el panel del motor de Sentinel (paquete .deb de APT o Snap)."}
     try:
         args = build_action(body)
     except (ValueError, TypeError) as e:

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Lanzador de Sentinel dentro del snap: usa el Python del propio snap, aislado (-I) para ignorar el directorio actual y PYTHONPATH.
+D="$SNAP/opt/sentinel"
+export SENTINEL_SNAP=1
+exec "$SNAP/usr/bin/python3" -I -c 'import sys; sys.path.insert(0, sys.argv[1]); sys.argv[0] = "sentinel"; from sentinel.cli import main; sys.exit(main(sys.argv[2:]))' "$D" "$@"

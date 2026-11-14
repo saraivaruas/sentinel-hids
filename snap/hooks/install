@@ -1,0 +1,9 @@
+#!/bin/sh
+# Primera instalación: carpetas y configuración (solo si no existen; una actualización jamás las pisa).
+set -e
+install -d -m 755 /etc/sentinel
+install -d -m 750 -o root -g adm /var/lib/sentinel /var/log/sentinel 2>/dev/null || install -d -m 750 /var/lib/sentinel /var/log/sentinel
+[ -f /etc/sentinel/sentinel.conf ] || sed 's/^desktop_user = .*/desktop_user =/' "$SNAP/usr/share/sentinel/sentinel.conf.example" > /etc/sentinel/sentinel.conf
+chown root:adm /etc/sentinel/sentinel.conf 2>/dev/null || true; chmod 640 /etc/sentinel/sentinel.conf
+[ -f /var/lib/sentinel/fim_baseline.json ] || "$SNAP/bin/sentinel-snap" baseline init >/dev/null 2>&1 || true
+exit 0

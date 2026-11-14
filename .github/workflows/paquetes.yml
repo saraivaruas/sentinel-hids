@@ -1,0 +1,117 @@
+name: paquetes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  debian12:
+    name: Pruebas en Debian 12
+    runs-on: ubuntu-24.04
+    container: debian:12
+    steps:
+      - name: Dependencias
+        run: apt-get update -qq && apt-get install -y --no-install-recommends python3 inotify-tools procps iproute2 ca-certificates git
+      - uses: actions/checkout@v7
+      - name: Pruebas
+        run: cd tests && python3 -W ignore -m unittest discover -s . -v
+
+  deb:
+    name: Instalar, actualizar y purgar el .deb (${{ matrix.imagen }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        imagen: ["debian:12", "ubuntu:22.04", "ubuntu:24.04"]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Construir el .deb
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends fakeroot dpkg-dev && ./packaging/build-deb.sh
+      - name: Probar en una distribución limpia
+        run: docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/tests/paquete:/t:ro" "${{ matrix.imagen }}" bash /t/probar.sh
+
+  appstream:
+    name: AppStream y lanzador de escritorio
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends appstream desktop-file-utils
+      - run: appstreamcli validate --pedantic --no-net packaging/appstream/io.github.saraivaruas.sentinel.metainfo.xml
+      - run: desktop-file-validate desktop/sentinel.desktop
+
+  snap:
+    name: Snap (classic)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: snapcore/action-build@v1
+        id: build
+      - name: Instalar y probar
+        run: |
+          sudo snap install --dangerous --classic "${{ steps.build.outputs.snap }}"
+          sentinel-hids --help >/dev/null
+          sentinel-hids requisitos --json | python3 -c "import json,sys; assert json.load(sys.stdin)['requisitos']"
+          sentinel-hids endurecer plan --json | python3 -c "import json,sys; assert json.load(sys.stdin)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-snap
+          path: ${{ steps.build.outputs.snap }}
+
+  flatpak:
+    name: Flatpak (solo panel)
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: sentinel.flatpak
+          manifest-path: packaging/flatpak/io.github.saraivaruas.sentinel.yml
+          cache-key: flatpak-${{ github.sha }}
+
+  repo-apt:
+    name: Repositorio APT firmado
+    if: github.event_name == 'release'
+    needs: [deb]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Comprobar que existe la clave de firma
+        id: clave
+        env:
+          K: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: if [ -n "$K" ]; then echo "hay=yes" >> "$GITHUB_OUTPUT"; else echo "No hay secreto APT_GPG_PRIVATE_KEY: no se publica el repositorio (ver packaging/PUBLICAR.md)"; fi
+      - name: Construir y firmar
+        if: steps.clave.outputs.hay == 'yes'
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends fakeroot dpkg-dev apt-utils
+          ./packaging/build-deb.sh
+          echo "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          HUELLA="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
+          printf 'allow-loopback-pinentry\n' > ~/.gnupg/gpg-agent.conf; gpgconf --reload gpg-agent
+          export GPG_TTY=; echo "$APT_GPG_PASSPHRASE" > /tmp/pp
+          gpg() { command gpg --batch --pinentry-mode loopback --passphrase-file /tmp/pp "$@"; }; export -f gpg
+          ./tools/crear-repo-apt.sh "$HUELLA" "$PWD/apt"
+          rm -f /tmp/pp
+      - name: Publicar en GitHub Pages
+        if: steps.clave.outputs.hay == 'yes'
+        run: |
+          git config user.name "sentinel-release"; git config user.email "noreply@users.noreply.github.com"
+          git fetch origin gh-pages 2>/dev/null && git checkout gh-pages || git checkout --orphan gh-pages
+          git rm -rf . >/dev/null 2>&1 || true
+          cp -a apt ./apt; touch .nojekyll; git add apt .nojekyll
+          git commit -m "Repositorio APT ${{ github.event.release.tag_name }}" && git push origin gh-pages

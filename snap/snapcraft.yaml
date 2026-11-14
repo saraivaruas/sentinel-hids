@@ -1,0 +1,77 @@
+name: sentinel-hids
+title: Sentinel
+base: core24
+adopt-info: sentinel
+summary: Detector de intrusiones y cambios para tu equipo Linux
+description: |
+  Sentinel vigila tu equipo y te avisa, en lenguaje claro, cuando alguien intenta
+  entrar o algo cambia donde no debería: fuerza bruta, escaneos de puertos,
+  procesos sospechosos y cambios en archivos críticos. Incluye un panel gráfico
+  local, endurecimiento guiado y reversible, informes por correo y un asistente
+  de IA opcional que solo explica (local o con tu propia clave).
+
+  Necesita confinamiento «classic» porque debe leer los registros y archivos
+  del sistema y, con tu permiso, cambiar el cortafuegos y la configuración de
+  seguridad del equipo. No envía datos a ningún servicio por su cuenta.
+license: MIT
+website: https://github.com/saraivaruas/sentinel-hids
+source-code: https://github.com/saraivaruas/sentinel-hids
+issues: https://github.com/saraivaruas/sentinel-hids/issues
+contact: https://github.com/saraivaruas/sentinel-hids/issues
+grade: stable
+confinement: classic
+
+apps:
+  sentinel-hids:
+    command: bin/sentinel-snap
+  panel:
+    command: bin/sentinel-snap ui
+    desktop: usr/share/applications/sentinel.desktop
+  monitor:
+    command: bin/sentinel-snap monitor
+    daemon: simple
+    restart-condition: always
+  informe:
+    command: bin/sentinel-snap equipo --programado
+    daemon: oneshot
+    timer: 08:00;16:00;23:00
+
+parts:
+  sentinel:
+    plugin: dump
+    source: .
+    source-type: local
+    override-pull: |
+      craftctl default
+      craftctl set version="$(python3 -c "import sys; sys.path.insert(0,'.'); from sentinel import core; print(core.VERSION)")"
+    organize:
+      sentinel: opt/sentinel/sentinel
+      bin/sentinel: opt/sentinel/bin/sentinel
+      yara: opt/sentinel/yara
+      README.md: opt/sentinel/README.md
+      etc/sentinel.conf.example: usr/share/sentinel/sentinel.conf.example
+      desktop/sentinel.desktop: usr/share/applications/sentinel.desktop
+      sentinel/ui/icon.svg: meta/gui/sentinel.svg
+    stage:
+      - opt/sentinel
+      - usr/share/sentinel
+      - usr/share/applications
+    prime:
+      - -opt/sentinel/sentinel/__pycache__
+    override-prime: |
+      craftctl default
+      find "$CRAFT_PRIME" -name __pycache__ -prune -exec rm -rf {} +
+      install -d "$CRAFT_PRIME/meta/gui"
+      install -m 644 "$CRAFT_PART_SRC/sentinel/ui/icon.svg" "$CRAFT_PRIME/meta/gui/sentinel.svg"
+      sed -i 's|^Icon=.*|Icon=${SNAP}/meta/gui/sentinel.svg|; s|^Exec=.*|Exec=sentinel-hids.panel|' "$CRAFT_PRIME/usr/share/applications/sentinel.desktop"
+  launcher:
+    plugin: dump
+    source: snap/local
+    organize:
+      sentinel-snap: bin/sentinel-snap
+    stage-packages:
+      - python3-minimal
+      - libpython3-stdlib
+      - python3-venv
+      - procps
+      - iproute2

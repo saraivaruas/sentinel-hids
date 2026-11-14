@@ -15,6 +15,7 @@ cp "$AQUI/packaging/polkit/org.sentinel.policy" "$P/usr/share/polkit-1/actions/o
 cp "$AQUI"/systemd/*.service "$AQUI"/systemd/*.timer "$P/lib/systemd/system/"
 install -m 644 "$AQUI/desktop/sentinel.desktop" "$P/usr/share/applications/sentinel.desktop"
 mkdir -p "$P/etc/xdg/autostart"; install -m 644 "$AQUI/desktop/sentinel-tray.desktop" "$P/etc/xdg/autostart/sentinel-tray.desktop"
+mkdir -p "$P/usr/share/metainfo"; install -m 644 "$AQUI/packaging/appstream/io.github.saraivaruas.sentinel.metainfo.xml" "$P/usr/share/metainfo/"
 install -m 644 "$AQUI/sentinel/ui/icon.svg" "$P/usr/share/icons/hicolor/scalable/apps/sentinel.svg"
 # La configuración NO va en el paquete como «conffile»: Sentinel la edita él mismo (allow, config, smtp) y dpkg la pisaba al actualizar.
 # Se instala un ejemplo y el postinst crea /etc/sentinel/sentinel.conf solo si no existe.
