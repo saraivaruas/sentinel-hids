@@ -3,3 +3,4 @@ __pycache__/
 *.tmp
 .coverage
 dist/
+packaging/release-key.asc
