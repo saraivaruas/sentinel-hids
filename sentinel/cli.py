@@ -30,7 +30,10 @@ def build():
 
 def cmd_status(a) -> int:
     cfg, al, allow, banner = build()
-    print(f"Sentinel {core.VERSION}")
+    from . import ui
+    ov = ui.Data().overview()                          # el mismo veredicto que el panel (los avisos ya revisados no cuentan)
+    veredicto = {"protegido": col("PROTEGIDO", "ok"), "atencion": col("REQUIERE ATENCIÓN", "high")}.get(ov["level"], col(str(ov["level"]).upper(), "aviso"))
+    print(f"Sentinel {core.VERSION} — {veredicto}: {ov['why']}")
     for n in ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"):
         st = core.run(["systemctl", "is-active", n], 5)[1].strip().split("\n")[-1]
         print(f"  {n:<24} {col(st, 'ok' if st == 'active' else 'fallo')}")
@@ -38,13 +41,18 @@ def cmd_status(a) -> int:
     if hb:
         age = int(core.now() - hb["epoch"])
         print(f"  último latido           hace {age} s " + col("(vivo)", "ok") if age < 120 else f"  último latido           hace {age} s " + col("(DETENIDO)", "fallo"))
-    base = core.read_json(os.path.join(core.state_dir(), "fim_baseline.json"))
-    print(f"  referencia de integridad {len(base['files']) if base else 0} elementos" + (f", creada {base['created'][:16]}" if base else col(" · falta: sentinel baseline init", "aviso")))
+    # La referencia completa es solo de root; el resumen público (fim_meta.json) permite mostrarla sin sudo
+    meta = core.read_json(os.path.join(core.state_dir(), "fim_meta.json"))
+    if meta and meta.get("count"):
+        print(f"  referencia de integridad {meta['count']:,} elementos, creada {str(meta.get('created', ''))[:16]}")
+    else:
+        print("  referencia de integridad " + col("falta: ejecuta  sudo sentinel baseline init", "aviso"))
     bans = {k: v for k, v in banner.bans.items() if v["until"] > core.now()}
     print(f"  bloqueos activos        {len(bans)}")
-    ev = core.read_events(core.now() - 86400)
+    done = core.resolved_ids()
+    ev = [e for e in core.read_events(core.now() - 86400) if core.event_id(e) not in done]
     cnt = {s: sum(1 for e in ev if e["sev"] == s) for s in core.SEV}
-    print("  últimas 24 h            " + ", ".join(f"{cnt[s]} {core.SEV_ES[s]}" for s in ("critical", "high", "medium", "low")))
+    print("  últimas 24 h            " + ", ".join(f"{cnt[s]} {core.SEV_ES[s]}" for s in ("critical", "high", "medium", "low")) + "  (sin contar los avisos ya revisados)")
     for e in [e for e in ev if core.SEV[e["sev"]] >= 2][-5:]:
         print("   ·", col(f"{e['ts'][5:16]} {core.SEV_ES[e['sev']]}", e["sev"]), e["msg"][:110])
     return 0

@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.8.4] - 2026-11-14
+
+### Corregido
+- **`sentinel status` dice lo mismo que el panel.** Empieza con el veredicto («PROTEGIDO» o «REQUIERE ATENCIÓN» y por qué), ya no cuenta ni lista los avisos que marcaste como revisados, y muestra la referencia de integridad sin necesitar sudo (antes decía «0 elementos · falta: baseline init» aunque existiera).
+
 ## [2.8.3] - 2026-11-14
 
 ### Corregido
