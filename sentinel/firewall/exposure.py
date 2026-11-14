@@ -64,6 +64,8 @@ def status_of(item: dict, open_ports: set[int], docker_ports: dict[int, str], pr
         return "docker", f"El contenedor «{docker_ports[p]}» lo publica en todas las interfaces y Docker salta el firewall. Publícalo como 127.0.0.1:{p}:… en tu docker-compose, o agrega una regla en DOCKER-USER."
     if "%tailscale0" in a or a.startswith(("100.", "fd7a:")):
         return "privada", ""
+    if item["proto"] == "udp" and "tailscaled" in str(item.get("proc", "")):
+        return "privada", "Es el puerto de Tailscale (VPN WireGuard). Tailscale lo abre por su cuenta (cadena ts-input) para conexiones directas entre tus equipos; solo responde a pares autenticados, así que no es una puerta abierta a cualquiera."
     if p in open_ports:
         return "abierto", "Es un puerto que elegiste dejar abierto."
     return "bloqueado", ("El firewall lo bloquea desde afuera, pero escucha en todas las interfaces: si solo lo usas en este equipo, configúralo para escuchar en 127.0.0.1 y así no depende del firewall." if a in ("0.0.0.0", "*", "[::]", "::") else "")

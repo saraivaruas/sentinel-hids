@@ -7,6 +7,22 @@ from helpers import core
 from sentinel import firewall
 from sentinel.firewall import exposure, iptables, ufw
 
+_ENV_ANTES = {}
+
+
+def setUpModule():
+    """Hermético: estas pruebas no deben leer el /etc/sentinel/sentinel.conf real del equipo (los valores por defecto son los que se prueban)."""
+    _ENV_ANTES["c"] = os.environ.get("SENTINEL_CONF")
+    os.environ["SENTINEL_CONF"] = os.path.join(tempfile.gettempdir(), "sentinel-no-existe.conf")
+
+
+def tearDownModule():
+    if _ENV_ANTES.get("c") is None:
+        os.environ.pop("SENTINEL_CONF", None)
+    else:
+        os.environ["SENTINEL_CONF"] = _ENV_ANTES["c"]
+
+
 UFW = """Estado: activo
 
      Hasta                      Acción      Desde
@@ -120,6 +136,11 @@ tcp LISTEN 0 4096 100.71.15.101%tailscale0:52047 0.0.0.0:*
 udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
 """
     DOCKER = "web\t0.0.0.0:8080->80/tcp, :::8080->80/tcp\ndb\t33060/tcp, 127.0.0.1:3307->3306/tcp\napi\t0.0.0.0:9000->9000/tcp\n"
+
+    def test_el_puerto_udp_de_tailscale_no_se_reporta_como_bloqueado(self):
+        ss = 'udp UNCONN 0 0 0.0.0.0:41641 0.0.0.0:* users:(("tailscaled",pid=1,fd=3))\nudp UNCONN 0 0 0.0.0.0:5353 0.0.0.0:* users:(("avahi-daemon",pid=2,fd=3))\n'
+        r = {i["port"]: i for i in exposure.analyze(ss, set(), [])}
+        self.assertEqual(r[41641]["status"], "privada"); self.assertIn("Tailscale", r[41641]["advice"]); self.assertEqual(r[5353]["status"], "bloqueado")
 
     def test_docker_publicado(self):
         d = exposure.parse_docker(self.DOCKER)

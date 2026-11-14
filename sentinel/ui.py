@@ -23,7 +23,7 @@ import urllib.parse
 import webbrowser
 
 from . import pin
-from . import audit, core, equipo, explain, geoip, ia, incidents, requisitos, update
+from . import audit, core, endurecer, equipo, explain, geoip, ia, incidents, requisitos, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
@@ -185,6 +185,31 @@ class Data:
                 "equipo": {"enviar": cfg.getboolean("equipo", "enviar_correo", fallback=True), "horas": equipo.horas_validas(cfg.get("equipo", "horas", fallback=equipo.HORAS_POR_DEFECTO)) or equipo.HORAS_POR_DEFECTO.split(","),
                            "siguiente": sig if sig and sig != "n/a" else "", "temporizador_activo": activo, "ultimo_informe": ultimo}}
 
+    def endurecer(self, perfil: str) -> dict:
+        """Lo que muestra la página «Endurecimiento»: cada medida con su estado (solo lectura; no cambia nada)."""
+        perfil = perfil if perfil in endurecer.PERFILES else "recomendado"
+        items = endurecer.plan(perfil)
+        return {"perfil": perfil, "perfiles": list(endurecer.PERFILES), "historial": endurecer.historial()[-5:],
+                "medidas": [{"id": i.medida.id, "titulo": i.medida.titulo, "estado": i.codigo, "detalle": i.detalle, "que_hace": i.medida.que_hace, "por_que": i.medida.por_que,
+                             "riesgo": i.medida.riesgo, "perfil": i.medida.perfil, "nota": i.medida.nota} for i in items]}
+
+    def inicio(self) -> dict:
+        """Lista de «primeros pasos»: qué está listo y qué falta, con el lugar del panel donde se resuelve."""
+        from . import mailer
+        cfg = core.load_config()
+        rq = requisitos.resumen()
+        sm = mailer.estado(cfg)
+        pend = sum(1 for i in endurecer.plan("recomendado") if i.codigo == endurecer.PENDIENTE)
+        iae = ia.estado(cfg)
+        pasos = [
+            {"id": "requisitos", "titulo": "Que el equipo tenga lo que Sentinel necesita", "ok": not rq["faltan"], "detalle": "Todo instalado." if not rq["faltan"] else f"Faltan {len(rq['faltan'])} cosas (se instalan desde el panel).", "vista": "requisitos", "obligatorio": True},
+            {"id": "pin", "titulo": "Proteger Sentinel con un PIN", "ok": pin.required(), "detalle": "Sin PIN, quien use tu sesión podría apagar Sentinel o cambiar sus reglas." if not pin.required() else "PIN establecido.", "vista": "ajustes", "obligatorio": False},
+            {"id": "correo", "titulo": "Recibir alertas e informes por correo", "ok": bool(sm["ok"]), "detalle": "Listo para enviar." if sm["ok"] else "Falta configurar el correo (SMTP).", "vista": "correo", "obligatorio": False},
+            {"id": "endurecer", "titulo": "Endurecer el equipo (opcional, reversible)", "ok": pend == 0, "detalle": "Sin medidas pendientes." if pend == 0 else f"{pend} medida(s) recomendada(s) sin aplicar.", "vista": "endurecer", "obligatorio": False},
+            {"id": "ia", "titulo": "Asistente de IA que explica las detecciones (opcional)", "ok": bool(iae["ok"]), "detalle": "Activo." if iae["ok"] else "Apagado; no hace falta para que Sentinel funcione.", "vista": "ia", "obligatorio": False},
+        ]
+        return {"pasos": pasos, "listos": sum(1 for x in pasos if x["ok"]), "total": len(pasos)}
+
     def ia(self) -> dict:
         return ia.estado(core.load_config())
 
@@ -293,6 +318,15 @@ def build_action(body: dict) -> list[str]:
                 raise ValueError("la contraseña no puede tener saltos de línea")
             out.append("--password-stdin")
         return out
+    if name == "endurecer_aplicar":
+        perfil = str(body.get("perfil", "recomendado"))
+        ids = body.get("ids") or []
+        validos = {m.id for m in endurecer.MEDIDAS}
+        if perfil not in endurecer.PERFILES or not isinstance(ids, list) or not ids or not all(isinstance(x, str) and x in validos for x in ids):
+            raise ValueError("elige al menos una medida válida")
+        return ["endurecer", "aplicar", "--perfil", perfil, "--solo", ",".join(ids), "--si"]
+    if name == "endurecer_revertir":
+        return ["endurecer", "revertir"]
     if name == "ia_guardar":
         modo, prov = str(body.get("modo", "local")), str(body.get("proveedor", "anthropic"))
         lurl, lmod, aurl, amod = (str(body.get(k, "")).strip() for k in ("local_url", "local_modelo", "api_url", "api_modelo"))
@@ -515,6 +549,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(d.packets())
         if u.path == "/api/correo":
             return self._json(d.correo())
+        if u.path == "/api/inicio":
+            return self._json(d.inicio())
+        if u.path == "/api/endurecer":
+            return self._json(d.endurecer((q.get("perfil") or ["recomendado"])[0]))
         if u.path == "/api/ia":
             return self._json(d.ia())
         if u.path == "/api/requisitos":

@@ -2,6 +2,17 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.11.0] - 2026-11-14
+
+### Agregado
+- **Página «Endurecimiento» en el panel:** cada medida con ✔/○/✖, qué hace, para qué sirve, riesgo y estado actual; eliges cuáles aplicar (perfil básico / recomendado / estricto), se confirma, pide administrador y PIN, y hay botón «Deshacer la última tanda».
+- **Página «Primeros pasos»:** lista de lo que está listo y lo que falta (requisitos, PIN, correo, endurecimiento, IA) con un botón «Ir» a cada lugar; se abre sola la primera vez si falta algo y deja un aviso numérico en el menú.
+
+### Corregido
+- Tailscale: su puerto UDP (41641) ya no se informa como «bloqueado por el firewall»: Tailscale lo abre por su cuenta y solo responde a pares autenticados (queda como «privada» con la explicación).
+- Las pruebas del firewall ya no leen el `sentinel.conf` real del equipo que las ejecuta.
+- `pyproject.toml` toma la versión del código (decía 2.1.0).
+
 ## [2.10.0] - 2026-11-14
 
 ### Agregado

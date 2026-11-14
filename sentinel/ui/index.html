@@ -15,6 +15,7 @@
     <nav>
       <p class="nav-h">Sentinel · detección</p>
       <button class="nav" data-view="resumen" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 12 12 4l9 8M5 10v10h5v-6h4v6h5V10"/></svg><span>Resumen</span></button>
+      <button class="nav" data-view="inicio"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg><span>Primeros pasos</span><i class="count" id="nav-ini" hidden></i></button>
       <button class="nav" data-view="eventos"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Eventos</span><i class="count" id="nav-ev" hidden></i></button>
       <button class="nav" data-view="bloqueos"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.600 5.600l12.800 12.800"/></svg><span>Bloqueos</span><i class="count" id="nav-bans" hidden></i></button>
       <button class="nav" data-view="atacantes"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.600-7 8-7s8 3 8 7"/><path d="m17 3 4 4m0-4-4 4"/></svg><span>Atacantes</span><i class="count" id="nav-att" hidden></i></button>
@@ -24,6 +25,7 @@
       <button class="nav" data-view="ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M5.600 18.400l2.100-2.100M16.300 7.700l2.100-2.100"/></svg><span>Ajustes</span></button>
       <button class="nav" data-view="requisitos"><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg><span>Requisitos</span></button>
       <button class="nav" data-view="correo"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span>Correo e informes</span></button>
+      <button class="nav" data-view="endurecer"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>Endurecimiento</span></button>
       <button class="nav" data-view="ia"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z"/><path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></svg><span>Asistente de IA</span></button>
       <p class="nav-h">Firewall · puertos</p>
       <button class="nav" data-view="fw-puertos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M9 5v5M15 10v9M9 15v4"/></svg><span>Puertos</span><i class="count" id="nav-fw" hidden></i></button>
@@ -48,6 +50,15 @@
       <div class="upd-t"><b id="upd-t">Hay una versión nueva de Sentinel</b><span id="upd-s"></span><details id="upd-n" hidden><summary>Ver las novedades</summary><pre id="upd-pre"></pre></details></div>
       <div class="upd-a"><button class="btn primary" id="upd-go">Actualizar ahora</button><button class="btn" id="upd-later">Más tarde</button></div>
     </div>
+
+    <section class="view" id="view-inicio" hidden>
+      <article class="card">
+        <div class="card-h"><h3>Primeros pasos</h3><span class="badge" id="ini-st">—</span></div>
+        <p class="hint">Sentinel ya está vigilando. Estos pasos lo dejan a tu medida; ninguno es urgente salvo el primero, y puedes hacerlos en cualquier orden.</p>
+        <div id="ini-list"></div>
+        <div class="fix-row"><button class="btn" id="ini-hide">Ya lo revisé, no mostrar al abrir</button></div>
+      </article>
+    </section>
 
     <section class="view" id="view-resumen">
       <div class="hero" id="hero">
@@ -224,6 +235,17 @@
           <p class="hint">Cambiar el correo o el horario pide tu clave de administrador (y el PIN de Sentinel, si lo tienes). El informe completo se guarda en /var/lib/sentinel/informes.</p>
         </article>
       </div>
+    </section>
+
+    <section class="view" id="view-endurecer" hidden>
+      <article class="card">
+        <div class="card-h"><h3>Endurecimiento del equipo</h3><span class="badge" id="en-st">—</span></div>
+        <p class="hint">Ajustes de seguridad que cierran puertas comunes de ataque (red, kernel, SSH, actualizaciones…), basados en buenas prácticas de CIS, Lynis y KSPP. <b>Nada se aplica solo</b>: tú eliges qué, cada cambio guarda una copia y puedes <b>deshacerlo todo</b>. Si una comprobación falla, el cambio se deshace solo.</p>
+        <div class="fix-row"><label>Perfil <select id="en-perfil"><option value="basico">Básico: sin efectos visibles</option><option value="recomendado" selected>Recomendado: CIS nivel 1</option><option value="estricto">Estricto: para servidores</option></select></label></div>
+        <div id="en-list"></div>
+        <div class="fix-row"><button class="btn primary" id="en-apl" hidden>Aplicar las seleccionadas</button><button class="btn" id="en-rev" hidden>Deshacer la última tanda</button><span class="hint" id="en-note"></span></div>
+        <p class="hint">Aplicar o deshacer pide tu clave de administrador (y el PIN de Sentinel, si lo tienes).</p>
+      </article>
     </section>
 
     <section class="view" id="view-ia" hidden>

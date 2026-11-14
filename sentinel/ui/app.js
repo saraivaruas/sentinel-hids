@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar"]);
+  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar", "endurecer_aplicar", "endurecer_revertir"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -94,9 +94,9 @@
   document.querySelectorAll(".nav").forEach((b) => { const t = b.querySelector("span"); if (t) b.setAttribute("title", t.textContent); });
   try { if (!narrow() && localStorage.getItem("sentinel-sb") === "0") setSidebar(false); } catch (e) { /* idem */ }
   // ---------- navegación
-  const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
+  const TITLES = { inicio: ["Primeros pasos", "Deja Sentinel a tu medida en pocos minutos"], resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
-    requisitos: ["Requisitos", "Qué necesita Sentinel y qué tiene tu equipo"], correo: ["Correo e informes", "Cómo te llegan los avisos y el informe del equipo"], ia: ["Asistente de IA", "Explica cada detección en lenguaje sencillo (solo explica, no actúa)"],
+    requisitos: ["Requisitos", "Qué necesita Sentinel y qué tiene tu equipo"], correo: ["Correo e informes", "Cómo te llegan los avisos y el informe del equipo"], endurecer: ["Endurecimiento", "Cierra puertas de ataque comunes, con copia y reversión"], ia: ["Asistente de IA", "Explica cada detección en lenguaje sencillo (solo explica, no actúa)"],
     ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], servidores: ["Servidores", "El estado de Sentinel en tus otros servidores"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
@@ -110,6 +110,8 @@
     if (v === "ajustes") loadSettings();
     if (v === "correo") loadCorreo();
     if (v === "ia") loadIA();
+    if (v === "inicio") loadInicio();
+    if (v === "endurecer") loadEndurecer();
     if (v === "requisitos") loadRequisitos();
     if (v === "servidores") loadServers();
     if (v === "eventos") loadEvents();
@@ -423,6 +425,55 @@
   // ---------- correo (SMTP) e informe del equipo
   const PRESETS = { gmail: ["smtp.gmail.com", 587, "starttls", "Con Gmail necesitas una «contraseña de aplicación» de 16 letras (Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones). Tu contraseña normal no funciona."],
     outlook: ["smtp-mail.outlook.com", 587, "starttls", "Con Outlook/Microsoft 365 usa tu correo completo como usuario. Si tienes verificación en dos pasos, crea una contraseña de aplicación."], otro: ["", 587, "starttls", "Pídele a tu proveedor el servidor SMTP, el puerto y si usa STARTTLS (587) o SSL (465)."] };
+  // ---------- primeros pasos
+  async function loadInicio() {
+    const r = await api("/api/inicio"), box = $("#ini-list"); clear(box);
+    r.pasos.forEach((p) => {
+      const row = el("div", "rq-row"); row.appendChild(el("span", "rq-m " + (p.ok ? "rq-ok" : p.obligatorio ? "rq-no" : "rq-op"), p.ok ? "✔" : p.obligatorio ? "✖" : "○"));
+      const d = el("div"); d.appendChild(el("b", null, p.titulo)); d.appendChild(el("small", null, p.detalle)); row.appendChild(d);
+      if (!p.ok) { const b = el("button", "btn sm", "Ir"); b.addEventListener("click", () => go(p.vista)); row.appendChild(b); }
+      box.appendChild(row);
+    });
+    const b = $("#ini-st"); b.textContent = r.listos + " de " + r.total + " listos"; b.className = "badge sev-" + (r.listos === r.total ? "low" : "medium");
+    const n = $("#nav-ini"), faltan = r.total - r.listos; n.hidden = !faltan; n.textContent = String(faltan);
+    return r;
+  }
+  $("#ini-hide").addEventListener("click", () => { try { localStorage.setItem("sentinel-ini", "1"); } catch (e) { /* sin almacenamiento */ } go("resumen"); });
+  const hash0 = location.hash;
+  (async () => {            // primera vez: si falta algo, abre «Primeros pasos»; después solo deja el aviso numérico
+    try { const r = await loadInicio(); let visto = false; try { visto = localStorage.getItem("sentinel-ini") === "1"; } catch (e) { /* idem */ } if (!visto && r.listos < r.total && !hash0) go("inicio"); } catch (e) { /* sin API todavía */ }
+  })();
+  // ---------- endurecimiento: elegir, aplicar con copia y deshacer
+  async function loadEndurecer() {
+    const r = await api("/api/endurecer?perfil=" + encodeURIComponent($("#en-perfil").value)), box = $("#en-list"); clear(box);
+    const ap = r.medidas.filter((m) => m.estado === "aplicada").length, pe = r.medidas.filter((m) => m.estado === "pendiente"), tot = r.medidas.filter((m) => m.estado !== "no_aplica").length;
+    const b = $("#en-st"); b.textContent = ap + " de " + tot + " aplicadas"; b.className = "badge sev-" + (pe.length ? "medium" : "low");
+    r.medidas.forEach((m) => {
+      const row = el("div", "rq-row"), mk = el("span", "rq-m " + (m.estado === "aplicada" ? "rq-ok" : m.estado === "pendiente" ? "rq-op" : m.estado === "bloqueada" ? "rq-no" : "rq-op"), m.estado === "aplicada" ? "✔" : m.estado === "pendiente" ? "○" : m.estado === "bloqueada" ? "✖" : "–");
+      row.appendChild(mk);
+      const d = el("div");
+      if (m.estado === "pendiente") { const c = el("input", null, "", { type: "checkbox" }); c.dataset.id = m.id; c.checked = true; c.className = "en-chk"; c.setAttribute("aria-label", "Aplicar " + m.titulo); row.insertBefore(c, mk); }
+      d.appendChild(el("b", null, m.titulo + (m.estado === "aplicada" ? " (ya aplicada)" : m.estado === "bloqueada" ? " (bloqueada por seguridad)" : m.estado === "no_aplica" ? " (no aplica a este equipo)" : "")));
+      if (m.estado !== "aplicada") {
+        d.appendChild(el("small", null, "Qué hace: " + m.que_hace)); d.appendChild(el("small", null, "Para qué: " + m.por_que));
+        d.appendChild(el("small", null, "Riesgo: " + m.riesgo + (m.nota ? " · " + m.nota : "") + " · Ahora: " + m.detalle));
+      }
+      row.appendChild(d); box.appendChild(row);
+    });
+    $("#en-apl").hidden = !pe.length; $("#en-rev").hidden = !r.historial.length;
+    $("#en-note").textContent = pe.length ? "" : "No hay nada pendiente en este perfil.";
+  }
+  $("#en-perfil").addEventListener("change", loadEndurecer);
+  $("#en-apl").addEventListener("click", async (e) => {
+    const ids = [...document.querySelectorAll(".en-chk:checked")].map((c) => c.dataset.id);
+    if (!ids.length) { toast("Marca al menos una medida.", true); return; }
+    if (!(await confirmDlg("Aplicar " + ids.length + " medida(s)", "Se guarda una copia de cada archivo y, si una comprobación falla, el cambio se deshace solo. Puedes deshacer todo después.", "Aplicar"))) return;
+    toast("Aplicando…"); await runAction("endurecer_aplicar", { perfil: $("#en-perfil").value, ids }, e.currentTarget); loadEndurecer();
+  });
+  $("#en-rev").addEventListener("click", async (e) => {
+    if (!(await confirmDlg("Deshacer la última tanda", "Se restauran los archivos como estaban antes de aplicar.", "Deshacer"))) return;
+    await runAction("endurecer_revertir", {}, e.currentTarget); loadEndurecer();
+  });
   async function loadIA() {
     const r = await api("/api/ia");
     $("#ia-modo").value = r.modo; $("#ia-lmod").value = r.local_modelo || ""; $("#ia-lurl").value = r.local_url || "http://127.0.0.1:11434"; $("#ia-prov").value = r.proveedor; $("#ia-amod").value = r.api_modelo || ""; $("#ia-aurl").value = r.api_url || "";
