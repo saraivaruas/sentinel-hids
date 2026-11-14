@@ -1,0 +1,8 @@
+Repositorio APT de Sentinel (firmado). Para instalar en Debian/Ubuntu:
+
+  sudo install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://saraivaruas.github.io/sentinel-hids/apt/sentinel-archive-keyring.gpg | sudo tee /etc/apt/keyrings/sentinel-archive-keyring.gpg >/dev/null
+  echo "deb [signed-by=/etc/apt/keyrings/sentinel-archive-keyring.gpg] https://saraivaruas.github.io/sentinel-hids/apt stable main" | sudo tee /etc/apt/sources.list.d/sentinel.list
+  sudo apt update && sudo apt install sentinel
+
+Huella de la clave: E46805D3F897C5C5F09D4CD879D4AF9784AD0C94

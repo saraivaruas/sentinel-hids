@@ -1,0 +1,22 @@
+Package: sentinel
+Architecture: all
+Version: 2.11.0
+Priority: optional
+Section: admin
+Maintainer: Jorge Luis Saraiva Ruas <28052181+saraivaruas@users.noreply.github.com>
+Installed-Size: 896
+Depends: python3 (>= 3.8), systemd, procps, iproute2, util-linux, coreutils
+Recommends: inotify-tools, libnotify-bin, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
+Suggests: clamav, yara, crowdsec, crowdsec-firewall-bouncer-iptables, lynis, mailutils
+Filename: pool/main/sentinel_2.11.0_all.deb
+Size: 157946
+MD5sum: 3ff3962a96884b672eccc82ab5dfd605
+SHA1: f5e86f37bb1542170fb3ad882273ef34f9db4f21
+SHA256: eda102a494756cf6f0a78b9cc2686845fb6d9ac3312183645fa40c4253767328
+SHA512: c280abac508c52e1a3214455f158fab5106e2cd854cfd1d4a4e9c50f0348406c1907a6937ef9d12119551b07fd6367b61f8d4e5664facbff1da9fa3e61347786
+Description: Sentinel: detector de intrusiones y cambios para Linux
+ Vigila la integridad de archivos críticos, detecta puertas traseras web,
+ fuerza bruta, escaneos de puertos y procesos sospechosos, tiene puertos
+ señuelo y un panel gráfico local. Bloquea atacantes de forma temporal con
+ CrowdSec, firewalld, ufw o iptables. Sin dependencias de Python externas.
+

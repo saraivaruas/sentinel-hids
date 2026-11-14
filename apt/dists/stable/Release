@@ -1,0 +1,24 @@
+Architectures: all
+Codename: stable
+Components: main
+Date: Sat, 14 Nov 2026 15:36:19 +0000
+Description: Sentinel, detector de intrusiones para Linux
+Label: Sentinel
+Origin: Sentinel
+Suite: stable
+MD5Sum:
+ caadbcf2c60772a5c435a2dc226df8df              196 Release
+ 643ad301e1fe3b066b35314416c726f9             1241 main/binary-all/Packages
+ 9c2732c74400d70cf624a8268660071f              845 main/binary-all/Packages.gz
+SHA1:
+ 0c298d2d51d67ce463045ad64e332298d93ef101              196 Release
+ 4905d13ee8471aac8ed7c165e2be5553180e934f             1241 main/binary-all/Packages
+ 7a00ac3b514c1ada8a4f29558dbcf0511182fef0              845 main/binary-all/Packages.gz
+SHA256:
+ 2e67a3de130080c0360dcc519f0c3f262b1f9dfeec8c0cce1d42f5586f075432              196 Release
+ c87977008f37536528835e61c8fdd17bbb4c16df02f42af0d0e70167cbb3b617             1241 main/binary-all/Packages
+ 54392d994d65f966edff8d0621ac2d68c12741fc6b467a969ca7210824e2d8b8              845 main/binary-all/Packages.gz
+SHA512:
+ a67e9851a5e5e00a13af935213d98afa4f3edf1730918fc4ce27e625a61717ca5fd7a7ff129ed381016a63935a31500bdd586f7b32d8bfebc5668d5ebf067031              196 Release
+ 40135d7a221fecee6dd7d541201e34eeeedd30978b75df1be062b4dfd1117d1079b8f516763df7c54600a9679390e7d2198098b4b9cc2508cf1dd09f756a6d08             1241 main/binary-all/Packages
+ 9bcbb5a95278da9e56b8970ad2f0ea78504a60b338efed85e171bf7712cd693ba470569a867577117f11fa6b697d48115dbc3a7d2c360716fb4c114fbb3629b9              845 main/binary-all/Packages.gz
