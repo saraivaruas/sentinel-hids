@@ -71,7 +71,9 @@ parts:
       sentinel-snap: bin/sentinel-snap
     stage-packages:
       - python3-minimal
+      - python3.12-minimal
+      - libpython3.12-minimal
+      - libpython3.12-stdlib
       - libpython3-stdlib
-      - python3-venv
       - procps
       - iproute2

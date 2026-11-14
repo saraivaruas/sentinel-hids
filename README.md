@@ -59,6 +59,16 @@ Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te a
 
 **Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Quien ya es root puede apagar cualquier programa a la fuerza (por ejemplo `kill -9`): el PIN cierra las vías normales, avisa y deja rastro, pero no es una barrera absoluta. Si el monitor deja de latir, un temporizador aparte te avisa.
 
+## Dónde conseguirlo
+
+| Vía | Qué instala | Estado |
+| --- | --- | --- |
+| **APT** (Debian, Ubuntu, Mint…) | Todo: motor, panel, temporizadores. Repositorio firmado; `LEEME.txt` del repositorio trae las 4 líneas de instalación. | Listo (`tools/crear-repo-apt.sh`) |
+| **Snap** (`sentinel-hids`, *classic*) | Todo, con servicios del snap. Requiere aprobación de Canonical para *classic*. | Se compila y prueba en la CI |
+| **Flatpak** | Solo el panel, en modo lectura (el motor necesita ser root y Flatpak no lo permite). | Se compila en la CI |
+
+Cada cambio se prueba instalando, actualizando, quitando y purgando el `.deb` en Debian 12, Ubuntu 22.04 y Ubuntu 24.04 (`tests/paquete/probar.sh`). Pasos para publicar en cada tienda: [`packaging/PUBLICAR.md`](packaging/PUBLICAR.md).
+
 ## Asistente de IA (opcional)
 
 Explica cada detección en lenguaje sencillo y sugiere qué hacer. **Solo explica**: no bloquea, borra ni cambia nada, y sus respuestas pueden tener errores. Viene apagado.
