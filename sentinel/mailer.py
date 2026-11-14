@@ -62,15 +62,23 @@ def clear_password() -> None:
         pass
 
 
+def password_present() -> bool:
+    """¿Hay una contraseña guardada? (sin ser root no se puede leer, pero sí ver que el archivo existe)"""
+    try:
+        return os.path.getsize(secret_path()) > 1
+    except OSError:
+        return False
+
+
 def configured(cfg) -> bool:
     s = settings(cfg)
-    return bool(s["enabled"] and s["host"] and s["to"] and s["sender"] and s["security"] in SECURITY and (not s["user"] or password()))
+    return bool(s["enabled"] and s["host"] and s["to"] and s["sender"] and s["security"] in SECURITY and (not s["user"] or password_present()))
 
 
 def estado(cfg) -> dict:
     s = settings(cfg)
     p = secret_path()
-    return {**s, "password": "guardada" if password() else "falta", "secret": p, "ok": configured(cfg)}
+    return {**s, "password": "guardada" if password() else "guardada (solo root puede leerla)" if password_present() else "falta", "secret": p, "ok": configured(cfg)}
 
 
 def build_message(subject: str, text: str, sender: str, to: list[str], html: str | None = None, attachments=None) -> EmailMessage:
@@ -97,6 +105,8 @@ def send(cfg, subject: str, text: str, html: str | None = None, attachments=None
         return False, f"Seguridad SMTP no válida: {s['security']!r} (usa starttls, ssl o none)."
     pw = password() if s["user"] else ""
     if s["user"] and not pw:
+        if password_present():
+            return False, "La contraseña SMTP está guardada pero solo root puede leerla: ejecuta con sudo."
         return False, "Falta la contraseña SMTP (sudo sentinel smtp configurar)."
     if s["user"] and s["security"] == "none" and s["host"] not in LOCAL_HOSTS:
         return False, "Por seguridad no se envía usuario y contraseña sin cifrado a un servidor remoto (usa starttls o ssl)."

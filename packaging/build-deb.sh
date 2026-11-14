@@ -16,7 +16,10 @@ cp "$AQUI"/systemd/*.service "$AQUI"/systemd/*.timer "$P/lib/systemd/system/"
 install -m 644 "$AQUI/desktop/sentinel.desktop" "$P/usr/share/applications/sentinel.desktop"
 mkdir -p "$P/etc/xdg/autostart"; install -m 644 "$AQUI/desktop/sentinel-tray.desktop" "$P/etc/xdg/autostart/sentinel-tray.desktop"
 install -m 644 "$AQUI/sentinel/ui/icon.svg" "$P/usr/share/icons/hicolor/scalable/apps/sentinel.svg"
-sed 's/^desktop_user = .*/desktop_user =/' "$AQUI/etc/sentinel.conf.example" > "$P/etc/sentinel/sentinel.conf"
+# La configuración NO va en el paquete como «conffile»: Sentinel la edita él mismo (allow, config, smtp) y dpkg la pisaba al actualizar.
+# Se instala un ejemplo y el postinst crea /etc/sentinel/sentinel.conf solo si no existe.
+mkdir -p "$P/usr/share/sentinel"
+sed 's/^desktop_user = .*/desktop_user =/' "$AQUI/etc/sentinel.conf.example" > "$P/usr/share/sentinel/sentinel.conf.example"
 cat > "$P/etc/logrotate.d/sentinel" <<'EOF'
 /var/log/sentinel/events.jsonl /var/log/sentinel/decoy/honeypot.jsonl {
     weekly
@@ -30,7 +33,6 @@ EOF
 cp "$AQUI/README.md" "$P/usr/share/doc/sentinel/README.md"
 cp "$AQUI/LICENSE" "$P/usr/share/doc/sentinel/copyright"
 install -m 755 "$AQUI/packaging/debian/postinst" "$AQUI/packaging/debian/prerm" "$AQUI/packaging/debian/postrm" "$P/DEBIAN/"
-echo /etc/sentinel/sentinel.conf > "$P/DEBIAN/conffiles"
 find "$P" -type d -exec chmod 755 {} +; find "$P" -type f ! -path "*/DEBIAN/*" ! -perm -u+x -exec chmod 644 {} +; find "$P/opt/sentinel" -type f -exec chmod go-w,a+r {} +; chmod 755 "$P/opt/sentinel/bin/sentinel"
 SIZE=$(du -sk "$P" | cut -f1)
 cat > "$P/DEBIAN/control" <<EOF

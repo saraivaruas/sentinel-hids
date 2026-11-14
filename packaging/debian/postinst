@@ -6,6 +6,9 @@ if [ "$1" = "configure" ]; then
   install -d -m 750 -o root -g adm /var/lib/sentinel /var/log/sentinel 2>/dev/null || install -d -m 750 /var/lib/sentinel /var/log/sentinel
   install -d -m 770 -o root -g sentinel /var/log/sentinel/decoy
   chgrp adm /var/log/sentinel/events.jsonl 2>/dev/null || true; chmod 640 /var/log/sentinel/events.jsonl 2>/dev/null || true
+  # la configuración se crea solo la primera vez: una actualización jamás la pisa (la edita el propio Sentinel)
+  install -d -m 755 /etc/sentinel
+  [ -f /etc/sentinel/sentinel.conf ] || sed 's/^desktop_user = .*/desktop_user =/' /usr/share/sentinel/sentinel.conf.example > /etc/sentinel/sentinel.conf
   chown root:adm /etc/sentinel/sentinel.conf 2>/dev/null || true; chmod 640 /etc/sentinel/sentinel.conf
   # retirar la versión 1 (con copia de respaldo)
   if [ -f /etc/rc.local ] && grep -q sentinel-core.sh /etc/rc.local 2>/dev/null; then

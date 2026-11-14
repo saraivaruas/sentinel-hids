@@ -53,8 +53,9 @@ class DebTests(unittest.TestCase):
         for dep in ("python3 (>= 3.8)", "systemd", "iproute2", "Recommends:", "inotify-tools", "libnotify-bin", "ufw | firewalld | iptables"):
             self.assertIn(dep, info)
         cont = subprocess.run(["dpkg-deb", "--contents", deb], capture_output=True, text=True).stdout
-        for f in ("./usr/bin/sentinel", "./opt/sentinel/sentinel/ui/app.js", "./lib/systemd/system/sentinel-monitor.service", "./usr/share/applications/sentinel.desktop", "./etc/sentinel/sentinel.conf"):
+        for f in ("./usr/bin/sentinel", "./opt/sentinel/sentinel/ui/app.js", "./lib/systemd/system/sentinel-monitor.service", "./usr/share/applications/sentinel.desktop", "./usr/share/sentinel/sentinel.conf.example"):
             self.assertIn(f, cont)
+        self.assertNotIn("./etc/sentinel/sentinel.conf", cont)       # la configuración no viaja en el paquete: una actualización no puede pisarla
         self.assertNotIn("rw-rw", cont)            # nada con permiso de escritura para el grupo
         self.assertNotIn("__pycache__", cont)
         d = tempfile.mkdtemp()
@@ -62,8 +63,16 @@ class DebTests(unittest.TestCase):
             subprocess.run(["dpkg-deb", "-e", deb, d], check=True)
             for s in ("postinst", "prerm", "postrm"):
                 self.assertEqual(subprocess.run(["sh", "-n", os.path.join(d, s)]).returncode, 0, s)
+            self.assertFalse(os.path.exists(os.path.join(d, "conffiles")))       # sin «conffiles»: dpkg no toca /etc/sentinel/sentinel.conf
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+    def test_la_configuracion_se_crea_solo_si_no_existe(self):
+        """El 14-nov-2026 una actualización pisó la lista blanca del usuario (sentinel.conf era conffile de dpkg)."""
+        post = open(os.path.join(ROOT, "packaging", "debian", "postinst")).read()
+        self.assertIn("[ -f /etc/sentinel/sentinel.conf ] ||", post); self.assertIn("/usr/share/sentinel/sentinel.conf.example", post)
+        build = open(os.path.join(ROOT, "packaging", "build-deb.sh")).read()
+        self.assertNotIn("conffiles", build.replace("sin «conffile»", ""))
 
     def test_el_paquete_no_enciende_los_senuelos(self):
         post = open(os.path.join(ROOT, "packaging", "debian", "postinst")).read()

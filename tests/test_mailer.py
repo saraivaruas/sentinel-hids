@@ -46,6 +46,17 @@ class MailerTests(unittest.TestCase):
         self.assertNotIn("claveSecreta1234", str(mailer.estado(self.e.cfg)))          # el estado nunca la muestra
         mailer.clear_password(); self.assertEqual(mailer.password(), "")
 
+    def test_sin_ser_root_la_contrasena_guardada_no_se_reporta_como_faltante(self):
+        """Sin sudo no se lee /etc/sentinel/smtp.pass, pero existe: el estado decía «falta» y mandaba a reconfigurar."""
+        mailer.set_password("abcdabcdabcdabcd")
+        with mock.patch.object(mailer, "password", return_value=""):                # lo que ve un usuario sin permiso
+            e = mailer.estado(self.e.cfg)
+            ok, msg = mailer.send(self.e.cfg, "a", "b")
+        self.assertIn("solo root", e["password"]); self.assertTrue(e["ok"])
+        self.assertFalse(ok); self.assertIn("solo root puede leerla", msg)
+        mailer.clear_password()
+        self.assertEqual(mailer.estado(self.e.cfg)["password"], "falta")
+
     def test_contrasena_con_salto_de_linea_se_rechaza(self):
         with self.assertRaises(ValueError):
             mailer.set_password("a\nb")

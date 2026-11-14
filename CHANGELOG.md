@@ -2,6 +2,12 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.8.1] - 2026-11-14
+
+### Corregido
+- **Actualizar el paquete ya no pisa `sentinel.conf`.** El archivo iba como «conffile» de dpkg y el propio Sentinel lo edita (`allow`, `config`, `smtp`): al actualizar a la 2.8.0 se reemplazó por el de fábrica y se perdieron la lista blanca y `notify_min` (quedó la copia en `sentinel.conf.dpkg-old`). Ahora el paquete instala solo un ejemplo en `/usr/share/sentinel/` y el `postinst` crea la configuración únicamente si no existe.
+- **`sentinel smtp estado` sin sudo** decía «contraseña: falta» aunque `/etc/sentinel/smtp.pass` existe (solo root puede leerla). Ahora dice «guardada (solo root puede leerla)».
+
 ## [2.8.0] - 2026-11-14
 
 ### Agregado
