@@ -153,7 +153,7 @@ class PacketWatcher:
         self.known_at = 0.0
         self.pending: dict = {}
         self.recent: list[dict] = []
-        self.stats = {"vistos": 0, "interesantes": 0, "muestreados": 0, "desde": core.iso(), "activo": False}
+        self.stats = {"vistos": 0, "interesantes": 0, "muestreados": 0, "detectados": 0, "ultima_deteccion": None, "desde": core.iso(), "activo": False, "motivo": ""}
         self.max_pps = cfg.getint("packets", "max_pps", fallback=30000)
         self._sec, self._cnt = 0, 0
         self.local = self._local_addrs()
@@ -198,6 +198,8 @@ class PacketWatcher:
         return found
 
     def _report(self, ip: str, f: dict, t: float) -> None:
+        self.stats["detectados"] += 1
+        self.stats["ultima_deteccion"] = core.iso(t)
         info = explain.TIPOS[f["kind"]]
         where = self.intel.geo_text(ip)
         self.intel.attempt(ip, f["kind"], n=f["n"], proto="tcp" if f["kind"] != "escaneo_udp" else "udp", detail=f["detail"])
@@ -215,17 +217,22 @@ class PacketWatcher:
         if self.cfg.getboolean("packets", "ban", fallback=True):
             self.banner.ban(ip, f"{info['nombre'].lower()} ({f['detail']})")
 
+    def guardar_estado(self) -> None:
+        """Estado de la captura para el panel y «sentinel packets». Se escribe siempre (antes solo cuando había algo sospechoso que guardar, y en una red tranquila
+        el archivo quedaba viejo: el panel decía «captura apagada» con la captura funcionando)."""
+        try:
+            core.atomic_write_json(os.path.join(core.state_dir(), "packets_stats.json"), dict(self.stats, ts=core.now()), 0o644)
+        except OSError:
+            pass
+
     def flush(self) -> None:
+        self.guardar_estado()
         if not self.pending and not self.recent:
             return
         agg, rec, self.pending, self.recent = self.pending, self.recent[-500:], {}, []
         try:
             self.intel.store.add_packets({k: tuple(v) for k, v in agg.items()}, rec)
         except Exception:
-            pass
-        try:
-            core.atomic_write_json(os.path.join(core.state_dir(), "packets_stats.json"), dict(self.stats, ts=core.now()), 0o644)
-        except OSError:
             pass
 
     def run(self, stop=lambda: False) -> None:
@@ -234,6 +241,8 @@ class PacketWatcher:
             s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(ETH_P_ALL))
         except (AttributeError, PermissionError, OSError) as e:
             self.alerter.emit("low", "packets", "no_disponible", f"Captura de paquetes no disponible ({type(e).__name__}): se usan los registros del cortafuegos", key="pkt:nodisp")
+            self.stats.update(activo=False, motivo=type(e).__name__)
+            self.guardar_estado()
             return
         s.settimeout(1.0)
         try:
@@ -243,7 +252,8 @@ class PacketWatcher:
         iface = self.cfg.get("packets", "interface", fallback="")
         if iface:
             s.bind((iface, 0))
-        self.stats["activo"] = True
+        self.stats.update(activo=True, motivo="")
+        self.guardar_estado()
         last = 0.0
         while not stop():
             try:
@@ -269,4 +279,5 @@ class PacketWatcher:
                 last = t
                 self.flush()
         self.stats["activo"] = False
+        self.guardar_estado()
         s.close()

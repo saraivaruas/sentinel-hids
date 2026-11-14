@@ -2,6 +2,12 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.8.3] - 2026-11-14
+
+### Corregido
+- **Se podía saber qué es un paquete pero no si Sentinel los estaba detectando.** El estado de la captura (`packets_stats.json`) solo se escribía cuando había algo sospechoso que guardar; en una red tranquila quedaba horas sin actualizarse y el panel decía «captura apagada» con la captura funcionando. Ahora se escribe cada 5 s siempre.
+- **El panel y `sentinel packets` muestran el estado real**: «Capturando ahora · N paquetes vistos · M escaneo(s) detectado(s) (sin novedades: es lo normal)», «Sin señal de la captura hace X» si el monitor se detuvo, o «Captura apagada» con el motivo (por ejemplo, sin permisos).
+
 ## [2.8.2] - 2026-11-14
 
 ### Corregido

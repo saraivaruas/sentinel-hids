@@ -507,7 +507,9 @@
     }
     const r = await api("/api/packets");
     const lv = $("#pk-live"); lv.classList.toggle("off", !r.captura_viva);
-    $("#pk-live-t").textContent = r.captura_viva ? "capturando · " + nf.format(r.captura.vistos) + " paquetes vistos" : "captura apagada (se usan los registros del cortafuegos)";
+    const cp = r.captura || {}, nd = cp.detectados || 0;
+    $("#pk-live-t").textContent = r.captura_viva ? "Capturando ahora · " + nf.format(cp.vistos || 0) + " paquetes vistos · " + nf.format(nd) + " escaneo(s) detectado(s)" + (nd ? "" : " (sin novedades: es lo normal)")
+      : cp.ts ? "Sin señal de la captura " + ago(Date.now() / 1000 - cp.ts) + " (¿el monitor está detenido?)" : "Captura apagada (se usan los registros del cortafuegos)";
     const body = $("#pk-body"); clear(body); $("#pk-empty").hidden = r.recientes.length > 0;
     r.recientes.forEach((p) => { const tr = el("tr"); tr.appendChild(el("td", "mono", hhmmss(p.ts))); tr.appendChild(el("td", "mono", p.ip)); tr.appendChild(el("td", null, p.dport ? String(p.dport) : "—"));
       const td = el("td"); td.appendChild(nivelBadge(p.info.nivel)); td.appendChild(document.createTextNode(" " + p.info.nombre)); td.setAttribute("title", p.info.nino); tr.appendChild(td); body.appendChild(tr); });

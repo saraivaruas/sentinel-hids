@@ -168,7 +168,23 @@ def cmd_attacker(a) -> int:
     return 0
 
 
+def estado_captura() -> str:
+    """Una línea que dice si la captura de paquetes está funcionando y qué ha visto (lo mismo que muestra el panel)."""
+    s = core.read_json(os.path.join(core.state_dir(), "packets_stats.json"))
+    if not s:
+        return "CAPTURA DE PAQUETES: sin datos todavía (el monitor aún no la inició, o está apagada)"
+    edad = core.now() - s.get("ts", 0)
+    if s.get("activo") and edad < 120:
+        d = s.get("detectados", 0)
+        return (f"CAPTURA DE PAQUETES: ACTIVA · {s.get('vistos', 0):,} paquetes vistos desde {str(s.get('desde', ''))[:16].replace('T', ' ')} · "
+                f"{s.get('interesantes', 0):,} sin conversación previa · {d} escaneo(s) detectado(s)" + (" (sin novedades: es lo normal)" if not d else ""))
+    if s.get("activo"):
+        return f"CAPTURA DE PAQUETES: SIN SEÑAL desde hace {int(edad // 60)} min (¿el monitor está detenido?)"
+    return f"CAPTURA DE PAQUETES: APAGADA ({s.get('motivo') or 'detenida'}): se usan los registros del cortafuegos"
+
+
 def cmd_packets(a) -> int:
+    print(estado_captura() + "\n")
     print("¿QUÉ ES UN PAQUETE?\n" + explain.GLOSARIO[0][1] + "\n")
     for k, t in explain.PAQUETES.items():
         if k != "otro":
