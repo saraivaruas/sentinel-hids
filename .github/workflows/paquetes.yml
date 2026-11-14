@@ -56,8 +56,6 @@ jobs:
       - name: Instalar y probar
         run: |
           sudo snap install --dangerous --classic "${{ steps.build.outputs.snap }}"
-          ls -la /snap/sentinel-hids/current/usr/bin/ | grep -i python || true
-          P="$(readlink -f /snap/sentinel-hids/current/usr/bin/python3)"; echo "python3 -> $P"; readelf -l "$P" 2>&1 | grep -i interpreter || true; file "$P" || true
           sentinel-hids --help >/dev/null
           sentinel-hids requisitos --json | python3 -c "import json,sys; assert json.load(sys.stdin)['requisitos']"
           sentinel-hids endurecer plan --json | python3 -c "import json,sys; assert json.load(sys.stdin)"
@@ -74,11 +72,20 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v7
+      # El contenedor de Flathub falla a veces al actualizar el SDK («Invalid cross-device link»): un solo reintento, sin ocultar un fallo real
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        id: intento1
+        continue-on-error: true
         with:
           bundle: sentinel.flatpak
           manifest-path: packaging/flatpak/io.github.saraivaruas.sentinel.yml
-          cache-key: flatpak-${{ github.sha }}
+          cache-key: flatpak-${{ github.sha }}-1
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        if: steps.intento1.outcome == 'failure'
+        with:
+          bundle: sentinel.flatpak
+          manifest-path: packaging/flatpak/io.github.saraivaruas.sentinel.yml
+          cache-key: flatpak-${{ github.sha }}-2
 
   repo-apt:
     name: Repositorio APT firmado
