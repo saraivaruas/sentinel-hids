@@ -2,6 +2,20 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.8.0] - 2026-11-14
+
+### Agregado
+- **Informe completo del equipo** (`sentinel equipo`): autenticación (journal), firewall con los **puertos abiertos a cualquier origen** y cómo cerrarlos, conexiones salientes por proceso, indicadores de shell reversa, procesos desde carpetas temporales, integridad de paquetes (`dpkg -V`), cuentas/sudoers/llaves SSH, persistencia, salud de CrowdSec y del resto de herramientas, túneles públicos, actualizaciones pendientes y los eventos de Sentinel de las últimas 24 h. Reúne y reemplaza los scripts sueltos `auditoria_red.sh` y `auditoria_extra.sh`. El resultado es ALTO / MEDIO / BAJO; solo ALTO y MEDIO suben el riesgo. No incluye el historial de comandos ni los argumentos de los procesos (el informe viaja por correo).
+- **Correo por SMTP desde Sentinel** (`[smtp]`, `sentinel smtp estado|configurar|importar|probar|quitar`): sin depender del comando `mail`, con STARTTLS o SSL. La contraseña **no** va en `sentinel.conf` (lo lee el grupo `adm`): se guarda en `/etc/sentinel/smtp.pass` (0600, solo root). `sentinel smtp importar --desde ~/.msmtprc` reutiliza una configuración de msmtp sin volver a escribirla. Las alertas por correo usan SMTP si está configurado, con tope por hora (`email_max_per_hour`; las críticas siempre salen).
+- **Temporizador `sentinel-equipo.timer`**: genera el informe a las 08:00, 16:00 y 23:00 y lo manda por correo. Con `Persistent=true`: si el equipo estaba apagado a esa hora, se ejecuta al encender (con el cron anterior esos informes se perdían).
+
+### Corregido (falsos positivos)
+- **Parar Sentinel durante `apt upgrade`** ya no es una alerta CRÍTICA de «intento de detener sin PIN»: apt/needrestart reinician servicios al actualizar. Sin una actualización en curso la alerta sigue igual. (El servicio `unattended-upgrade-shutdown`, siempre encendido en Ubuntu, no cuenta como actualización.)
+- **Programas de desarrollo reemplazados mientras corrían** (`claude` o `node` actualizados con npm, proyectos .NET recompilados) ya no son «binario borrado» de gravedad alta: pasan a «reinicio pendiente». En `/tmp`, `/dev/shm`, `/var/tmp` y `/run/user` sigue siendo alta.
+- **Respuestas UDP** a puertos donde el equipo tiene un programa (Meet/WebRTC/STUN de Google) ya no cuentan como «escaneo de puertos UDP»: antes bloqueaban 24 h una IP de Google. Un escaneo real a puertos sin nada escuchando se detecta igual.
+- **Regla de firewall del loopback** (`Anywhere on lo`): ya no se informa como «abierta a cualquiera» (la etiqueta lleva «[N]» delante y no coincidía) ni al agregarla ni al quitarla.
+- **Sentinel no se reporta a sí mismo**: sus archivos en `/opt/sentinel` que coinciden con el paquete oficial bajan a informativos (si no coinciden, el aviso se mantiene: alguien los tocó) y sus propios procesos no se analizan como sospechosos.
+
 ## [2.7.0] - 2026-11-01
 
 ### Agregado

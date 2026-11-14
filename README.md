@@ -59,6 +59,12 @@ Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te a
 
 **Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Quien ya es root puede apagar cualquier programa a la fuerza (por ejemplo `kill -9`): el PIN cierra las vías normales, avisa y deja rastro, pero no es una barrera absoluta. Si el monitor deja de latir, un temporizador aparte te avisa.
 
+## Novedades de la 2.8: informe del equipo y correo por SMTP
+
+- **`sentinel equipo`**: una foto completa de seguridad del equipo (autenticación, firewall y **puertos abiertos a cualquier origen**, conexiones salientes por proceso, shell reversa, integridad de paquetes, cuentas, persistencia, CrowdSec, túneles y los eventos de Sentinel). El informe HTML/texto queda en `/var/lib/sentinel/informes/` y el temporizador `sentinel-equipo.timer` lo genera a las 08:00, 16:00 y 23:00 (si el equipo estaba apagado, al encender).
+- **Correo por SMTP**: `sudo sentinel smtp configurar` (o `sudo sentinel smtp importar --desde ~/.msmtprc`) y `sentinel smtp probar`. Sirve para las alertas y para el informe. La contraseña vive en `/etc/sentinel/smtp.pass` (solo root), nunca en `sentinel.conf`. Con Gmail: `smtp.gmail.com`, puerto 587 y una *contraseña de aplicación*.
+- **Menos falsos positivos**: parar Sentinel durante `apt upgrade`, programas de desarrollo actualizados mientras corren, respuestas UDP de Meet/WebRTC y la regla del loopback del firewall ya no generan alertas graves; Sentinel tampoco se reporta a sí mismo. Detalle en el CHANGELOG.
+
 ## Novedades de la 2.7
 
 - **«Esto es normal» y modo aprendizaje**: aceptas un aviso con un botón (pide tu PIN) y, al instalar programas nuevos, `sentinel aprender 3` acepta los puertos, USB y módulos nuevos sin avisar durante 3 días. Los ataques nunca se «aceptan».
@@ -177,6 +183,8 @@ Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` �
 | `sentinel audit` | postura de seguridad |
 | `sentinel ui` | abre el panel gráfico |
 | `sentinel report --lynis` | informe HTML (semanal, automático) con el índice de Lynis |
+| `sentinel equipo [--enviar] [--rapido]` | revisión completa del equipo con informe; `--aceptar` acepta como nueva referencia los cambios de cuentas y persistencia (pide PIN) |
+| `sentinel smtp estado\|configurar\|importar\|probar\|quitar` | correo por SMTP para alertas e informes |
 
 Configuración: `/etc/sentinel/sentinel.conf` (parte de `etc/sentinel.conf.example`). Registros: `/var/log/sentinel/`.
 

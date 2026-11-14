@@ -10,7 +10,7 @@ import shutil
 import sys
 import time
 
-from . import audit, core, explain, fim, geoip, honeypot, hostcheck, incidents, pin, report, update
+from . import audit, core, equipo, explain, fim, geoip, honeypot, hostcheck, incidents, mailer, pin, report, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -31,7 +31,7 @@ def build():
 def cmd_status(a) -> int:
     cfg, al, allow, banner = build()
     print(f"Sentinel {core.VERSION}")
-    for n in ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer"):
+    for n in ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"):
         st = core.run(["systemctl", "is-active", n], 5)[1].strip().split("\n")[-1]
         print(f"  {n:<24} {col(st, 'ok' if st == 'active' else 'fallo')}")
     hb = core.read_json(os.path.join(core.state_dir(), "heartbeat.json"))
@@ -223,6 +223,101 @@ def cmd_report(a) -> int:
     return 0
 
 
+def cmd_equipo(a) -> int:
+    """Revisión completa del equipo: la muestra, la guarda como informe y, si se pide, la manda por correo SMTP."""
+    cfg = core.load_config()
+    inf = equipo.revisar(cfg, aceptar=a.aceptar, rapido=a.rapido)
+    c = inf.cuenta()
+    if a.json:
+        print(json.dumps({"host": inf.host, "fecha": inf.fecha, "riesgo": inf.nivel(), "cuenta": c, "hallazgos": [vars(h) for h in inf.unicos()]}, ensure_ascii=False, indent=1))
+    elif not a.programado:
+        print(equipo.a_texto(inf))
+    try:
+        ruta_html, ruta_txt = equipo.guardar(inf, cfg)
+    except OSError as e:
+        print("No pude guardar el informe:", e, file=sys.stderr)
+        return 1
+    print(f"Riesgo {inf.nivel()} (alto {c['ALTO']}, medio {c['MEDIO']}, bajo {c['BAJO']}). Informe guardado: {ruta_html}")
+    if a.aceptar:
+        print("Las referencias de esta revisión (cuentas, persistencia) quedaron actualizadas.")
+    if a.enviar or (a.programado and cfg.getboolean("equipo", "enviar_correo", fallback=True)):
+        if not mailer.configured(cfg):
+            print("Correo no enviado: SMTP sin configurar (sudo sentinel smtp configurar)."); return 0 if a.programado else 1
+        ok, msg = equipo.enviar(cfg, inf, ruta_html, ruta_txt)
+        print(("Correo: " if ok else "No se pudo enviar el correo: ") + msg)
+        return 0 if ok else 1
+    return 0
+
+
+def _smtp_reiniciar_monitor() -> None:
+    """El monitor lee la configuración al arrancar: lo reinicia (ya se demostró el PIN, así que no es un «intento de detener»)."""
+    if core.is_root() and shutil.which("systemctl") and core.conf_path() == "/etc/sentinel/sentinel.conf":
+        pin.authorize_stop()
+        core.run(["systemctl", "try-restart", "sentinel-monitor.service"], 20)
+
+
+def cmd_smtp(a) -> int:
+    """Correo por SMTP: estado, configurar, importar de un ~/.msmtprc, probar y quitar. La contraseña va a /etc/sentinel/smtp.pass (solo root), no a sentinel.conf."""
+    cfg = core.load_config()
+    if a.accion == "estado":
+        e = mailer.estado(cfg)
+        print(f"SMTP: {'activo' if e['enabled'] else 'apagado'} · servidor {e['host'] or '—'}:{e['port']} ({e['security']}) · usuario {e['user'] or '—'} · remitente {e['sender'] or '—'}")
+        print(f"Destinatarios: {', '.join(e['to']) or '—'} · contraseña: {e['password']} ({e['secret']})")
+        print("Listo para enviar." if e["ok"] else "Falta configurarlo: sudo sentinel smtp configurar")
+        return 0 if e["ok"] else 1
+    if a.accion == "probar":
+        ok, msg = mailer.test(cfg)
+        print(msg)
+        return 0 if ok else 1
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel smtp " + a.accion, file=sys.stderr)
+        return 1
+    if a.accion == "quitar":
+        core.set_setting("smtp", "enabled", "no")
+        mailer.clear_password()
+        print("SMTP desactivado y contraseña borrada.")
+        _smtp_reiniciar_monitor()
+        return 0
+    s = mailer.settings(cfg)
+    if a.accion == "importar":
+        try:
+            v = mailer.from_msmtp(a.desde)
+        except OSError as e:
+            print(f"No pude leer {a.desde}: {e.strerror or e}", file=sys.stderr); return 1
+        clave = v.pop("password")
+        if not v["host"]:
+            print("En ese archivo no encontré «host»: nada que importar.", file=sys.stderr); return 1
+    else:
+        ask = lambda texto, actual: (input(f"{texto} [{actual}]: ").strip() or str(actual)) if sys.stdin.isatty() else str(actual)
+        v = {"host": a.host or ask("Servidor SMTP", s["host"]), "port": str(a.puerto or ask("Puerto (587 starttls, 465 ssl)", s["port"])),
+             "security": a.seguridad or ask("Seguridad (starttls, ssl, none)", s["security"]), "user": a.usuario if a.usuario is not None else ask("Usuario", s["user"]),
+             "sender": a.de or ask("Remitente (vacío = el usuario)", s["sender"])}
+        if a.password_stdin:
+            clave = sys.stdin.readline().strip("\r\n")
+        elif sys.stdin.isatty() and v["user"]:
+            import getpass
+            clave = getpass.getpass("Contraseña (con Gmail, una «contraseña de aplicación»; no se muestra): ")
+        else:
+            clave = ""
+    para = a.para if a.para is not None else (",".join(s["to"]) or (input("Destinatarios, separados por coma: ").strip() if sys.stdin.isatty() else ""))
+    if any(h in v["host"] for h in ("gmail.com", "googlemail.com")):
+        clave = clave.replace(" ", "")                           # Google las muestra en grupos de 4 con espacios: no son parte de la contraseña
+    try:
+        for k in ("host", "port", "security", "user", "sender"):
+            core.set_setting("smtp", k, str(v[k]))
+        core.set_setting("smtp", "to", para)
+        core.set_setting("smtp", "enabled", "yes")
+        if clave:
+            mailer.set_password(clave)
+    except (ValueError, OSError) as e:
+        print("No se guardó:", e, file=sys.stderr); return 1
+    print("Guardado. Probando el envío…")
+    _smtp_reiniciar_monitor()
+    ok, msg = mailer.test(core.load_config())
+    print(msg)
+    return 0 if ok else 1
+
+
 def cmd_allow(a) -> int:
     path = core.conf_path()
     if not os.path.exists(path):
@@ -343,7 +438,7 @@ def _protected(a) -> bool:
     n = a.fn.__name__
     if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender", "cmd_resolver"):
         return True
-    return ((n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
+    return ((n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_equipo" and a.aceptar) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
             or (n == "cmd_pin" and a.accion in ("establecer", "quitar")))
 
@@ -414,7 +509,7 @@ def cmd_detener(a) -> int:
     if not core.is_root():
         print("Necesita administrador: ejecuta  sudo sentinel detener", file=sys.stderr); return 1
     pin.authorize_stop()
-    units = ["sentinel-monitor.service", "sentinel-honeypot.service", "sentinel-scan.timer", "sentinel-report.timer"]
+    units = ["sentinel-monitor.service", "sentinel-honeypot.service", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"]
     rc, out = core.run(["systemctl", "stop", *units], 60)
     core.Alerter(core.load_config()).emit("high", "pin", "detenido", "Sentinel fue detenido de forma autorizada", key=f"stop:{int(core.now())}")
     pin.revoke_stop()
@@ -422,7 +517,7 @@ def cmd_detener(a) -> int:
 
 
 def cmd_iniciar(a) -> int:
-    rc, out = core.run(["systemctl", "start", "sentinel-monitor.service", "sentinel-scan.timer", "sentinel-report.timer"], 60)
+    rc, out = core.run(["systemctl", "start", "sentinel-monitor.service", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"], 60)
     print("Sentinel iniciado." if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 
 
@@ -515,6 +610,11 @@ def main(argv=None) -> int:
     sub.add_parser("packets", help="qué es un paquete y los últimos paquetes sospechosos").set_defaults(fn=cmd_packets)
     s = sub.add_parser("audit", help="revisa la postura de seguridad del equipo"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_audit)
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
+    s = sub.add_parser("equipo", help="revisión completa del equipo con informe (y correo por SMTP)"); s.add_argument("--enviar", action="store_true", help="manda el informe por correo"); s.add_argument("--programado", action="store_true", help="modo del temporizador: guarda y manda solo si [equipo] enviar_correo = yes")
+    s.add_argument("--aceptar", action="store_true", help="acepta los cambios de cuentas y persistencia de esta revisión como nueva referencia (pide el PIN)"); s.add_argument("--rapido", action="store_true", help="sin dpkg -V ni actualizaciones pendientes"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_equipo)
+    s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])
+    s.add_argument("--host"); s.add_argument("--puerto", type=int); s.add_argument("--seguridad", choices=["starttls", "ssl", "none"]); s.add_argument("--usuario"); s.add_argument("--de", help="remitente"); s.add_argument("--para", help="destinatarios separados por coma")
+    s.add_argument("--password-stdin", dest="password_stdin", action="store_true", help="lee la contraseña de la entrada estándar (no queda en el historial)"); s.add_argument("--desde", default="", metavar="RUTA", help="importar: ruta de un ~/.msmtprc"); s.set_defaults(fn=cmd_smtp)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
     s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config", "confirmar", "restaurar"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")

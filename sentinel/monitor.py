@@ -105,8 +105,10 @@ class Monitor:
         (El apagado o reinicio del equipo y las paradas autorizadas con el PIN sí lo detienen.)"""
         try:
             if pin.required() and not pin.stop_authorized() and not pin.shutting_down():
-                self.alerter.emit("critical", "pin", "intento_detener", "Alguien intentó detener Sentinel sin el PIN (systemctl stop, kill u otra vía). Sigue vigilando; si fuiste tú, usa «sudo sentinel detener».", key=f"pin:term:{int(core.now())}")
-                return
+                if not pin.package_update_running():
+                    self.alerter.emit("critical", "pin", "intento_detener", "Alguien intentó detener Sentinel sin el PIN (systemctl stop, kill u otra vía). Sigue vigilando; si fuiste tú, usa «sudo sentinel detener».", key=f"pin:term:{int(core.now())}")
+                    return
+                self.alerter.emit("info", "monitor", "reinicio_por_paquetes", "Sentinel se reinicia porque hay una actualización de paquetes en curso (apt)", key=f"mon:pkg:{int(core.now() // 60)}")
         except Exception:
             pass
         self.stop.set()

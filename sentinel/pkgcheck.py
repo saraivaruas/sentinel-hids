@@ -9,7 +9,7 @@ import hashlib
 import os
 
 INFO_DIR = "/var/lib/dpkg/info"
-ROOTS = ("/usr/", "/lib/", "/lib64/", "/bin/", "/sbin/")
+ROOTS = ("/usr/", "/lib/", "/lib64/", "/bin/", "/sbin/", "/opt/sentinel/")
 _cache: dict = {"stamp": None, "idx": {}}
 
 

@@ -26,7 +26,7 @@ from . import audit, core, explain, geoip, incidents, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
-UNITS = ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer")
+UNITS = ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer")
 DEFAULT_PORT = 8737
 
 

@@ -136,6 +136,31 @@ def revoke_stop() -> None:
         pass
 
 
+PKG_PROCS = ("apt", "apt-get", "aptitude", "dpkg", "needrestart")
+
+
+def package_update_running() -> bool:
+    """¿Hay una instalación o actualización de paquetes en curso? Entonces apt/needrestart reinician los servicios y Sentinel se detiene solo: es normal.
+    (El servicio «unattended-upgrade-shutdown» está siempre encendido en Ubuntu: no cuenta; sí cuenta la actualización automática en marcha.)"""
+    try:
+        for d in os.listdir("/proc"):
+            if not d.isdigit():
+                continue
+            try:
+                comm = open(f"/proc/{d}/comm", encoding="utf-8", errors="replace").read().strip()
+                if comm in PKG_PROCS:
+                    return True
+                if comm.startswith("unattended-upgr"):
+                    cmd = open(f"/proc/{d}/cmdline", "rb").read().replace(b"\x00", b" ").decode("utf-8", "replace")
+                    if "unattended-upgrade" in cmd and "-shutdown" not in cmd:
+                        return True
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return False
+
+
 def shutting_down() -> bool:
     """¿El sistema se está apagando o reiniciando? (entonces detener Sentinel es normal)."""
     rc, out = core.run(["systemctl", "is-system-running"], 4)

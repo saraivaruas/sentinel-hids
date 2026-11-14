@@ -132,7 +132,7 @@ paso "6/8 Referencia inicial de integridad y del equipo"
 do_ /usr/local/bin/sentinel baseline init
 
 paso "7/8 Arrancar"
-[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer || echo "  (sin systemd: inicia a mano con «sentinel monitor»)"
+[ "$HAY_SYSTEMD" = 1 ] && do_ systemctl enable --now sentinel-monitor.service sentinel-scan.timer sentinel-report.timer sentinel-equipo.timer || echo "  (sin systemd: inicia a mano con «sentinel monitor»)"
 
 paso "8/8 Cerrar puertos de señuelos antiguos"
 # Sentinel NUNCA abre puertos: retira las reglas de señuelos que dejaron versiones anteriores y apaga los señuelos

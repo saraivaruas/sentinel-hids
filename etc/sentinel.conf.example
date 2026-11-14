@@ -57,3 +57,23 @@ refresh_seconds = 60
 
 [honeypot]
 ports = 2222,2323,3390,5900,60009
+
+[smtp]
+; Correo por SMTP (sin necesitar el comando «mail»). Se configura con:  sudo sentinel smtp configurar
+; (o  sudo sentinel smtp importar --desde ~/.msmtprc ). La contraseña NO se escribe aquí: queda en /etc/sentinel/smtp.pass, solo legible por root.
+; Con Gmail: smtp.gmail.com, puerto 587, security = starttls y una «contraseña de aplicación» de 16 letras.
+enabled = no
+host =
+port = 587
+security = starttls
+user =
+sender =
+to =
+
+[equipo]
+; Informe completo del equipo (sudo sentinel equipo). El temporizador sentinel-equipo.timer lo genera a las 08:00, 16:00 y 23:00
+; y lo manda por correo si [smtp] está configurado.
+enviar_correo = yes
+; Procesos que pueden tener conexiones externas sin generar hallazgo (se suman a [allow] procs)
+conexiones_permitidas = chrome,firefox,claude,claude-desktop,cloudflared,syncthing,tailscaled,crowdsec,crowdsec-firewa,apt,apt-get,http,curl,wget,snapd,packagekitd,fwupd,gnome-software,unattended-upgr,node,python3,msmtp,git,ssh,code,dotnet
+informes_max = 30

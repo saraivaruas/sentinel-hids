@@ -78,8 +78,29 @@ def interesting(p: dict) -> str | None:
     if p["proto"] == "icmp":
         return "ping" if p["flags"] == "ECHO" else None
     if p["proto"] == "udp":
+        if (p["dport"] or 0) in bound_udp_ports():
+            return None                          # llega a un puerto en que este equipo tiene un programa: es una respuesta, no un escaneo
         return "udp" if (p["sport"] or 0) >= 1024 and (p["dport"] or 0) > 0 else None     # sport bajo = respuesta de un servidor (DNS, QUIC…)
     return None
+
+
+_bound: dict = {"t": 0.0, "ports": set()}
+
+
+def bound_udp_ports(ttl: float = 5.0) -> set:
+    """Puertos UDP en que este equipo tiene un programa (Chrome, Meet, syncthing…). Un paquete hacia ellos responde a algo que el equipo inició;
+    un escaneo real golpea puertos donde no hay nada, y esos siguen contando."""
+    t = time.time()
+    if t - _bound["t"] > ttl:
+        ports = set()
+        for f in ("/proc/net/udp", "/proc/net/udp6"):
+            try:
+                for ln in open(f, encoding="utf-8").read().splitlines()[1:]:
+                    ports.add(int(ln.split()[1].rsplit(":", 1)[1], 16))
+            except (OSError, ValueError, IndexError):
+                pass
+        _bound.update(t=t, ports=ports)
+    return _bound["ports"]
 
 
 class Detector:

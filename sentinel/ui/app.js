@@ -241,7 +241,7 @@
     ["critical", "high", "medium", "low", "info"].forEach((k) => { if (h.c[k]) { const d = el("div"); d.appendChild(el("span", null, SEV_ES[k])); d.appendChild(el("b", null, String(h.c[k]))); t.appendChild(d); } });
     t.style.left = Math.min(e.clientX + 14, innerWidth - 200) + "px"; t.style.top = e.clientY + 14 + "px";
   }
-  const SVC = { "sentinel-monitor": "Monitor principal", "sentinel-honeypot": "Señuelos", "sentinel-scan.timer": "Revisión cada 30 min", "sentinel-report.timer": "Informe semanal" };
+  const SVC = { "sentinel-monitor": "Monitor principal", "sentinel-honeypot": "Señuelos", "sentinel-scan.timer": "Revisión cada 30 min", "sentinel-report.timer": "Informe semanal", "sentinel-equipo.timer": "Informe del equipo (08, 16 y 23 h)" };
   function renderServices(o) {
     const ul = $("#svc"); clear(ul);
     Object.keys(SVC).forEach((k) => {
