@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Página «Endurecimiento» en el panel:** cada medida con ✔/○/✖, qué hace, para qué sirve, riesgo y estado actual; eliges cuáles aplicar (perfil básico / recomendado / estricto), se confirma, pide administrador y PIN, y hay botón «Deshacer la última tanda».
 - **Página «Primeros pasos»:** lista de lo que está listo y lo que falta (requisitos, PIN, correo, endurecimiento, IA) con un botón «Ir» a cada lugar; se abre sola la primera vez si falta algo y deja un aviso numérico en el menú.
 
+- **Paquetes para las tiendas, probados en la CI:** AppStream (Centro de Software), repositorio APT firmado (`tools/crear-repo-apt.sh`, verificado con `apt` real, rechaza una firma alterada), Snap *classic* (`snap/`), Flatpak solo-panel en modo lectura (`packaging/flatpak/`) y la guía `packaging/PUBLICAR.md`. La CI instala, actualiza, quita y purga el `.deb` en Debian 12, Ubuntu 22.04 y 24.04 y corre las pruebas también en Debian 12.
+
+### Seguridad
+- El cliente HTTP del asistente de IA **nunca sigue redirecciones**: antes habría reenviado la clave de la API (cabecera) a otro servidor si el destino redirigía. Prueba incluida.
+
 ### Corregido
 - Tailscale: su puerto UDP (41641) ya no se informa como «bloqueado por el firewall»: Tailscale lo abre por su cuenta y solo responde a pares autenticados (queda como «privada» con la explicación).
 - Las pruebas del firewall ya no leen el `sentinel.conf` real del equipo que las ejecuta.
