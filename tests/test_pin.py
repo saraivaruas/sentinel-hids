@@ -1,5 +1,6 @@
 import io
 import json
+import io
 import os
 import stat
 import tempfile
@@ -128,10 +129,39 @@ class MonitorTermTests(unittest.TestCase):
 
     def test_con_pin_y_sin_permiso_sigue_y_avisa(self):
         pin.set_pin("secreto-1"); m = self.mon()
-        with mock.patch.object(pin, "shutting_down", return_value=False):
+        with mock.patch.object(pin, "shutting_down", return_value=False), mock.patch.object(pin, "package_update_running", return_value=False):
             m._on_term()
         self.assertFalse(m.stop.is_set()); sev, src, kind = m.alerter.emit.call_args[0][:3]
         self.assertEqual((sev, kind), ("critical", "intento_detener"))
+
+    def test_durante_una_actualizacion_de_paquetes_se_detiene_y_solo_informa(self):
+        """apt/needrestart reinician servicios al actualizar: no es un intento de apagar Sentinel (antes salía como CRÍTICA)."""
+        pin.set_pin("secreto-1"); m = self.mon()
+        with mock.patch.object(pin, "shutting_down", return_value=False), mock.patch.object(pin, "package_update_running", return_value=True):
+            m._on_term()
+        self.assertTrue(m.stop.is_set()); sev, src, kind = m.alerter.emit.call_args[0][:3]
+        self.assertEqual((sev, kind), ("info", "reinicio_por_paquetes"))
+
+    def test_el_servicio_unattended_upgrade_shutdown_no_cuenta_como_actualizacion(self):
+        """Corre siempre en Ubuntu; si contara, la alerta crítica quedaría anulada para siempre."""
+        real = open
+
+        def fake_open(path, *a, **k):
+            if path == "/proc/4242/comm":
+                return io.StringIO("unattended-upgr\n")
+            if path == "/proc/4242/cmdline":
+                return io.BytesIO(b"/usr/bin/python3\x00/usr/share/unattended-upgrades/unattended-upgrade-shutdown\x00--wait-for-signal\x00")
+            return real(path, *a, **k)
+        with mock.patch("os.listdir", return_value=["4242"]), mock.patch("builtins.open", side_effect=fake_open):
+            self.assertFalse(pin.package_update_running())
+
+    def test_apt_en_marcha_si_cuenta(self):
+        real = open
+
+        def fake_open(path, *a, **k):
+            return io.StringIO("apt\n") if path == "/proc/4243/comm" else real(path, *a, **k)
+        with mock.patch("os.listdir", return_value=["4243"]), mock.patch("builtins.open", side_effect=fake_open):
+            self.assertTrue(pin.package_update_running())
 
     def test_con_permiso_o_apagando_el_equipo_se_detiene(self):
         pin.set_pin("secreto-1")

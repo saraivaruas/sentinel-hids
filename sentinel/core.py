@@ -19,7 +19,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -42,6 +42,8 @@ popup_seconds = 120
 journal_min = low
 email_to =
 email_min = high
+; máximo de correos de alerta por hora (las críticas siempre salen)
+email_max_per_hour = 20
 ntfy_url =
 ntfy_min = high
 dedupe_seconds = 3600
@@ -159,6 +161,28 @@ ports = 2222,2323,3390,5900,60009
 bind = 0.0.0.0
 max_conn_per_ip = 20
 read_timeout = 5
+
+[smtp]
+; correo por SMTP (sin necesitar el comando «mail»). La contraseña NO va aquí: sudo sentinel smtp configurar la guarda en /etc/sentinel/smtp.pass (solo root)
+enabled = no
+host =
+port = 587
+; starttls (puerto 587), ssl (puerto 465) o none (solo para un servidor local)
+security = starttls
+user =
+sender =
+; destinatarios separados por comas (vacío = general.email_to)
+to =
+
+[equipo]
+; revisión completa del equipo (sentinel equipo): procesos que pueden tener conexiones externas sin generar hallazgo
+conexiones_permitidas = chrome,firefox,claude,claude-desktop,cloudflared,syncthing,tailscaled,crowdsec,crowdsec-firewa,apt,apt-get,http,curl,wget,snapd,packagekitd,fwupd,gnome-software,unattended-upgr,node,python3,msmtp,git,ssh,code,dotnet
+; puertos de destino típicos de shells inversas o canales de mando y control
+puertos_c2 = 4444,4445,1337,31337,6666,6667,5555,9001,9050,2222,8888
+; si el informe del equipo se manda por correo cuando lo ejecuta el temporizador (necesita [smtp])
+enviar_correo = yes
+; el informe se guarda en /var/lib/sentinel/informes; cuántos se conservan
+informes_max = 30
 """
 
 
@@ -196,6 +220,15 @@ EDITABLE = {
     ("general", "quiet_to"): lambda v: v == "" or bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v)),
     ("general", "email_to"): lambda v: v == "" or bool(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", v)),
     ("general", "ntfy_url"): lambda v: v == "" or bool(re.fullmatch(r"https://[\w.-]{1,120}(?::\d{2,5})?/[\w.~%/-]{1,120}", v)),
+    ("smtp", "enabled"): lambda v: v in ("yes", "no"),
+    ("smtp", "host"): lambda v: v == "" or bool(re.fullmatch(r"[A-Za-z0-9.-]{1,200}", v)),
+    ("smtp", "port"): lambda v: v.isdigit() and 1 <= int(v) <= 65535,
+    ("smtp", "security"): lambda v: v in ("starttls", "ssl", "none"),
+    ("smtp", "user"): lambda v: v == "" or bool(re.fullmatch(r"[^\s\x00-\x1f]{1,120}", v)),
+    ("smtp", "sender"): lambda v: v == "" or bool(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", v)),
+    ("smtp", "to"): lambda v: v == "" or all(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", x.strip()) for x in v.split(",")),
+    ("equipo", "conexiones_permitidas"): lambda v: bool(re.fullmatch(r"[\w.@+-]{1,64}(,[\w.@+-]{1,64})*", v.replace(" ", ""))) or v == "",
+    ("equipo", "enviar_correo"): lambda v: v in ("yes", "no"),
     ("alerts", "heartbeat_url"): lambda v: v == "" or __import__("sentinel.heartbeat", fromlist=["valid"]).valid(v),
 }
 
@@ -430,14 +463,30 @@ class Alerter:
             self.desktop(ev)
         if self.cfg.getboolean("general", "enable_desktop", fallback=True) and n >= self._min("popup_min") and not silencio:
             self.popup(ev)
-        if n >= self._min("email_min") and self.cfg.get("general", "email_to", fallback="") and shutil.which("mail"):
-            try:
-                subprocess.run(["mail", "-s", f"[Sentinel {SEV_ES[ev.sev]}] {ev.kind}", self.cfg.get("general", "email_to")], input=ev.line() + "\n" + json.dumps(ev.data, ensure_ascii=False, indent=1), text=True, timeout=15, check=False)
-            except (OSError, subprocess.SubprocessError):
-                pass
+        if n >= self._min("email_min"):
+            self._email(ev)
         url = self.cfg.get("general", "ntfy_url", fallback="")
         if url and n >= self._min("ntfy_min") and shutil.which("curl"):
             run(["curl", "-s", "-m", "8", "-H", f"Title: Sentinel {SEV_ES[ev.sev]}", "-H", f"Priority: {'urgent' if n >= 4 else 'high'}", "-d", ev.line(), url], 12)
+
+    def _email(self, ev: Event) -> None:
+        """Correo de alerta: por SMTP propio si está configurado (en segundo plano y con tope por hora); si no, el comando «mail» como antes."""
+        from . import mailer
+        body = ev.line() + "\n" + json.dumps(ev.data, ensure_ascii=False, indent=1)
+        subject = f"[Sentinel {SEV_ES[ev.sev]}] {ev.kind}"
+        if mailer.configured(self.cfg):
+            if ev.sev != "critical":
+                now_ = now()
+                self._mails = [t for t in getattr(self, "_mails", []) if now_ - t < 3600]
+                if len(self._mails) >= self.cfg.getint("general", "email_max_per_hour", fallback=20):
+                    return
+                self._mails.append(now_)
+            threading.Thread(target=mailer.send, args=(self.cfg, subject, body), daemon=True).start()
+        elif self.cfg.get("general", "email_to", fallback="") and shutil.which("mail"):
+            try:
+                subprocess.run(["mail", "-s", subject, self.cfg.get("general", "email_to")], input=body, text=True, timeout=15, check=False)
+            except (OSError, subprocess.SubprocessError):
+                pass
 
     def desktop_target(self) -> tuple[str, int] | None:
         user = self.cfg.get("general", "desktop_user", fallback="")

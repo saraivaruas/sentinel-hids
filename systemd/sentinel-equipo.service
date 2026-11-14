@@ -1,0 +1,9 @@
+[Unit]
+Description=Sentinel: informe completo del equipo (se manda por correo si hay SMTP)
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/opt/sentinel
+ExecStart=/usr/bin/python3 -m sentinel equipo --programado
+Nice=15
+TimeoutStartSec=900

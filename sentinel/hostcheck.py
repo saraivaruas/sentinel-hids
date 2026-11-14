@@ -115,19 +115,34 @@ def proc_scan(exec_dirs: list[str], miners: list[str], skip: set[str]) -> list[d
         name = os.path.basename(exe.replace(" (deleted)", ""))
         if comm in skip or name in skip:
             continue
+        if _es_de_sentinel(base):
+            continue                                       # Sentinel no se reporta a sí mismo
         sev = kind = msg = None
         if any(m == name.lower() or m == comm.lower() for m in miners):
             sev, kind, msg = "critical", "minero", f"proceso con nombre de minero de criptomonedas: {comm} (PID {d}, {exe})"
         elif any(exe.startswith(x.rstrip("/") + "/") for x in exec_dirs):
             sev, kind, msg = "high", "ejecuta_desde_temporal", f"{comm} (PID {d}) ejecuta un programa desde una carpeta temporal: {exe}"
         elif exe.endswith(" (deleted)"):
-            if exe.startswith(("/tmp", "/var/tmp", "/dev/shm", "/run/user", "/home")):
+            if exe.startswith(("/tmp", "/var/tmp", "/dev/shm", "/run/user")) or (exe.startswith("/home") and not any(m in exe for m in DEV_MARKERS)):
                 sev, kind, msg = "high", "binario_borrado", f"{comm} (PID {d}) corre con su ejecutable borrado desde {exe}"
             else:
                 sev, kind, msg = "low", "reinicio_pendiente", f"{comm} (PID {d}) usa un programa actualizado: conviene reiniciarlo ({exe})"
         if sev:
             found.append({"sev": sev, "kind": kind, "msg": msg, "pid": int(d), "comm": comm, "exe": exe})
     return found
+
+
+# Carpetas de herramientas de desarrollo y gestores de paquetes de usuario: un programa que se actualiza o recompila mientras corre deja el ejecutable «borrado»; no es una amenaza
+DEV_MARKERS = ("/node_modules/", "/.npm", "/.nvm/", "/.dotnet/", "/.cache/", "/.local/share/", "/.cargo/", "/go/pkg/", "/bin/Debug/", "/bin/Release/", "/obj/", "/.config/Claude/", "/.config/google-chrome/")
+
+
+def _es_de_sentinel(base: str) -> bool:
+    """¿Es un proceso del propio Sentinel (su monitor, su panel, la bandeja, sus revisiones)?"""
+    try:
+        cmd = open(f"{base}/cmdline", "rb").read()
+    except OSError:
+        return False
+    return b"-m\x00sentinel" in cmd or b"/opt/sentinel/" in cmd or cmd.split(b"\x00", 1)[0].endswith(b"/sentinel")
 
 
 def input_readers(skip: set[str]) -> list[dict]:

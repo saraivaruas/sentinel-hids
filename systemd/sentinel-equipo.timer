@@ -1,0 +1,12 @@
+[Unit]
+Description=Sentinel: informe del equipo a las 08:00, 16:00 y 23:00
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+OnCalendar=*-*-* 16:00:00
+OnCalendar=*-*-* 23:00:00
+# si el equipo estaba apagado a esa hora, se ejecuta al encender (antes se perdían esos informes)
+Persistent=true
+
+[Install]
+WantedBy=timers.target

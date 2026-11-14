@@ -217,6 +217,11 @@ def _rule_key(r: dict) -> tuple:
     return (re.sub(r"^\[\s*\d+\]\s*", "", r["label"]), r["action"], r["from"], r.get("comment", ""))
 
 
+def _is_loopback(r: dict) -> bool:
+    """Reglas «Anywhere on lo» (IPv4 o IPv6): solo hablan del propio equipo."""
+    return re.sub(r"^\[\s*\d+\]\s*", "", r.get("label", "")).lower().startswith(("anywhere on lo", "anywhere (v6) on lo"))
+
+
 def diff_snapshots(old: dict, new: dict) -> dict:
     """Qué reglas aparecieron o desaparecieron y qué puertos de Docker quedaron expuestos entre dos fotos."""
     o, n = {_rule_key(r): r for r in old.get("rules", [])}, {_rule_key(r): r for r in new.get("rules", [])}
@@ -236,9 +241,13 @@ def watch(cfg, alerter) -> dict | None:
         return None
     d = diff_snapshots(prev, s)
     for r in d["added"]:
-        wide = r["action"] == "ALLOW" and r["from"].lower().startswith("anywhere") and not r["label"].lower().startswith(("anywhere on lo", "anywhere (v6) on lo"))
+        if _is_loopback(r):
+            continue                                   # permitir el loopback no abre nada hacia afuera
+        wide = r["action"] == "ALLOW" and r["from"].lower().startswith("anywhere")
         alerter.emit("high" if wide else "medium", "firewall", "regla_nueva", f"Se agregó una regla al firewall fuera de Sentinel: {r['label']} {r['action']} desde {r['from']}" + (" (abierta a cualquiera)" if wide else ""), key=f"fw:add:{_rule_key(r)}")
     for r in d["removed"]:
+        if _is_loopback(r):
+            continue
         alerter.emit("medium" if r["action"] == "DENY" else "low", "firewall", "regla_quitada", f"Se quitó una regla del firewall fuera de Sentinel: {r['label']} {r['action']} desde {r['from']}", key=f"fw:del:{_rule_key(r)}")
     for e in d["docker"]:
         alerter.emit("high", "firewall", "docker_expuesto", f"Docker publicó el puerto {e['proto']}/{e['port']} en todas las interfaces y salta el firewall", key=f"fw:docker:{e['proto']}:{e['port']}")
