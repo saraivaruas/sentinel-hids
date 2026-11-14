@@ -34,7 +34,7 @@ apps:
   informe:
     command: bin/sentinel-snap equipo --programado
     daemon: oneshot
-    timer: 08:00;16:00;23:00
+    timer: 08:00,16:00,23:00
 
 parts:
   sentinel:

@@ -25,7 +25,7 @@ modules:
       - find /app/opt/sentinel -name __pycache__ -prune -exec rm -rf {} +
       - install -m 755 packaging/flatpak/sentinel-panel /app/bin/sentinel-panel
       - install -Dm 644 sentinel/ui/icon.svg /app/share/icons/hicolor/scalable/apps/io.github.saraivaruas.sentinel.svg
-      - sed 's/^Icon=.*/Icon=io.github.saraivaruas.sentinel/; s/^Exec=.*/Exec=sentinel-panel/' desktop/sentinel.desktop > /tmp/d.desktop
-      - install -Dm 644 /tmp/d.desktop /app/share/applications/io.github.saraivaruas.sentinel.desktop
-      - sed 's|<launchable type="desktop-id">sentinel.desktop|<launchable type="desktop-id">io.github.saraivaruas.sentinel.desktop|' packaging/appstream/io.github.saraivaruas.sentinel.metainfo.xml > /tmp/m.xml
-      - install -Dm 644 /tmp/m.xml /app/share/metainfo/io.github.saraivaruas.sentinel.metainfo.xml
+      - install -Dm 644 desktop/sentinel.desktop /app/share/applications/io.github.saraivaruas.sentinel.desktop
+      - sed -i 's/^Icon=.*/Icon=io.github.saraivaruas.sentinel/; s/^Exec=.*/Exec=sentinel-panel/' /app/share/applications/io.github.saraivaruas.sentinel.desktop
+      - install -Dm 644 packaging/appstream/io.github.saraivaruas.sentinel.metainfo.xml /app/share/metainfo/io.github.saraivaruas.sentinel.metainfo.xml
+      - sed -i 's|<launchable type="desktop-id">sentinel.desktop|<launchable type="desktop-id">io.github.saraivaruas.sentinel.desktop|' /app/share/metainfo/io.github.saraivaruas.sentinel.metainfo.xml

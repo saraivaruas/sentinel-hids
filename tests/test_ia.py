@@ -116,6 +116,32 @@ class ExplicarTests(unittest.TestCase):
             self.assertNotIn(prohibido, src.replace("«", ""), prohibido)          # la IA solo devuelve texto: este módulo no tiene cómo actuar
 
 
+class RedireccionesTests(unittest.TestCase):
+    def test_una_redireccion_no_reenvia_la_clave_a_otro_servidor(self):
+        import http.server, threading
+        visto = {}
+
+        class Destino(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                visto["clave"] = self.headers.get("x-api-key"); self.send_response(200); self.end_headers(); self.wfile.write(b"{}")
+            log_message = lambda *a: None
+        destino = http.server.HTTPServer(("127.0.0.1", 0), Destino)
+
+        class Origen(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.send_response(307); self.send_header("Location", f"http://127.0.0.1:{destino.server_address[1]}/robo"); self.end_headers()
+            log_message = lambda *a: None
+        origen = http.server.HTTPServer(("127.0.0.1", 0), Origen)
+        for s in (destino, origen):
+            threading.Thread(target=s.serve_forever, daemon=True).start()
+        try:
+            with self.assertRaises(OSError):                       # HTTPError es un OSError: la redirección se rechaza
+                ia._post(f"http://127.0.0.1:{origen.server_address[1]}/v1", {"a": 1}, {"x-api-key": "SECRETA"}, 5)
+            self.assertNotIn("clave", visto)
+        finally:
+            origen.shutdown(); destino.shutdown(); origen.server_close(); destino.server_close()
+
+
 class PanelTests(unittest.TestCase):
     def test_acciones_validas_y_peligrosas(self):
         ok = ui.build_action({"name": "ia_guardar", "modo": "api", "proveedor": "anthropic", "api_modelo": "claude-haiku-5-5", "clave": "sk-abc"})

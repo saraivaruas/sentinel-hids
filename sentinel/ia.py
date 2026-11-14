@@ -188,9 +188,19 @@ def prompt_de(evento: dict, red: Redactor) -> str:
 
 
 # ---------- conexiones
+class _SinRedirecciones(urllib.request.HTTPRedirectHandler):
+    """Nunca seguir una redirección: reenviaría la clave de la API (o los datos) a otro servidor."""
+
+    def redirect_request(self, *a, **k):
+        return None
+
+
+_ABRIR = urllib.request.build_opener(_SinRedirecciones).open
+
+
 def _post(url: str, payload: dict, headers: dict, timeout: int) -> dict:
     req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers={"Content-Type": "application/json", "User-Agent": "sentinel-hids", **headers})
-    with urllib.request.urlopen(req, timeout=timeout) as r:           # noqa: S310 (esquema validado: http solo a loopback, https para la API)
+    with _ABRIR(req, timeout=timeout) as r:           # esquema validado: http solo a loopback, https para la API
         return json.loads(r.read(200000).decode("utf-8", "replace"))
 
 
@@ -199,7 +209,7 @@ def modelos_locales(cfg) -> list[str]:
     if not url_local_valida(s["local_url"]):
         return []
     try:
-        with urllib.request.urlopen(s["local_url"].rstrip("/") + "/api/tags", timeout=3) as r:      # noqa: S310
+        with _ABRIR(urllib.request.Request(s["local_url"].rstrip("/") + "/api/tags"), timeout=3) as r:
             return [m.get("name", "") for m in json.loads(r.read(100000)).get("models", []) if m.get("name")][:50]
     except (OSError, ValueError):
         return []
