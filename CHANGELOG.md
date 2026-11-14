@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.9.1] - 2026-11-14
+
+### Cambiado
+- **El instalador (`install.sh`) ya no pide empezar con `sudo` ni instala en silencio.** Corre con tu usuario, detecta qué tiene tu equipo, lo muestra con ✔ / ✖, pregunta («¿Instalar lo que falta y después Sentinel?») y **solo si aceptas** pide tu contraseña de administrador y sigue. Si dices que no, no se instala nada (y sin Python 3 avisa que Sentinel no podría funcionar). `--si` instala sin preguntar (para automatizar) y sin terminal también continúa. 6 pruebas nuevas, con un `sudo` falso para que nunca instalen nada real.
+
 ## [2.9.0] - 2026-11-14
 
 ### Agregado

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Instala Sentinel v2 y las dependencias que falten (Ubuntu/Debian, Fedora/RHEL, Arch, openSUSE).
-# Uso: sudo ./install.sh [--dry-run] [--sin-dependencias] [--sin-limpiar]
+# Uso: ./install.sh [--dry-run] [--si] [--sin-dependencias] [--sin-limpiar]
+#   Detecta qué tiene tu equipo, lo marca con ✔ / ✖, te pregunta y, si aceptas, pide tu contraseña de administrador (sudo) e instala lo que falta.
 #   --dry-run            muestra lo que haría sin cambiar nada
+#   --si                 no preguntar: instalar lo que falte (para automatizar)
 #   --sin-dependencias   no instala paquetes (solo copia Sentinel)
 #   --sin-limpiar        no retira los restos de la versión 1 (scripts antiguos y la línea de rc.local)
 set -euo pipefail
 
-DRY=0; LIMPIAR=1; DEPS=1
-for a in "$@"; do case "$a" in --dry-run) DRY=1;; --sin-dependencias) DEPS=0;; --sin-limpiar) LIMPIAR=0;; -h|--help) sed -n 2,8p "$0"; exit 0;; *) echo "Opción desconocida: $a"; exit 1;; esac; done
+DRY=0; LIMPIAR=1; DEPS=1; SI=0
+for a in "$@"; do case "$a" in --dry-run) DRY=1;; --sin-dependencias) DEPS=0;; --sin-limpiar) LIMPIAR=0;; --si|-y) SI=1;; -h|--help) sed -n 2,10p "$0"; exit 0;; *) echo "Opción desconocida: $a"; exit 1;; esac; done
 
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 DEST=/opt/sentinel
@@ -17,7 +19,6 @@ USUARIO="${SUDO_USER:-}"
 do_() { if [ "$DRY" = 1 ]; then echo "  [simulación] $*"; else "$@"; fi; }
 paso() { echo; echo "== $*"; }
 
-if [ "$DRY" = 0 ] && [ "$(id -u)" -ne 0 ]; then echo "Ejecútalo con sudo (o usa --dry-run para ver qué haría)."; exit 1; fi
 HAY_SYSTEMD=0; [ -d /run/systemd/system ] && HAY_SYSTEMD=1
 
 # ---------- dependencias: detecta la distribución y qué falta
@@ -56,10 +57,51 @@ faltan() {   # comandos que no están instalados (SENTINEL_FAKE_MISSING fuerza l
   if ! command -v cscli >/dev/null && ! command -v ufw >/dev/null && ! command -v firewall-cmd >/dev/null && ! command -v iptables >/dev/null; then out="$out firewall"; fi
   echo "$out"
 }
+nombre_de() {   # nombre entendible de cada requisito
+  case "$1" in
+    python3) echo "Python 3";; inotifywait) echo "inotify-tools (vigilancia de archivos en vivo)";; notify-send) echo "libnotify (avisos en la pantalla)";;
+    pkexec) echo "polkit (pide tu contraseña de administrador desde el panel)";; ss) echo "iproute2 (ver puertos y conexiones)";; ps) echo "procps (lista de procesos)";;
+    runuser) echo "util-linux";; logrotate) echo "logrotate (rotar los registros)";; lynis) echo "Lynis (auditoría complementaria)";;
+    firewall) echo "un cortafuegos (ufw, firewalld o iptables)";; *) echo "$1";;
+  esac
+}
+mostrar_requisitos() {   # $1 = lista de lo que falta; marca cada requisito con ✔ (lo tienes) o ✖ (falta)
+  local c
+  echo "Requisitos de Sentinel:"
+  for c in python3 inotifywait notify-send pkexec ss ps runuser logrotate lynis firewall; do
+    case " $1 " in *" $c "*) echo "   ✖ $(nombre_de "$c")  — falta";; *) echo "   ✔ $(nombre_de "$c")";; esac
+  done
+}
+preguntar() {   # $1 = pregunta; devuelve 0 si aceptas (Enter = sí). Sin terminal no se pregunta: se sigue (para automatizar). SENTINEL_FAKE_ANSWER sirve para las pruebas.
+  local r="${SENTINEL_FAKE_ANSWER:-}"
+  if [ -z "$r" ]; then
+    [ "$SI" = 1 ] && return 0
+    [ -t 0 ] || return 0
+    read -r -p "$1 [S/n]: " r || r="n"
+  fi
+  case "${r:-s}" in n|N|no|NO|No) return 1;; *) return 0;; esac
+}
+
+# Sin permisos de administrador: primero se detecta y se pregunta; la contraseña de sudo solo se pide si aceptas
+if [ "$DRY" = 0 ] && [ "$(id -u)" -ne 0 ]; then
+  detectar_gestor
+  FALTA_INICIAL="$(faltan)"
+  mostrar_requisitos "$FALTA_INICIAL"
+  command -v sudo >/dev/null 2>&1 || { echo "Falta sudo: ejecuta este instalador como administrador."; exit 1; }
+  echo
+  if [ -n "${FALTA_INICIAL// /}" ]; then PREG="¿Instalar lo que falta y después Sentinel? Te pedirá tu contraseña de administrador."; else PREG="Todo está listo. ¿Instalar Sentinel? Te pedirá tu contraseña de administrador."; fi
+  preguntar "$PREG" || { echo "No se instaló nada."; exit 0; }
+  exec sudo env SENTINEL_ACEPTADO=1 SENTINEL_FAKE_ANSWER="" "$0" "$@"
+fi
+
 paso "0/8 Dependencias"
 if [ "$DEPS" = 0 ]; then echo "  omitido (--sin-dependencias)"; else
   detectar_gestor
   FALTA="$(faltan)"
+  [ -n "${SENTINEL_ACEPTADO:-}" ] || mostrar_requisitos "$FALTA"        # si vienes de la pregunta anterior, ya los viste
+  if [ -n "${FALTA// /}" ] && [ -z "${SENTINEL_ACEPTADO:-}" ] && [ "$DRY" = 0 ]; then
+    preguntar "¿Instalar lo que falta?" || { case " $FALTA " in *" python3 "*) echo "Sin Python 3 Sentinel no puede funcionar."; exit 1;; esac; echo "  no se instalarán las dependencias"; FALTA=""; }
+  fi
   if [ -z "${FALTA// /}" ]; then echo "  todo está instalado"; else
     PAQS=""; for c in $FALTA; do p="$(paquete "$c")"; [ -n "$p" ] && PAQS="$PAQS $p"; done
     PAQS="$(echo $PAQS | tr ' ' '\n' | sort -u | tr '\n' ' ')"

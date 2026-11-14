@@ -37,6 +37,28 @@ class InstallTests(unittest.TestCase):
         self.assertIn("omitido", simular("ubuntu", "inotifywait", "--sin-dependencias")[1])
         rc, out = simular("gentoo", "inotifywait"); self.assertEqual(rc, 0); self.assertIn("No reconozco", out)
 
+    def test_lista_los_requisitos_con_marcas(self):
+        _, out = simular("ubuntu", "inotifywait")
+        self.assertIn("✖ inotify-tools", out); self.assertIn("✔ Python 3", out); self.assertIn("✔ libnotify", out)
+        _, out = simular("ubuntu", " "); self.assertNotIn("✖", out)
+
+    def test_dry_run_no_pregunta(self):
+        _, out = simular("ubuntu", "inotifywait")
+        self.assertNotIn("[S/n]", out); self.assertNotIn("Te pedirá tu contraseña", out)
+
+    def test_dry_run_con_distribucion_desconocida_sigue_funcionando(self):
+        rc, out = simular("gentoo", "inotifywait"); self.assertEqual(rc, 0); self.assertIn("✖ inotify-tools", out)
+
+    def test_dry_run_nunca_pide_administrador(self):
+        self.assertNotIn("Falta sudo", simular("ubuntu", "inotifywait")[1])
+
+    def test_el_script_pasa_shellcheck_basico_de_sintaxis(self):
+        self.assertEqual(subprocess.run(["bash", "-n", os.path.join(ROOT, "install.sh")]).returncode, 0)
+
+    def test_el_help_explica_la_pregunta_y_la_opcion_si(self):
+        r = subprocess.run([os.path.join(ROOT, "install.sh"), "--help"], capture_output=True, text=True)
+        self.assertIn("--si", r.stdout); self.assertIn("contraseña de administrador", r.stdout)
+
     def test_dry_run_no_cambia_nada(self):
         rc, out = simular("ubuntu", "inotifywait")
         self.assertEqual(rc, 0); self.assertTrue(all("[simulación]" in l for l in out.splitlines() if l.startswith("  [")))
@@ -84,3 +106,43 @@ class DebTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(os.getuid() == 0, "como root el instalador instalaría de verdad: estas pruebas son solo para un usuario normal")
+class InstalarSinAdministradorTests(unittest.TestCase):
+    """Sin permisos de administrador el instalador detecta, muestra ✔/✖, pregunta y solo si aceptas pide sudo (aquí un `sudo` falso: no se instala nada)."""
+
+    def setUp(self):
+        self.bin = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.bin, True)
+        falso = os.path.join(self.bin, "sudo")
+        with open(falso, "w") as f:
+            f.write("#!/bin/sh\necho \"SUDO_LLAMADO: $*\"\n")
+        os.chmod(falso, 0o755)
+
+    def correr(self, faltan, respuesta="", *args):
+        env = dict(os.environ, SENTINEL_FAKE_OS="ubuntu", SENTINEL_FAKE_LIKE="", SENTINEL_FAKE_MISSING=faltan, SENTINEL_FAKE_ANSWER=respuesta, PATH=self.bin + os.pathsep + os.environ["PATH"])
+        r = subprocess.run([os.path.join(ROOT, "install.sh"), *args], capture_output=True, text=True, env=env, timeout=60, stdin=subprocess.DEVNULL)
+        return r.returncode, r.stdout + r.stderr
+
+    def test_si_falta_algo_lo_muestra_y_acepta_pide_sudo_con_la_marca_de_aceptado(self):
+        rc, out = self.correr("inotifywait", "s")
+        self.assertEqual(rc, 0, out); self.assertIn("✖ inotify-tools", out)
+        self.assertIn("SUDO_LLAMADO: env SENTINEL_ACEPTADO=1", out); self.assertIn("install.sh", out)
+
+    def test_si_dices_que_no_no_se_pide_la_contrasena_ni_se_instala_nada(self):
+        rc, out = self.correr("inotifywait", "n")
+        self.assertEqual(rc, 0); self.assertIn("No se instaló nada", out); self.assertNotIn("SUDO_LLAMADO", out)
+
+    def test_si_todo_esta_listo_pregunta_si_instalar_sentinel(self):
+        rc, out = self.correr(" ", "s")
+        self.assertNotIn("✖", out); self.assertIn("SUDO_LLAMADO", out)
+        rc, out = self.correr(" ", "n"); self.assertNotIn("SUDO_LLAMADO", out)
+
+    def test_sin_terminal_y_sin_respuesta_sigue_solo_para_poder_automatizar(self):
+        rc, out = self.correr("inotifywait", "")
+        self.assertIn("SUDO_LLAMADO", out)
+
+    def test_los_argumentos_viajan_al_script_que_corre_con_sudo(self):
+        rc, out = self.correr("inotifywait", "s", "--sin-limpiar")
+        self.assertIn("--sin-limpiar", out)
