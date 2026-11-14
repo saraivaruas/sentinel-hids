@@ -56,6 +56,8 @@ jobs:
       - name: Instalar y probar
         run: |
           sudo snap install --dangerous --classic "${{ steps.build.outputs.snap }}"
+          ls -la /snap/sentinel-hids/current/usr/bin/ | grep -i python || true
+          P="$(readlink -f /snap/sentinel-hids/current/usr/bin/python3)"; echo "python3 -> $P"; readelf -l "$P" 2>&1 | grep -i interpreter || true; file "$P" || true
           sentinel-hids --help >/dev/null
           sentinel-hids requisitos --json | python3 -c "import json,sys; assert json.load(sys.stdin)['requisitos']"
           sentinel-hids endurecer plan --json | python3 -c "import json,sys; assert json.load(sys.stdin)"
