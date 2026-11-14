@@ -511,7 +511,7 @@ def cmd_detener(a) -> int:
     pin.authorize_stop()
     units = ["sentinel-monitor.service", "sentinel-honeypot.service", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"]
     rc, out = core.run(["systemctl", "stop", *units], 60)
-    core.Alerter(core.load_config()).emit("high", "pin", "detenido", "Sentinel fue detenido de forma autorizada", key=f"stop:{int(core.now())}")
+    core.Alerter(core.load_config()).emit("low", "pin", "detenido", "Sentinel fue detenido de forma autorizada (con el PIN)", key=f"stop:{int(core.now())}")
     pin.revoke_stop()
     print("Sentinel detenido. Para volver a encenderlo:  sudo sentinel iniciar" if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 

@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.8.2] - 2026-11-14
+
+### Corregido
+- **Detener Sentinel con tu PIN ya no pone el panel en «Requiere atención».** El aviso «Sentinel fue detenido de forma autorizada» salía con gravedad *alta* y cada actualización o limpieza (que detienen el monitor) dejaba el resumen en naranja. Ahora es *baja*: queda en el historial pero no cuenta como alerta. Una parada **sin** PIN sigue siendo CRÍTICA.
+
 ## [2.8.1] - 2026-11-14
 
 ### Corregido

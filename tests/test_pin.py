@@ -1,6 +1,5 @@
 import io
 import json
-import io
 import os
 import stat
 import tempfile
@@ -133,6 +132,14 @@ class MonitorTermTests(unittest.TestCase):
             m._on_term()
         self.assertFalse(m.stop.is_set()); sev, src, kind = m.alerter.emit.call_args[0][:3]
         self.assertEqual((sev, kind), ("critical", "intento_detener"))
+
+    def test_la_parada_autorizada_con_pin_no_es_una_alerta_alta(self):
+        """Cada actualización o limpieza detiene Sentinel con el PIN; eso dejaba el panel en «Requiere atención»."""
+        import argparse
+        with mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", return_value=(0, "")), mock.patch.object(core, "Alerter") as al, mock.patch("sys.stdout", io.StringIO()):
+            cli.cmd_detener(argparse.Namespace())
+        sev, source, kind = al.return_value.emit.call_args[0][:3]
+        self.assertEqual((sev, source, kind), ("low", "pin", "detenido"))
 
     def test_durante_una_actualizacion_de_paquetes_se_detiene_y_solo_informa(self):
         """apt/needrestart reinician servicios al actualizar: no es un intento de apagar Sentinel (antes salía como CRÍTICA)."""
