@@ -13,6 +13,46 @@ def revision(e, root=False, **kw):
         return equipo.Revision(e.cfg, **kw)
 
 
+class DuenosTests(unittest.TestCase):
+    def fake(self, tabla):
+        def estat(p):
+            if p not in tabla:
+                raise OSError
+            uid, modo = tabla[p]
+            return mock.Mock(st_uid=uid, st_mode=modo)
+        return estat
+
+    def test_detecta_dueno_no_root_en_carpetas_criticas(self):
+        est = self.fake({"/var": (1000, 0o40755), "/var/lib/dpkg": (1000, 0o40755), "/etc": (0, 0o40755), "/etc/shadow": (0, 0o100640)})
+        malos = equipo.duenos_inseguros(("/var", "/var/lib/dpkg", "/etc", "/etc/shadow", "/no/existe"), est)
+        self.assertEqual(len(malos), 2); self.assertTrue(all("/var" in m for m in malos))
+
+    def test_escribible_por_todos_solo_cuenta_sin_sticky(self):
+        est = self.fake({"/opt": (0, 0o40777), "/tmpx": (0, 0o41777), "/etc/passwd": (0, 0o100666)})
+        malos = equipo.duenos_inseguros(("/opt", "/tmpx", "/etc/passwd"), est)
+        self.assertEqual(sorted(m.split(" ")[0] for m in malos), ["/etc/passwd", "/opt"])
+
+    def test_todo_root_no_da_hallazgo_y_el_informe_lo_dice(self):
+        e = Env()
+        try:
+            r = revision(e)
+            with mock.patch.object(equipo, "duenos_inseguros", return_value=[]):
+                r.duenos()
+            self.assertEqual(r.inf.unicos(), [])
+            with mock.patch.object(equipo, "duenos_inseguros", return_value=["/var (dueño: jorge)"]):
+                r.duenos()
+            h = r.inf.unicos(); self.assertEqual(h[0].nivel, "ALTO"); self.assertIn("/var", h[0].texto); self.assertIn("por zonas", h[0].texto)
+        finally:
+            e.close()
+
+    def test_en_este_orden_de_pasos_existe_la_comprobacion(self):
+        e = Env()
+        try:
+            self.assertTrue(callable(revision(e).duenos))
+        finally:
+            e.close()
+
+
 class InformeTests(unittest.TestCase):
     def test_hallazgos_unicos_ordenados_y_nivel(self):
         i = equipo.Informe()

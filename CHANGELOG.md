@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.11.1] - 2026-11-14
+
+### Agregado
+- **El informe del equipo revisa los dueños de lo crítico:** carpetas y archivos del sistema (`/var/lib/dpkg`, `/var/lib/apt`, `/etc/sudoers.d`, `/usr/bin`…) que no sean de root, o que cualquiera pueda escribir sin «sticky», salen como **ALTO**. Caso real que lo motivó: un `chown -R` equivocado dejó `/var` y dpkg/apt en manos de un usuario, que así podía llegar a root en la siguiente actualización. 4 pruebas nuevas.
+
 ## [2.11.0] - 2026-11-14
 
 ### Agregado

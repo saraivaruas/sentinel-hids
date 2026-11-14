@@ -32,6 +32,33 @@ DPKG_CRITICO = re.compile(r"^/(bin|sbin|usr/bin|usr/sbin|lib|usr/lib|boot)/")
 TMP_DIRS = ("/tmp", "/dev/shm", "/var/tmp")
 TMP_RUIDO = re.compile(r"systemd-private|snap-private-tmp|opensearch-|\.X11|\.ICE-unix|\.font-unix|\.XIM-unix|\.Test-unix|hsperfdata|\.com\.google|/claude-|scratchpad")
 RKH_BENIGNO = re.compile(r"/etc/\.java|lwp-request|SSH and rkhunter configuration|large\) shared memory|xdg-desktop-portal|Possible rootkits|Suspect files|Process:")
+# Carpetas y archivos del sistema que SOLO puede poseer root: si los posee un usuario normal, ese usuario puede reemplazar lo que root ejecuta o instala
+# (ejemplo real: un «chown -R usuario /var» dejó a dpkg y apt en manos de un usuario, que así llegaba a root en la próxima actualización).
+DUENOS_ROOT = ("/", "/etc", "/usr", "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/local", "/usr/local/bin", "/usr/local/sbin", "/bin", "/sbin", "/lib", "/boot", "/opt",
+               "/var", "/var/lib", "/var/lib/dpkg", "/var/lib/dpkg/status", "/var/lib/apt", "/var/cache", "/var/cache/apt", "/var/backups", "/var/spool",
+               "/etc/sudoers", "/etc/sudoers.d", "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/cron.d", "/etc/systemd/system", "/etc/ssh", "/etc/pam.d", "/etc/ld.so.preload")
+
+
+def duenos_inseguros(rutas=DUENOS_ROOT, estat=os.stat) -> list[str]:
+    """Rutas del sistema cuyo dueño no es root (o que cualquiera puede escribir sin «sticky»). Devuelve «ruta (motivo)»; las que no existen se ignoran."""
+    malos = []
+    for p in rutas:
+        try:
+            st = estat(p)
+        except OSError:
+            continue
+        if st.st_uid != 0:
+            try:
+                import pwd
+                quien = pwd.getpwuid(st.st_uid).pw_name
+            except (ImportError, KeyError):
+                quien = f"uid {st.st_uid}"
+            malos.append(f"{p} (dueño: {quien})")
+        elif stat.S_ISDIR(st.st_mode) and st.st_mode & 0o002 and not st.st_mode & 0o1000:
+            malos.append(f"{p} (cualquiera puede escribir)")
+        elif not stat.S_ISDIR(st.st_mode) and st.st_mode & 0o002:
+            malos.append(f"{p} (cualquiera puede modificarlo)")
+    return malos
 
 
 @dataclass
@@ -117,7 +144,7 @@ class Revision:
 
     def run(self) -> Informe:
         pasos = [self.contexto, self.autenticacion, self.firewall, self.puertos, self.conexiones, self.shell_reversa, self.procesos_riesgo,
-                 self.tmp_ejecutables, self.cuentas, self.persistencia, self.herramientas, self.crowdsec, self.tuneles, self.integridad_extra, self.sentinel, self.correo]
+                 self.tmp_ejecutables, self.cuentas, self.duenos, self.persistencia, self.herramientas, self.crowdsec, self.tuneles, self.integridad_extra, self.sentinel, self.correo]
         if not self.rapido:
             pasos[8:8] = [self.paquetes]
             pasos.append(self.actualizaciones)
@@ -363,6 +390,16 @@ class Revision:
                 for ln in core.run(["ssh-keygen", "-lf", ak], 10)[1].splitlines():
                     lineas.append(f"llave:{home}:{ln.strip()}")
         self.comparar("cuentas", lineas, "MEDIO", "Cambiaron cuentas con shell, grupos privilegiados, sudoers o llaves SSH autorizadas")
+
+    def duenos(self) -> None:
+        i = self.inf
+        i.sec("Dueños de carpetas y archivos críticos del sistema")
+        malos = duenos_inseguros()
+        if malos:
+            i.hall("ALTO", "dueños", f"{len(malos)} carpeta(s)/archivo(s) críticos del sistema NO son de root: " + ", ".join(malos[:6]) + (" …" if len(malos) > 6 else "")
+                   + ". Quien los posea puede reemplazar lo que root instala o ejecuta. No uses «chown -R» a ciegas: restaura por zonas (dpkg y apt primero)")
+        else:
+            i.linea("Todo es de root, como debe ser.")
 
     def persistencia(self) -> None:
         i = self.inf
