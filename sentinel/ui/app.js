@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario"]);
+  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -96,7 +96,7 @@
   // ---------- navegación
   const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
-    requisitos: ["Requisitos", "Qué necesita Sentinel y qué tiene tu equipo"], correo: ["Correo e informes", "Cómo te llegan los avisos y el informe del equipo"],
+    requisitos: ["Requisitos", "Qué necesita Sentinel y qué tiene tu equipo"], correo: ["Correo e informes", "Cómo te llegan los avisos y el informe del equipo"], ia: ["Asistente de IA", "Explica cada detección en lenguaje sencillo (solo explica, no actúa)"],
     ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], servidores: ["Servidores", "El estado de Sentinel en tus otros servidores"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
@@ -109,6 +109,7 @@
     if (v.startsWith("fw-")) loadFirewall();
     if (v === "ajustes") loadSettings();
     if (v === "correo") loadCorreo();
+    if (v === "ia") loadIA();
     if (v === "requisitos") loadRequisitos();
     if (v === "servidores") loadServers();
     if (v === "eventos") loadEvents();
@@ -335,13 +336,26 @@
       tr.addEventListener("click", (ev) => {
         if (ev.target.closest("button")) return;
         if (box) { box.remove(); box = null; return; }
-        box = el("div", "ev-more"); box.appendChild(el("pre", null, JSON.stringify(e.data || {}, null, 2) + "\nclave: " + e.key));
+        box = el("div", "ev-more"); box.addEventListener("click", (x) => x.stopPropagation()); box.appendChild(el("pre", null, JSON.stringify(e.data || {}, null, 2) + "\nclave: " + e.key));
         if (!e.resolved && SEVN[e.sev] >= 1) {
           const r = el("button", "btn sm", "Marcar como resuelto");
           r.title = "Deja de contar en el resumen y en los informes (sigue en el historial). Pide tu PIN y tu clave";
           r.addEventListener("click", async () => { const x = await runAction("resolver", { epoch: e.epoch, key: e.key }, r); if (x && x.ok) loadEvents(); });
           box.appendChild(r);
         }
+        const ex = el("button", "btn sm", "Explicar con IA");
+        ex.title = "Una explicación en lenguaje sencillo y qué hacer. Solo explica: no ejecuta nada";
+        ex.addEventListener("click", async () => {
+          ex.disabled = true; const old = ex.textContent; ex.textContent = "Consultando…";
+          let r; try { r = await api("/api/ia/explicar", { epoch: e.epoch, key: e.key }); } catch (x) { r = { texto: "", origen: "fija", error: "No se pudo consultar." }; }
+          ex.disabled = false; ex.textContent = old;
+          let out = box.querySelector(".ia-out"); if (out) out.remove();
+          out = el("div", "ia-out"); out.appendChild(el("p", "ia-t", r.texto));         // siempre como texto, nunca como HTML
+          if (r.error) out.appendChild(el("small", "mu", r.error));
+          out.appendChild(el("small", "mu", r.origen === "fija" ? "Explicación fija de Sentinel." : r.aviso));
+          box.appendChild(out);
+        });
+        box.appendChild(ex);
         if (e.normal) {
           const b = el("button", "btn sm", "Esto es normal");
           b.title = "Lo acepta como normal para que no vuelva a avisar (pide tu PIN y tu clave)";
@@ -409,6 +423,25 @@
   // ---------- correo (SMTP) e informe del equipo
   const PRESETS = { gmail: ["smtp.gmail.com", 587, "starttls", "Con Gmail necesitas una «contraseña de aplicación» de 16 letras (Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones). Tu contraseña normal no funciona."],
     outlook: ["smtp-mail.outlook.com", 587, "starttls", "Con Outlook/Microsoft 365 usa tu correo completo como usuario. Si tienes verificación en dos pasos, crea una contraseña de aplicación."], otro: ["", 587, "starttls", "Pídele a tu proveedor el servidor SMTP, el puerto y si usa STARTTLS (587) o SSL (465)."] };
+  async function loadIA() {
+    const r = await api("/api/ia");
+    $("#ia-modo").value = r.modo; $("#ia-lmod").value = r.local_modelo || ""; $("#ia-lurl").value = r.local_url || "http://127.0.0.1:11434"; $("#ia-prov").value = r.proveedor; $("#ia-amod").value = r.api_modelo || ""; $("#ia-aurl").value = r.api_url || "";
+    $("#ia-key").value = ""; $("#ia-key").placeholder = r.clave === "guardada" ? "•••• guardada (escribe solo si quieres cambiarla)" : "Pega aquí tu clave";
+    const dl = $("#ia-lmods"); clear(dl); (r.modelos_locales || []).forEach((m) => dl.appendChild(el("option", null, "", { value: m })));
+    $("#ia-lhelp").textContent = r.modo === "local" ? ((r.modelos_locales || []).length ? "Modelos encontrados en este equipo: " + r.modelos_locales.join(", ") : "No encuentro Ollama o no tiene modelos. Instálalo desde ollama.com y luego ejecuta «ollama pull llama3.2».") : "";
+    iaModo();
+    const b = $("#ia-st"); b.textContent = r.ok ? "Activo · " + (r.modo === "local" ? "local" : "en la nube") : r.enabled ? "Falta completar" : "Apagado"; b.className = "badge sev-" + (r.ok ? "low" : "info");
+  }
+  function iaModo() { const api_ = $("#ia-modo").value === "api"; $("#ia-api").hidden = !api_; $("#ia-local").hidden = api_; }
+  $("#ia-modo").addEventListener("change", iaModo);
+  $("#ia-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if ($("#ia-modo").value === "api" && !confirm("Con la IA en la nube, el texto de cada evento que pidas explicar (sin IPs, correos ni usuarios) se enviará al proveedor. ¿Continuar?")) return;
+    await runAction("ia_guardar", { modo: $("#ia-modo").value, local_url: $("#ia-lurl").value.trim(), local_modelo: $("#ia-lmod").value.trim(), proveedor: $("#ia-prov").value, api_url: $("#ia-aurl").value.trim(), api_modelo: $("#ia-amod").value.trim(), clave: $("#ia-key").value }, e.submitter);
+    $("#ia-key").value = ""; loadIA();
+  });
+  $("#ia-test").addEventListener("click", (e) => runAction("ia_probar", {}, e.currentTarget));
+  $("#ia-del").addEventListener("click", async (e) => { if (confirm("¿Apagar el asistente de IA y borrar la clave guardada?")) { await runAction("ia_quitar", {}, e.currentTarget); loadIA(); } });
   async function loadCorreo() {
     const r = await api("/api/correo"), s = r.smtp, q = r.equipo;
     $("#co-host").value = s.host || ""; $("#co-port").value = s.port || 587; $("#co-sec").value = s.security || "starttls"; $("#co-user").value = s.user || ""; $("#co-from").value = s.sender || ""; $("#co-to").value = (s.to || []).join(", ");

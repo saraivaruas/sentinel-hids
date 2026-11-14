@@ -19,7 +19,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.9.1"
+VERSION = "2.10.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -174,6 +174,19 @@ sender =
 ; destinatarios separados por comas (vacío = general.email_to)
 to =
 
+[ia]
+; asistente de IA que EXPLICA las detecciones (nunca decide ni ejecuta nada). Viene apagado. Se configura en el panel («Asistente de IA») o con: sudo sentinel ia configurar
+enabled = no
+; local = modelo en este mismo equipo con Ollama (nada sale de aquí) · api = servicio en la nube con tu propia clave (guardada en /etc/sentinel/ia.key)
+modo = local
+local_url = http://127.0.0.1:11434
+local_modelo =
+; anthropic u openai (también sirve cualquier servicio compatible con la API de OpenAI poniendo api_url con https://)
+proveedor = anthropic
+api_url =
+api_modelo = claude-haiku-5-5
+timeout = 60
+
 [equipo]
 ; revisión completa del equipo (sentinel equipo): procesos que pueden tener conexiones externas sin generar hallazgo
 conexiones_permitidas = chrome,firefox,claude,claude-desktop,cloudflared,syncthing,tailscaled,crowdsec,crowdsec-firewa,apt,apt-get,http,curl,wget,snapd,packagekitd,fwupd,gnome-software,unattended-upgr,node,python3,msmtp,git,ssh,code,dotnet
@@ -229,6 +242,13 @@ EDITABLE = {
     ("smtp", "user"): lambda v: v == "" or bool(re.fullmatch(r"[^\s\x00-\x1f]{1,120}", v)),
     ("smtp", "sender"): lambda v: v == "" or bool(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", v)),
     ("smtp", "to"): lambda v: v == "" or all(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", x.strip()) for x in v.split(",")),
+    ("ia", "enabled"): lambda v: v in ("yes", "no"),
+    ("ia", "modo"): lambda v: v in ("local", "api"),
+    ("ia", "local_url"): lambda v: __import__("sentinel.ia", fromlist=["x"]).url_local_valida(v),
+    ("ia", "local_modelo"): lambda v: __import__("sentinel.ia", fromlist=["x"]).modelo_valido(v),
+    ("ia", "proveedor"): lambda v: v in ("anthropic", "openai"),
+    ("ia", "api_url"): lambda v: __import__("sentinel.ia", fromlist=["x"]).url_api_valida(v),
+    ("ia", "api_modelo"): lambda v: __import__("sentinel.ia", fromlist=["x"]).modelo_valido(v),
     ("equipo", "conexiones_permitidas"): lambda v: bool(re.fullmatch(r"[\w.@+-]{1,64}(,[\w.@+-]{1,64})*", v.replace(" ", ""))) or v == "",
     ("equipo", "enviar_correo"): lambda v: v in ("yes", "no"),
     ("equipo", "horas"): lambda v: bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d(,([01]\d|2[0-3]):[0-5]\d){0,5}", v)),

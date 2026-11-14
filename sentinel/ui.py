@@ -23,7 +23,7 @@ import urllib.parse
 import webbrowser
 
 from . import pin
-from . import audit, core, equipo, explain, geoip, incidents, requisitos, update
+from . import audit, core, equipo, explain, geoip, ia, incidents, requisitos, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
@@ -185,6 +185,9 @@ class Data:
                 "equipo": {"enviar": cfg.getboolean("equipo", "enviar_correo", fallback=True), "horas": equipo.horas_validas(cfg.get("equipo", "horas", fallback=equipo.HORAS_POR_DEFECTO)) or equipo.HORAS_POR_DEFECTO.split(","),
                            "siguiente": sig if sig and sig != "n/a" else "", "temporizador_activo": activo, "ultimo_informe": ultimo}}
 
+    def ia(self) -> dict:
+        return ia.estado(core.load_config())
+
     def packets(self) -> dict:
         st = self._store()
         rec = []
@@ -290,6 +293,22 @@ def build_action(body: dict) -> list[str]:
                 raise ValueError("la contraseña no puede tener saltos de línea")
             out.append("--password-stdin")
         return out
+    if name == "ia_guardar":
+        modo, prov = str(body.get("modo", "local")), str(body.get("proveedor", "anthropic"))
+        lurl, lmod, aurl, amod = (str(body.get(k, "")).strip() for k in ("local_url", "local_modelo", "api_url", "api_modelo"))
+        if modo not in ("local", "api") or prov not in ("anthropic", "openai") or not ia.url_local_valida(lurl or "http://127.0.0.1:11434") or not ia.url_api_valida(aurl) or not ia.modelo_valido(lmod) or not ia.modelo_valido(amod):
+            raise ValueError("modo, dirección o modelo no válidos (el modelo local debe estar en este equipo y la API debe usar https)")
+        out = ["ia", "configurar", "--modo", modo, "--local-url", lurl or "http://127.0.0.1:11434", "--local-modelo", lmod, "--proveedor", prov, "--api-url", aurl, "--api-modelo", amod or "claude-haiku-5-5"]
+        k = str(body.get("clave", ""))
+        if k:
+            if re.search(r"[\s\x00-\x1f]", k) or len(k) > 300:
+                raise ValueError("la clave no puede tener espacios ni saltos de línea")
+            out.append("--key-stdin")
+        return out
+    if name == "ia_probar":
+        return ["ia", "probar"]
+    if name == "ia_quitar":
+        return ["ia", "quitar"]
     if name == "requisitos_instalar":
         return ["requisitos", "--instalar", "--si"]
     if name == "smtp_probar":
@@ -389,7 +408,7 @@ def run_action(body: dict) -> dict:
     if not binp:
         return {"ok": False, "out": "Sentinel no está instalado en el sistema: ejecuta «sudo ./install.sh»."}
     pin_in = str(body.get("pin", ""))[:200]
-    smtp_clave = body.get("name") == "smtp_guardar" and "--password-stdin" in args
+    smtp_clave = (body.get("name") == "smtp_guardar" and "--password-stdin" in args) or (body.get("name") == "ia_guardar" and "--key-stdin" in args)
     pre = ["--pin-stdin"] if ("pin" in body or smtp_clave) else []         # el PIN y la contraseña SMTP viajan por la entrada estándar, nunca en la lista de procesos
     if name_is_pin_change(body):
         pin_in = pin_in + "\n" + str(body.get("nuevo", ""))[:200]
@@ -496,6 +515,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(d.packets())
         if u.path == "/api/correo":
             return self._json(d.correo())
+        if u.path == "/api/ia":
+            return self._json(d.ia())
         if u.path == "/api/requisitos":
             return self._json(requisitos.como_dict())
         if u.path == "/api/glossary":
@@ -529,6 +550,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 return self._json({"ok": False, "out": "Operación desconocida"}, 400)
             return self._json({"ok": ok, "out": msg})
+        if self.path == "/api/ia/explicar":
+            from . import normal
+            try:
+                e = normal.find_event(float(body.get("epoch", 0)), str(body.get("key", ""))[:300])
+            except (TypeError, ValueError):
+                e = None
+            return self._json(ia.explicar(e) if e else {"texto": "", "origen": "fija", "error": "No encontré ese evento."})
         if self.path == "/api/action":
             res = run_action(body)
             if body.get("name") == "update" and res.get("ok"):

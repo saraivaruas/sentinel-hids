@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, incidents, mailer, pin, report, requisitos, update
+from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, incidents, mailer, pin, report, requisitos, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -451,6 +451,47 @@ def cmd_smtp(a) -> int:
     return 0 if ok else 1
 
 
+def cmd_ia(a) -> int:
+    """Asistente de IA: estado, configurar, probar, quitar. La clave de la API va a /etc/sentinel/ia.key (no a sentinel.conf)."""
+    cfg = core.load_config()
+    if a.accion == "estado":
+        e = ia.estado(cfg)
+        print(f"IA: {'activa' if e['enabled'] else 'apagada'} · modo {e['modo']}" + (f" · modelo local {e['local_modelo'] or '(el primero instalado)'} en {e['local_url']}" if e["modo"] == "local" else f" · {e['proveedor']} · modelo {e['api_modelo']} · clave: {e['clave']}"))
+        print("Solo explica las detecciones; nunca ejecuta nada. " + ia.AVISO)
+        return 0 if e["ok"] else 1
+    if a.accion == "probar":
+        ok, msg = ia.probar(cfg)
+        print(msg)
+        return 0 if ok else 1
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel ia " + a.accion, file=sys.stderr)
+        return 1
+    if a.accion == "quitar":
+        core.set_setting("ia", "enabled", "no"); ia.quitar_clave()
+        print("Asistente de IA apagado y clave borrada.")
+        return 0
+    pares = {"modo": a.modo, "local_url": a.local_url, "local_modelo": a.local_modelo, "proveedor": a.proveedor, "api_url": a.api_url, "api_modelo": a.api_modelo}
+    try:
+        for k, v in pares.items():
+            if v is not None:
+                core.set_setting("ia", k, v)
+        if a.key_stdin:
+            k = pin.next_stdin_line() if a.pin_stdin else sys.stdin.readline().strip("\r\n")
+            if k:
+                ia.set_clave(k)
+        core.set_setting("ia", "enabled", "yes")
+    except (ValueError, OSError) as e:
+        print("No se guardó:", e, file=sys.stderr); return 1
+    cfg = core.load_config()
+    if cfg.get("ia", "modo") == "api" and not ia.clave_presente():
+        print("Guardado, pero falta la clave de la API: sin ella la IA usará la explicación fija.")
+        return 1
+    print("Guardado. Probando…")
+    ok, msg = ia.probar(cfg)
+    print(msg)
+    return 0 if ok else 1
+
+
 def cmd_allow(a) -> int:
     path = core.conf_path()
     if not os.path.exists(path):
@@ -571,7 +612,7 @@ def _protected(a) -> bool:
     n = a.fn.__name__
     if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender", "cmd_resolver"):
         return True
-    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
+    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_ia" and a.accion in ("configurar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
             or (n == "cmd_pin" and a.accion in ("establecer", "quitar")))
 
@@ -754,6 +795,9 @@ def main(argv=None) -> int:
     s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])
     s.add_argument("--host"); s.add_argument("--puerto", type=int); s.add_argument("--seguridad", choices=["starttls", "ssl", "none"]); s.add_argument("--usuario"); s.add_argument("--de", help="remitente"); s.add_argument("--para", help="destinatarios separados por coma")
     s.add_argument("--password-stdin", dest="password_stdin", action="store_true", help="lee la contraseña de la entrada estándar (no queda en el historial)"); s.add_argument("--desde", default="", metavar="RUTA", help="importar: ruta de un ~/.msmtprc"); s.set_defaults(fn=cmd_smtp)
+    s = sub.add_parser("ia", help="asistente de IA que explica las detecciones: estado, configurar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "probar", "quitar"])
+    s.add_argument("--modo", choices=["local", "api"]); s.add_argument("--local-url", dest="local_url"); s.add_argument("--local-modelo", dest="local_modelo"); s.add_argument("--proveedor", choices=["anthropic", "openai"])
+    s.add_argument("--api-url", dest="api_url"); s.add_argument("--api-modelo", dest="api_modelo"); s.add_argument("--key-stdin", dest="key_stdin", action="store_true", help="lee la clave de la API de la entrada estándar"); s.set_defaults(fn=cmd_ia)
     s = sub.add_parser("allow", help="agrega algo a la lista blanca"); s.add_argument("tipo", choices=["ip", "proc", "port", "path"]); s.add_argument("valor"); s.set_defaults(fn=cmd_allow)
     sub.add_parser("test", help="prueba que las alertas lleguen").set_defaults(fn=cmd_test)
     s = sub.add_parser("firewall", help="módulo de cortafuegos (ufw/iptables): estado, plan, aplicar, config"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "plan", "aplicar", "config", "confirmar", "restaurar"]); s.add_argument("clave", nargs="?", default=""); s.add_argument("valor", nargs="?", default="")

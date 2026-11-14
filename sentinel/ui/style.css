@@ -166,3 +166,7 @@ select,input{height:38px;border-radius:10px}.form input,.form select{height:40px
 
 .rq-g{margin:1rem 0 .3rem;font-weight:700}.rq-row{display:flex;gap:.7rem;align-items:flex-start;padding:.4rem 0;border-bottom:1px solid rgba(120,120,140,.18)}.rq-m{width:1.4rem;font-weight:800;text-align:center}.rq-ok{color:#15803d}.rq-no{color:#b91c1c}.rq-op{color:#b45309}.rq-row small{display:block;color:var(--mu)}
 .form label.chk{display:flex;align-items:center;gap:.5rem;font-size:.85rem;font-weight:600}.form label.chk input{width:auto}
+
+.ia-out{margin-top:.6rem;padding:.6rem .8rem;border-left:3px solid var(--accent,#4c8bf5);background:rgba(127,127,127,.08);border-radius:6px}
+.ia-t{white-space:pre-wrap;margin:.2rem 0}
+.ia-out small{display:block;margin-top:.25rem}

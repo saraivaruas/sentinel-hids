@@ -2,6 +2,15 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.10.0] - 2026-11-14
+
+### Agregado
+- **Asistente de IA que explica cada detección** (opcional, apagado de fábrica). Botón «Explicar con IA» en cada evento y página «Asistente de IA» para configurarlo (`sentinel ia estado|configurar|probar|quitar`). Dos modos: **local** (Ollama en tu equipo, nada sale de aquí; es el predeterminado) o **api** (Anthropic u OpenAI/compatible, con tu propia clave).
+- **Solo explica, nunca actúa:** el módulo no puede ejecutar programas; la respuesta es texto y el panel la pinta como texto. Siempre rotulada «generado por IA, puede equivocarse». Sin IA, sin red o con error se muestra una explicación fija.
+- **Privacidad:** antes de enviar se ocultan IPs (v4/v6), correos, usuarios, nombre del equipo, rutas `/home/…` y cadenas que parecen claves; la respuesta se restaura solo en tu pantalla. El evento viaja como dato no confiable (puede traer texto de un atacante) y no puede cerrar la marca del prompt.
+- La clave de la API se guarda en `/etc/sentinel/ia.key` (0640 root:adm, como los registros; el panel corre con tu usuario) y nunca en `sentinel.conf` ni en la lista de procesos; el modo local solo acepta direcciones de este equipo y la API solo https. Cambiar la configuración pide administrador y PIN.
+- 13 pruebas nuevas.
+
 ## [2.9.1] - 2026-11-14
 
 ### Cambiado
