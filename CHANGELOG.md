@@ -2,6 +2,13 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.9.0] - 2026-11-14
+
+### Agregado
+- **Endurecimiento guiado** (`sentinel endurecer plan|aplicar|revertir`). Catálogo de medidas explicadas en lenguaje claro (red, kernel, módulos poco usados, SSH, actualizaciones automáticas, volcados de memoria, auditoría) en tres perfiles acumulativos: básico, recomendado y estricto. Fuentes: CIS Benchmarks, Lynis y el Kernel Self Protection Project (no es una certificación). Pensado para equipos ajenos: **nada se aplica solo** (el plan es solo lectura), cada medida escribe archivos propios (drop-ins) y guarda una copia con manifiesto, una medida con comprobación que falla (`sshd -t`) se **deshace sola**, SSH solo con llave **no se aplica si nadie tiene una llave** (no te deja fuera) y `revertir` lo deja todo como estaba. Aplicar y revertir piden el PIN. El vigilante de archivos no reporta como ataque lo que Sentinel mismo cambia.
+- **Requisitos** (`sentinel requisitos` y página «Requisitos» del panel): detecta solo qué tiene el equipo, lo marca con ✔ / ✖ / ○ (obligatorio, recomendado, opcional), pregunta y, si aceptas, instala lo que falta con apt, dnf, pacman o zypper pidiendo tu contraseña de administrador (sudo en la terminal, la ventana de clave del sistema en el panel). Nada se instala sin que lo aceptes.
+- **Página «Correo e informes» en el panel**: configurar o cambiar el SMTP (con atajos para Gmail y Outlook y la explicación de la contraseña de aplicación), probarlo, quitarlo, elegir las horas del informe del equipo (`sentinel equipo --horario 08:00,16:00,23:00`, con un drop-in del temporizador que una actualización no pisa), activar o apagar el envío y mandar un informe ahora. La contraseña viaja por la entrada estándar, nunca en la lista de procesos ni en el panel.
+
 ## [2.8.4] - 2026-11-14
 
 ### Corregido

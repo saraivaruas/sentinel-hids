@@ -6,6 +6,7 @@ y las que necesitan permisos de administrador pasan por pkexec (la ventana de cl
 from __future__ import annotations
 
 import collections
+import glob
 import hmac
 import http.server
 import ipaddress
@@ -22,7 +23,7 @@ import urllib.parse
 import webbrowser
 
 from . import pin
-from . import audit, core, explain, geoip, incidents, update
+from . import audit, core, equipo, explain, geoip, incidents, requisitos, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
@@ -168,6 +169,22 @@ class Data:
         finally:
             st.close()
 
+    def correo(self) -> dict:
+        """Lo que muestra la página «Correo e informes»: el SMTP (sin la contraseña), el horario del informe y cuándo fue el último."""
+        from . import mailer
+        cfg = core.load_config()
+        e = mailer.estado(cfg)
+        sig = core.run(["systemctl", "show", "sentinel-equipo.timer", "-p", "NextElapseUSecRealtime", "--value"], 5)[1].strip()
+        activo = core.run(["systemctl", "is-active", "sentinel-equipo.timer"], 5)[1].strip().split("\n")[-1] == "active"
+        try:
+            informes = sorted(glob.glob(os.path.join(core.state_dir(), "informes", "equipo-*.html")))
+            ultimo = os.path.getmtime(informes[-1]) if informes else None
+        except OSError:
+            ultimo = None
+        return {"smtp": {k: e[k] for k in ("enabled", "host", "port", "security", "user", "sender", "to", "password", "ok")},
+                "equipo": {"enviar": cfg.getboolean("equipo", "enviar_correo", fallback=True), "horas": equipo.horas_validas(cfg.get("equipo", "horas", fallback=equipo.HORAS_POR_DEFECTO)) or equipo.HORAS_POR_DEFECTO.split(","),
+                           "siguiente": sig if sig and sig != "n/a" else "", "temporizador_activo": activo, "ultimo_informe": ultimo}}
+
     def packets(self) -> dict:
         st = self._store()
         rec = []
@@ -256,6 +273,36 @@ def build_action(body: dict) -> list[str]:
                 raise ValueError("ajuste no permitido")
             out.append(f"{sec}.{key}={v}")
         return out
+    if name == "smtp_guardar":
+        host, user, de, para = str(body.get("host", "")).strip(), str(body.get("usuario", "")).strip(), str(body.get("de", "")).strip(), str(body.get("para", "")).strip()
+        port, seg = str(body.get("puerto", "587")).strip(), str(body.get("seguridad", "starttls"))
+        mail = r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}"
+        if not re.fullmatch(r"[A-Za-z0-9.-]{1,200}", host) or not port.isdigit() or not 1 <= int(port) <= 65535 or seg not in ("starttls", "ssl", "none"):
+            raise ValueError("servidor, puerto o seguridad no válidos")
+        if user and not re.fullmatch(r"[^\s\x00-\x1f]{1,120}", user) or (de and not re.fullmatch(mail, de)):
+            raise ValueError("usuario o remitente no válidos")
+        if not para or not all(re.fullmatch(mail, x.strip()) for x in para.split(",")):
+            raise ValueError("escribe al menos un correo de destino válido (varios separados por coma)")
+        out = ["smtp", "configurar", "--host", host, "--puerto", port, "--seguridad", seg, "--usuario", user, "--de", de, "--para", para]
+        clave = str(body.get("clave", ""))
+        if clave:
+            if "\n" in clave or "\r" in clave or len(clave) > 200:
+                raise ValueError("la contraseña no puede tener saltos de línea")
+            out.append("--password-stdin")
+        return out
+    if name == "requisitos_instalar":
+        return ["requisitos", "--instalar", "--si"]
+    if name == "smtp_probar":
+        return ["smtp", "probar"]
+    if name == "smtp_quitar":
+        return ["smtp", "quitar"]
+    if name == "equipo_enviar":
+        return ["equipo", "--enviar"]
+    if name == "equipo_horario":
+        horas = equipo.horas_validas(str(body.get("horas", "")))
+        if horas is None:
+            raise ValueError("usa de 1 a 6 horas HH:MM separadas por coma")
+        return ["equipo", "--horario", ",".join(horas)]
     if name == "senuelos":
         return ["senuelos", "activar" if body.get("on") is True else "desactivar"]
     if name == "normal":
@@ -342,9 +389,12 @@ def run_action(body: dict) -> dict:
     if not binp:
         return {"ok": False, "out": "Sentinel no está instalado en el sistema: ejecuta «sudo ./install.sh»."}
     pin_in = str(body.get("pin", ""))[:200]
-    pre = ["--pin-stdin"] if "pin" in body else []         # el PIN viaja por la entrada estándar, nunca en la lista de procesos
+    smtp_clave = body.get("name") == "smtp_guardar" and "--password-stdin" in args
+    pre = ["--pin-stdin"] if ("pin" in body or smtp_clave) else []         # el PIN y la contraseña SMTP viajan por la entrada estándar, nunca en la lista de procesos
     if name_is_pin_change(body):
         pin_in = pin_in + "\n" + str(body.get("nuevo", ""))[:200]
+    elif smtp_clave:
+        pin_in = (pin_in + "\n" if "pin" in body else "") + str(body.get("clave", ""))[:200]
     real = os.path.realpath(binp)                    # la política de polkit (org.sentinel.policy) recuerda la clave unos minutos para esta ruta
     cmd = [real, *pre, *args] if core.is_root() else ["pkexec", real, *pre, *args]
     if not core.is_root() and not shutil.which("pkexec"):
@@ -444,6 +494,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(d.update_info())
         if u.path == "/api/packets":
             return self._json(d.packets())
+        if u.path == "/api/correo":
+            return self._json(d.correo())
+        if u.path == "/api/requisitos":
+            return self._json(requisitos.como_dict())
         if u.path == "/api/glossary":
             return self._json(d.glossary())
         self._send(404, b"no encontrado", "text/plain; charset=utf-8")

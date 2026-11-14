@@ -553,15 +553,56 @@ pre{{background:#fff;padding:10px;border:1px solid #ddd;border-radius:5px;white-
 <div class="pie">Generado por Sentinel {core.VERSION} (sentinel equipo). Este informe no incluye el historial de comandos ni los argumentos de los procesos.</div></body></html>"""
 
 
+HORAS_POR_DEFECTO = "08:00,16:00,23:00"
+
+
+def horas_validas(txt: str) -> list[str] | None:
+    """«08:00, 16:00,23:00» → ['08:00', '16:00', '23:00'] (ordenadas, sin repetir, de 1 a 6); None si algo no es una hora válida."""
+    partes = [p.strip() for p in str(txt).split(",") if p.strip()]
+    if not 1 <= len(partes) <= 6 or not all(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", p) for p in partes):
+        return None
+    return sorted(set(partes))
+
+
+def carpeta_systemd() -> str:
+    return os.environ.get("SENTINEL_SYSTEMD_DIR", "/etc/systemd/system")
+
+
+def aplicar_horario(txt: str, ejecutar=None) -> tuple[bool, str]:
+    """Cambia las horas del informe: guarda [equipo] horas y escribe un drop-in del temporizador (el archivo del paquete no se toca, así que una actualización no lo pisa)."""
+    ejecutar = ejecutar or core.run
+    horas = horas_validas(txt)
+    if horas is None:
+        return False, "Horario no válido: usa de 1 a 6 horas HH:MM separadas por coma, por ejemplo 08:00,16:00,23:00."
+    try:
+        core.set_setting("equipo", "horas", ",".join(horas))
+        d = os.path.join(carpeta_systemd(), "sentinel-equipo.timer.d")
+        arch = os.path.join(d, "horario.conf")
+        if ",".join(horas) == HORAS_POR_DEFECTO:
+            if os.path.exists(arch):
+                os.remove(arch)
+        else:
+            core.ensure_dir(d, 0o755)
+            with open(arch, "w", encoding="utf-8") as f:
+                f.write("# Sentinel · horario del informe del equipo (sentinel equipo --horario)\n[Timer]\nOnCalendar=\n" + "".join(f"OnCalendar=*-*-* {h}:00\n" for h in horas))
+    except (ValueError, OSError) as e:
+        return False, f"No se pudo guardar el horario: {e}"
+    ejecutar(["systemctl", "daemon-reload"], 30)
+    ejecutar(["systemctl", "restart", "sentinel-equipo.timer"], 30)
+    return True, "Horario guardado: el informe se generará a las " + ", ".join(horas) + "."
+
+
 def guardar(inf: Informe, cfg=None) -> tuple[str, str]:
     cfg = cfg or core.load_config()
     d = os.path.join(core.state_dir(), "informes")
     core.ensure_dir(d, 0o750)
+    core.share_with_adm(d)                       # el panel (que corre con tu usuario) puede ver cuándo fue el último
     base = os.path.join(d, "equipo-" + time.strftime("%Y%m%d-%H%M"))
     for ext, txt in ((".html", a_html(inf)), (".txt", a_texto(inf))):
         with open(base + ext, "w", encoding="utf-8") as f:
             f.write(txt)
         os.chmod(base + ext, 0o640)
+        core.share_with_adm(base + ext)
     viejos = sorted(glob.glob(os.path.join(d, "equipo-*.html")))[:-max(1, cfg.getint("equipo", "informes_max", fallback=30))]
     for v in viejos:
         for ext in (".html", ".txt", ".pdf"):

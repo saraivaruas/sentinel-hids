@@ -166,8 +166,8 @@ class CliCorreoTests(unittest.TestCase):
     def test_los_cambios_de_smtp_piden_el_pin_y_estado_o_probar_no(self):
         for accion, protegido in (("configurar", True), ("importar", True), ("quitar", True), ("estado", False), ("probar", False)):
             self.assertEqual(cli._protected(argparse.Namespace(fn=cli.cmd_smtp, accion=accion)), protegido, accion)
-        self.assertTrue(cli._protected(argparse.Namespace(fn=cli.cmd_equipo, aceptar=True)))
-        self.assertFalse(cli._protected(argparse.Namespace(fn=cli.cmd_equipo, aceptar=False)))
+        self.assertTrue(cli._protected(argparse.Namespace(fn=cli.cmd_equipo, aceptar=True, horario=None)))
+        self.assertFalse(cli._protected(argparse.Namespace(fn=cli.cmd_equipo, aceptar=False, horario=None)))
 
     def test_equipo_programado_guarda_el_informe_y_avisa_si_falta_el_smtp(self):
         inf = equipo.Informe(); inf.sec("s"); inf.hall("BAJO", "x", "algo")

@@ -59,6 +59,12 @@ Sentinel **bloquea direcciones IP, nada más**. Todo lo demás lo detecta y te a
 
 **Límites.** El escaneo de puertos solo se ve si el cortafuegos registra los bloqueos o si la captura de paquetes está activa. Quien ya es root puede apagar cualquier programa a la fuerza (por ejemplo `kill -9`): el PIN cierra las vías normales, avisa y deja rastro, pero no es una barrera absoluta. Si el monitor deja de latir, un temporizador aparte te avisa.
 
+## Novedades de la 2.9: endurecimiento, requisitos y correo desde el panel
+
+- **`sentinel endurecer`**: endurecimiento guiado en tres perfiles (básico, recomendado, estricto). `plan` solo lee y explica; `aplicar` hace copia y comprueba; `revertir` lo deshace. Nunca te deja fuera (SSH solo con llave exige que ya haya una llave) y lo que Sentinel cambia no se reporta como ataque.
+- **`sentinel requisitos`** y la página **Requisitos**: marca con ✔/✖ lo que ya tiene tu equipo y, si aceptas, instala lo que falta pidiendo tu contraseña de administrador.
+- **Correo e informes** en el panel: configura el SMTP, cambia las horas del informe y mándalo cuando quieras, sin tocar la terminal.
+
 ## Novedades de la 2.8: informe del equipo y correo por SMTP
 
 - **`sentinel equipo`**: una foto completa de seguridad del equipo (autenticación, firewall y **puertos abiertos a cualquier origen**, conexiones salientes por proceso, shell reversa, integridad de paquetes, cuentas, persistencia, CrowdSec, túneles y los eventos de Sentinel). El informe HTML/texto queda en `/var/lib/sentinel/informes/` y el temporizador `sentinel-equipo.timer` lo genera a las 08:00, 16:00 y 23:00 (si el equipo estaba apagado, al encender).
@@ -185,6 +191,9 @@ Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` �
 | `sentinel report --lynis` | informe HTML (semanal, automático) con el índice de Lynis |
 | `sentinel equipo [--enviar] [--rapido]` | revisión completa del equipo con informe; `--aceptar` acepta como nueva referencia los cambios de cuentas y persistencia (pide PIN) |
 | `sentinel smtp estado\|configurar\|importar\|probar\|quitar` | correo por SMTP para alertas e informes |
+| `sentinel equipo --horario 08:00,16:00,23:00` | cambia las horas del informe del equipo (pide PIN) |
+| `sentinel requisitos [--instalar]` | qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta |
+| `sentinel endurecer plan\|aplicar\|revertir [--perfil basico\|recomendado\|estricto]` | endurecimiento guiado, reversible |
 
 Configuración: `/etc/sentinel/sentinel.conf` (parte de `etc/sentinel.conf.example`). Registros: `/var/log/sentinel/`.
 

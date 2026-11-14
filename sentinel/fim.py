@@ -249,6 +249,8 @@ class Fim:
         found = diff(old_view, new, self.www)
         pkg = package_activity()
         malware.start_pass(self.cfg)
+        propios = core.read_json(os.path.join(core.state_dir(), "self_changes.json"), {}) or {}
+        mios = set(propios.get("paths", [])) if core.now() - propios.get("at", 0) < 900 else set()      # lo que Sentinel cambió al endurecer (últimos 15 min)
         results = []
         for f in found:
             if self.allow.path_ignored(f["path"]):
@@ -263,6 +265,8 @@ class Fim:
                     sev = "high"; detail = "archivo ejecutable nuevo en carpeta web"
             pristine = f["kind"] in ("modified", "added") and not sigs and pkgcheck.is_pristine(f["path"])
             sev, detail = reclassify(f["path"], f["kind"], sev, detail, pkg, sigs, pristine)
+            if f["path"] in mios and not sigs:
+                sev, detail = "info", detail + " (cambio hecho por Sentinel al endurecer el equipo)"
             f2 = dict(f, sev=sev, detail=detail)
             results.append(f2)
             self.alerter.emit(sev, "fim", f["kind"], f"{f['path']}: {detail}", key=f"fim:{f['kind']}:{f['path']}:{f.get('sha', '')}", path=f["path"], detail=detail, signatures=sigs)

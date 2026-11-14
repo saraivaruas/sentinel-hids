@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar"]);
+  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -96,6 +96,7 @@
   // ---------- navegación
   const TITLES = { resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
+    requisitos: ["Requisitos", "Qué necesita Sentinel y qué tiene tu equipo"], correo: ["Correo e informes", "Cómo te llegan los avisos y el informe del equipo"],
     ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], servidores: ["Servidores", "El estado de Sentinel en tus otros servidores"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
@@ -107,6 +108,8 @@
     if (narrow()) setSidebar(false);
     if (v.startsWith("fw-")) loadFirewall();
     if (v === "ajustes") loadSettings();
+    if (v === "correo") loadCorreo();
+    if (v === "requisitos") loadRequisitos();
     if (v === "servidores") loadServers();
     if (v === "eventos") loadEvents();
     if (v === "postura") loadAudit();
@@ -381,6 +384,54 @@
   });
 
   // ---------- Ajustes
+  // ---------- requisitos: qué tiene el equipo (✔/✖) y, si aceptas, instalar lo que falta
+  let rqFaltan = [];
+  async function loadRequisitos() {
+    const r = await api("/api/requisitos"), box = $("#rq-list"); clear(box);
+    [["obligatorio", "Obligatorios (sin esto Sentinel no funciona)"], ["recomendado", "Recomendados (mejoran la protección)"], ["opcional", "Opcionales (funciones extra)"]].forEach(([nivel, titulo]) => {
+      box.appendChild(el("div", "rq-g", titulo));
+      r.requisitos.filter((x) => x.nivel === nivel).forEach((x) => {
+        const row = el("div", "rq-row"); row.appendChild(el("span", "rq-m " + (x.ok ? "rq-ok" : nivel === "opcional" ? "rq-op" : "rq-no"), x.ok ? "✔" : nivel === "opcional" ? "○" : "✖"));
+        const d = el("div"); d.appendChild(el("b", null, x.nombre)); d.appendChild(el("small", null, x.para_que + (!x.ok && x.manual ? " · " + x.manual : ""))); row.appendChild(d); box.appendChild(row);
+      });
+    });
+    rqFaltan = r.paquetes || [];
+    const sm = r.resumen, b = $("#rq-st"), ok = sm.faltan.length === 0;
+    b.textContent = ok ? "Todo instalado" : sm.obligatorios_ok ? "Faltan opciones" : "Falta lo obligatorio"; b.className = "badge sev-" + (ok ? "low" : sm.obligatorios_ok ? "medium" : "high");
+    $("#rq-inst").hidden = !rqFaltan.length;
+    $("#rq-note").textContent = ok ? "No hace falta instalar nada." : rqFaltan.length ? "Se instalaría con " + r.gestor + ": " + rqFaltan.join(", ") : "Falta algo que no se puede instalar automáticamente en esta distribución (mira las notas de arriba).";
+  }
+  $("#rq-inst").addEventListener("click", async (e) => {
+    if (!confirm("Se instalará: " + rqFaltan.join(", ") + ".\n\nTe pedirá tu contraseña de administrador. ¿Continuar?")) return;
+    toast("Instalando… puede tardar un minuto."); await runAction("requisitos_instalar", {}, e.currentTarget); loadRequisitos();
+  });
+
+  // ---------- correo (SMTP) e informe del equipo
+  const PRESETS = { gmail: ["smtp.gmail.com", 587, "starttls", "Con Gmail necesitas una «contraseña de aplicación» de 16 letras (Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones). Tu contraseña normal no funciona."],
+    outlook: ["smtp-mail.outlook.com", 587, "starttls", "Con Outlook/Microsoft 365 usa tu correo completo como usuario. Si tienes verificación en dos pasos, crea una contraseña de aplicación."], otro: ["", 587, "starttls", "Pídele a tu proveedor el servidor SMTP, el puerto y si usa STARTTLS (587) o SSL (465)."] };
+  async function loadCorreo() {
+    const r = await api("/api/correo"), s = r.smtp, q = r.equipo;
+    $("#co-host").value = s.host || ""; $("#co-port").value = s.port || 587; $("#co-sec").value = s.security || "starttls"; $("#co-user").value = s.user || ""; $("#co-from").value = s.sender || ""; $("#co-to").value = (s.to || []).join(", ");
+    $("#co-pass").value = ""; $("#co-pass").placeholder = String(s.password || "").startsWith("guardada") ? "•••• guardada (escribe solo si quieres cambiarla)" : "Contraseña (con Gmail, la de aplicación)";
+    const b = $("#co-st"); b.textContent = s.ok ? "Listo para enviar" : s.enabled ? "Falta completar" : "Sin configurar"; b.className = "badge sev-" + (s.ok ? "low" : "medium");
+    $("#eq-horas").value = (q.horas || []).join(","); $("#eq-mail").checked = !!q.enviar;
+    const mm = (q.siguiente || "").match(/(\d{4})-(\d\d)-(\d\d) (\d\d:\d\d)/);
+    $("#eq-next").textContent = mm ? mm[3] + "-" + mm[2] + "-" + mm[1] + " a las " + mm[4] : (q.temporizador_activo ? "—" : "el temporizador está apagado"); $("#eq-last").textContent = q.ultimo_informe ? new Date(q.ultimo_informe * 1000).toLocaleString("es-CL") : "todavía ninguno";
+    const e = $("#eq-st"); e.textContent = q.temporizador_activo ? "Programado" : "Apagado"; e.className = "badge sev-" + (q.temporizador_activo ? "low" : "medium");
+  }
+  document.querySelectorAll("[data-preset]").forEach((bt) => bt.addEventListener("click", () => { const p = PRESETS[bt.dataset.preset]; $("#co-host").value = p[0]; $("#co-port").value = p[1]; $("#co-sec").value = p[2]; $("#co-help").textContent = p[3]; $("#co-host").focus(); }));
+  $("#co-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const clave = $("#co-pass").value;
+    await runAction("smtp_guardar", { host: $("#co-host").value.trim(), puerto: $("#co-port").value, seguridad: $("#co-sec").value, usuario: $("#co-user").value.trim(), de: $("#co-from").value.trim(), para: $("#co-to").value.trim(), clave }, e.submitter);
+    $("#co-pass").value = ""; loadCorreo();
+  });
+  $("#co-test").addEventListener("click", (e) => runAction("smtp_probar", {}, e.currentTarget));
+  $("#co-del").addEventListener("click", async (e) => { if (confirm("¿Quitar el correo de Sentinel? Se borra la contraseña guardada y dejará de enviar alertas e informes por email.")) { await runAction("smtp_quitar", {}, e.currentTarget); loadCorreo(); } });
+  $("#eq-form").addEventListener("submit", async (e) => { e.preventDefault(); await runAction("equipo_horario", { horas: $("#eq-horas").value }, e.submitter); loadCorreo(); });
+  $("#eq-mail").addEventListener("change", async (e) => { const r = await runAction("ajustes", { pares: { "equipo.enviar_correo": e.target.checked ? "yes" : "no" } }); if (!r || !r.ok) e.target.checked = !e.target.checked; });
+  $("#eq-now").addEventListener("click", (e) => { toast("Generando el informe: puede tardar un par de minutos…"); runAction("equipo_enviar", {}, e.currentTarget); });
+
   async function loadSettings() {
     const s = await api("/api/settings"), v = s.values;
     $("#st-desk").value = v["general.enable_desktop"] === "no" ? "no" : "yes"; $("#st-min").value = v["general.notify_min"]; $("#st-style").value = v["general.notify_style"] || "corner";

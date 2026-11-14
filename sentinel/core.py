@@ -19,7 +19,7 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
-VERSION = "2.8.4"
+VERSION = "2.9.0"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
 
@@ -181,6 +181,8 @@ conexiones_permitidas = chrome,firefox,claude,claude-desktop,cloudflared,syncthi
 puertos_c2 = 4444,4445,1337,31337,6666,6667,5555,9001,9050,2222,8888
 ; si el informe del equipo se manda por correo cuando lo ejecuta el temporizador (necesita [smtp])
 enviar_correo = yes
+; horas a las que se genera el informe (HH:MM, hora local, separadas por coma). Se cambia con: sudo sentinel equipo --horario 08:00,16:00,23:00
+horas = 08:00,16:00,23:00
 ; el informe se guarda en /var/lib/sentinel/informes; cuántos se conservan
 informes_max = 30
 """
@@ -229,6 +231,7 @@ EDITABLE = {
     ("smtp", "to"): lambda v: v == "" or all(re.fullmatch(r"[\w.+-]{1,64}@[\w.-]{1,120}\.[A-Za-z]{2,}", x.strip()) for x in v.split(",")),
     ("equipo", "conexiones_permitidas"): lambda v: bool(re.fullmatch(r"[\w.@+-]{1,64}(,[\w.@+-]{1,64})*", v.replace(" ", ""))) or v == "",
     ("equipo", "enviar_correo"): lambda v: v in ("yes", "no"),
+    ("equipo", "horas"): lambda v: bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d(,([01]\d|2[0-3]):[0-5]\d){0,5}", v)),
     ("alerts", "heartbeat_url"): lambda v: v == "" or __import__("sentinel.heartbeat", fromlist=["valid"]).valid(v),
 }
 

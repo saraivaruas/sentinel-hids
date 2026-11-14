@@ -7,10 +7,11 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 
-from . import audit, core, equipo, explain, fim, geoip, honeypot, hostcheck, incidents, mailer, pin, report, update
+from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, incidents, mailer, pin, report, requisitos, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -250,6 +251,12 @@ def cmd_report(a) -> int:
 def cmd_equipo(a) -> int:
     """Revisión completa del equipo: la muestra, la guarda como informe y, si se pide, la manda por correo SMTP."""
     cfg = core.load_config()
+    if a.horario:
+        if not core.is_root():
+            print("Necesita administrador: ejecuta  sudo sentinel equipo --horario " + a.horario, file=sys.stderr); return 1
+        ok, msg = equipo.aplicar_horario(a.horario)
+        print(msg)
+        return 0 if ok else 1
     inf = equipo.revisar(cfg, aceptar=a.aceptar, rapido=a.rapido)
     c = inf.cuenta()
     if a.json:
@@ -271,6 +278,108 @@ def cmd_equipo(a) -> int:
         print(("Correo: " if ok else "No se pudo enviar el correo: ") + msg)
         return 0 if ok else 1
     return 0
+
+
+def _mostrar_requisitos(lista) -> None:
+    for nivel, titulo in ((requisitos.OBLIGATORIO, "Obligatorios (sin esto Sentinel no funciona)"), (requisitos.RECOMENDADO, "Recomendados (mejoran la protección)"), (requisitos.OPCIONAL, "Opcionales (funciones extra)")):
+        print(f" {titulo}")
+        for r, ok in lista:
+            if r.nivel != nivel:
+                continue
+            marca = col("✔", "ok") if ok else col("✖", "fallo") if nivel != requisitos.OPCIONAL else col("○", "aviso")
+            print(f"   {marca} {r.nombre}" + ("" if ok else f"\n       {r.para_que}"))
+        print()
+
+
+def cmd_requisitos(a) -> int:
+    """Muestra qué necesita Sentinel y qué tiene este equipo (✔ / ✖) y, si aceptas, instala lo que falta pidiendo tu contraseña de administrador."""
+    lista, g = requisitos.estado(), requisitos.gestor()
+    if a.json:
+        print(json.dumps(requisitos.como_dict(lista, g), ensure_ascii=False, indent=1))
+        return 0
+    print("REQUISITOS DE SENTINEL\n")
+    _mostrar_requisitos(lista)
+    pend = requisitos.faltan(lista=lista)
+    if not pend:
+        print(col("Todo lo necesario ya está instalado ✔", "ok"))
+        return 0
+    paquetes, sin = requisitos.paquetes_para(pend, g) if g else ([], pend)
+    faltan_obl = [r for r in pend if r.nivel == requisitos.OBLIGATORIO]
+    print(f"Faltan {len(pend)}: " + ", ".join(r.nombre for r in pend))
+    for r in sin:
+        print(f"   · {r.nombre}: " + (r.manual or "instálalo con el gestor de paquetes de tu distribución"))
+    if not g:
+        print("No reconozco el gestor de paquetes de esta distribución: instala a mano lo que falta.")
+        return 1 if faltan_obl else 0
+    if not paquetes:
+        return 1 if faltan_obl else 0
+    print(f"\nSe instalaría con {g}: {' '.join(paquetes)}")
+    tty = sys.stdin.isatty() and sys.stdout.isatty()
+    if not a.si:
+        if not tty:
+            print("Para instalarlo:  sentinel requisitos --instalar"); return 1 if faltan_obl else 0
+        if input("¿Instalar ahora lo que falta? Te pedirá tu contraseña de administrador. [S/n]: ").strip().lower() in ("n", "no"):
+            print("No se instaló nada." + (" Sin lo obligatorio Sentinel no podrá funcionar." if faltan_obl else ""))
+            return 1 if faltan_obl else 0
+    root = core.is_root()
+    if not root and not shutil.which("sudo"):
+        print("Falta sudo: ejecuta este comando como administrador.", file=sys.stderr); return 1
+    if g == "apt":
+        subprocess.run((["sudo"] if not root else []) + ["apt-get", "update", "-qq"], check=False)
+    rc = subprocess.run(requisitos.comando_instalar(g, paquetes, con_sudo=not root), check=False).returncode
+    print()
+    nuevo = requisitos.estado()
+    _mostrar_requisitos(nuevo)
+    quedan = requisitos.faltan(lista=nuevo)
+    print(col("Listo: todo instalado ✔", "ok") if not quedan else "Todavía falta: " + ", ".join(r.nombre for r in quedan))
+    return 0 if rc == 0 and not [r for r in quedan if r.nivel == requisitos.OBLIGATORIO] else 1
+
+
+def cmd_endurecer(a) -> int:
+    """Endurecimiento guiado: `plan` (solo lectura), `aplicar` (con copia y comprobación), `revertir` y `estado`."""
+    solo = core.csv(a.solo) if a.solo else None
+    items = endurecer.plan(a.perfil, solo)
+    cuenta = {c: sum(1 for i in items if i.codigo == c) for c in (endurecer.APLICADA, endurecer.PENDIENTE, endurecer.BLOQUEADA, endurecer.NO_APLICA)}
+    if a.accion == "revertir":
+        if not core.is_root():
+            print("Necesita administrador: ejecuta  sudo sentinel endurecer revertir", file=sys.stderr); return 1
+        r = endurecer.revertir(a.tanda, alerter=core.Alerter(core.load_config()))
+        print(r["error"] or "Revertido: " + ", ".join(r["revertidas"]) + ". Todo quedó como estaba antes.")
+        return 1 if r["error"] else 0
+    if a.json:
+        print(json.dumps([{"id": i.medida.id, "titulo": i.medida.titulo, "estado": i.codigo, "detalle": i.detalle, "riesgo": i.medida.riesgo, "perfil": i.medida.perfil} for i in items], ensure_ascii=False, indent=1))
+        return 0
+    icono = {endurecer.APLICADA: col("✔", "ok"), endurecer.PENDIENTE: col("○", "aviso"), endurecer.BLOQUEADA: col("✖", "fallo"), endurecer.NO_APLICA: col("–", "info")}
+    print(f"ENDURECIMIENTO · perfil {endurecer.PERFIL_ES[a.perfil]}\n")
+    for i in items:
+        m = i.medida
+        print(f" {icono[i.codigo]} {m.titulo}" + (f"  [{i.codigo.upper().replace('_', ' ')}]" if i.codigo != endurecer.APLICADA else col("  (ya aplicada)", "ok")))
+        if i.codigo in (endurecer.PENDIENTE, endurecer.BLOQUEADA):
+            print(f"     Qué hace: {m.que_hace}\n     Para qué:  {m.por_que}\n     Riesgo:    {m.riesgo}" + (f"  ·  {m.nota}" if m.nota else ""))
+        if i.codigo != endurecer.APLICADA:
+            print(f"     Ahora:     {i.detalle}")
+    total = len(items) - cuenta[endurecer.NO_APLICA]
+    print(f"\nEndurecimiento: {cuenta[endurecer.APLICADA]} de {total} medidas aplicadas · {cuenta[endurecer.PENDIENTE]} pendientes · {cuenta[endurecer.BLOQUEADA]} bloqueadas por seguridad")
+    if a.accion in ("plan", "estado"):
+        if cuenta[endurecer.PENDIENTE]:
+            print(f"Nada se ha cambiado. Para aplicar lo pendiente (con copia de seguridad y reversión):  sudo sentinel endurecer aplicar --perfil {a.perfil}")
+        return 0
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel endurecer aplicar", file=sys.stderr); return 1
+    if not cuenta[endurecer.PENDIENTE]:
+        print("No hay nada pendiente en este perfil."); return 0
+    if not a.si and sys.stdin.isatty() and input(f"\n¿Aplicar las {cuenta[endurecer.PENDIENTE]} medidas pendientes? Se guarda una copia y se puede deshacer. [s/N]: ").strip().lower() not in ("s", "si", "sí", "y"):
+        print("No se cambió nada."); return 0
+    r = endurecer.aplicar(items, alerter=core.Alerter(core.load_config()))
+    for x in r["aplicadas"]:
+        print(col(f" ✔ aplicada: {x}", "ok"))
+    for x, motivo in r["revertidas"]:
+        print(col(f" ✖ se deshizo sola: {x} — {motivo}", "fallo"))
+    for x, motivo in r["omitidas"]:
+        print(f" – omitida: {x} — {motivo}")
+    if r["carpeta"]:
+        print(f"\nCopia de seguridad: {r['carpeta']}\nPara deshacerlo todo:  sudo sentinel endurecer revertir")
+    return 0 if not r["revertidas"] else 1
 
 
 def _smtp_reiniciar_monitor() -> None:
@@ -317,7 +426,7 @@ def cmd_smtp(a) -> int:
              "security": a.seguridad or ask("Seguridad (starttls, ssl, none)", s["security"]), "user": a.usuario if a.usuario is not None else ask("Usuario", s["user"]),
              "sender": a.de or ask("Remitente (vacío = el usuario)", s["sender"])}
         if a.password_stdin:
-            clave = sys.stdin.readline().strip("\r\n")
+            clave = pin.next_stdin_line() if a.pin_stdin else sys.stdin.readline().strip("\r\n")        # desde el panel llega tras el PIN, por la misma entrada
         elif sys.stdin.isatty() and v["user"]:
             import getpass
             clave = getpass.getpass("Contraseña (con Gmail, una «contraseña de aplicación»; no se muestra): ")
@@ -462,7 +571,7 @@ def _protected(a) -> bool:
     n = a.fn.__name__
     if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender", "cmd_resolver"):
         return True
-    return ((n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_equipo" and a.aceptar) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
+    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
             or (n == "cmd_pin" and a.accion in ("establecer", "quitar")))
 
@@ -635,7 +744,13 @@ def main(argv=None) -> int:
     s = sub.add_parser("audit", help="revisa la postura de seguridad del equipo"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_audit)
     s = sub.add_parser("report", help="genera el informe HTML"); s.add_argument("--dias", type=int, default=7); s.add_argument("--lynis", action="store_true"); s.set_defaults(fn=cmd_report)
     s = sub.add_parser("equipo", help="revisión completa del equipo con informe (y correo por SMTP)"); s.add_argument("--enviar", action="store_true", help="manda el informe por correo"); s.add_argument("--programado", action="store_true", help="modo del temporizador: guarda y manda solo si [equipo] enviar_correo = yes")
-    s.add_argument("--aceptar", action="store_true", help="acepta los cambios de cuentas y persistencia de esta revisión como nueva referencia (pide el PIN)"); s.add_argument("--rapido", action="store_true", help="sin dpkg -V ni actualizaciones pendientes"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_equipo)
+    s.add_argument("--aceptar", action="store_true", help="acepta los cambios de cuentas y persistencia de esta revisión como nueva referencia (pide el PIN)"); s.add_argument("--rapido", action="store_true", help="sin dpkg -V ni actualizaciones pendientes"); s.add_argument("--json", action="store_true")
+    s.add_argument("--horario", metavar="HH:MM,HH:MM", help="cambia las horas a las que se genera y envía el informe (pide el PIN), por ejemplo 08:00,16:00,23:00"); s.set_defaults(fn=cmd_equipo)
+    s = sub.add_parser("endurecer", help="endurecimiento guiado del equipo: plan (solo lectura), aplicar (con copia y comprobación), revertir"); s.add_argument("accion", nargs="?", default="plan", choices=["plan", "estado", "aplicar", "revertir"])
+    s.add_argument("--perfil", default="recomendado", choices=list(endurecer.PERFILES), help="basico (sin efectos visibles), recomendado (CIS nivel 1) o estricto (servidores)"); s.add_argument("--solo", help="solo estas medidas, separadas por coma")
+    s.add_argument("--si", action="store_true", help="no preguntar antes de aplicar"); s.add_argument("--tanda", help="revertir: carpeta de la tanda (por defecto la última)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_endurecer)
+    s = sub.add_parser("requisitos", help="qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta"); s.add_argument("--instalar", action="store_true", help="instala lo que falta (pregunta antes y pide tu contraseña de administrador)")
+    s.add_argument("--si", action="store_true", help="instala sin preguntar (lo usa el panel)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_requisitos)
     s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])
     s.add_argument("--host"); s.add_argument("--puerto", type=int); s.add_argument("--seguridad", choices=["starttls", "ssl", "none"]); s.add_argument("--usuario"); s.add_argument("--de", help="remitente"); s.add_argument("--para", help="destinatarios separados por coma")
     s.add_argument("--password-stdin", dest="password_stdin", action="store_true", help="lee la contraseña de la entrada estándar (no queda en el historial)"); s.add_argument("--desde", default="", metavar="RUTA", help="importar: ruta de un ~/.msmtprc"); s.set_defaults(fn=cmd_smtp)
