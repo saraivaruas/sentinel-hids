@@ -11,7 +11,9 @@ from sentinel import cli, requisitos as rq
 
 class RequisitosTests(unittest.TestCase):
     def estado_con_faltas(self, *ids):
-        with mock.patch.dict("os.environ", {"SENTINEL_FAKE_MISSING": ",".join(ids)}):
+        # Hermético: todo «instalado» salvo lo que se pide que falte, sin depender de lo que tenga el equipo que corre las pruebas (CI incluido).
+        with mock.patch.dict("os.environ", {"SENTINEL_FAKE_MISSING": ",".join(ids)}), \
+             mock.patch.multiple(rq, REQUISITOS=[rq.Requisito(**{**r.__dict__, "esta": (lambda: True)}) for r in rq.REQUISITOS]):
             return rq.estado()
 
     def test_lo_que_se_detecta_se_marca_y_lo_que_falta_tambien(self):

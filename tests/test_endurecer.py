@@ -165,11 +165,11 @@ class VigilanteTests(unittest.TestCase):
         try:
             p = e.write("etc/sysctl.d/99-sentinel-red.conf", "viejo\n")
             f = fim.Fim(e.cfg, e.alerter, e.allow); f.init()
-            e.write("etc/sysctl.d/99-sentinel-red.conf", "nuevo\n")
+            e.write("etc/sysctl.d/99-sentinel-red.conf", "contenido nuevo bastante más largo\n")
             core.atomic_write_json(os.path.join(core.state_dir(), "self_changes.json"), {"at": core.now(), "paths": [p]}, 0o640)
             res = f.scan()
             self.assertEqual([r["sev"] for r in res if r["path"] == p], ["info"]); self.assertIn("Sentinel", [r["detail"] for r in res if r["path"] == p][0])
-            e.write("etc/sysctl.d/99-sentinel-red.conf", "otro cambio\n"); os.remove(os.path.join(core.state_dir(), "self_changes.json"))
+            e.write("etc/sysctl.d/99-sentinel-red.conf", "otro cambio ajeno todavía más largo que los anteriores\n"); os.remove(os.path.join(core.state_dir(), "self_changes.json"))
             self.assertNotEqual([r["sev"] for r in f.scan() if r["path"] == p], ["info"])          # un cambio ajeno sigue siendo un aviso
         finally:
             e.close()
