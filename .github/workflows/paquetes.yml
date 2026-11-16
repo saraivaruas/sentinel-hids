@@ -65,6 +65,26 @@ jobs:
           name: sentinel-snap
           path: ${{ steps.build.outputs.snap }}
 
+  snap-beta:
+    name: Snap (devmode, canal beta)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # Misma receta, pero en «devmode»: la tienda lo acepta en beta/edge sin revisión manual
+      - name: Receta devmode
+        run: sed -i 's/^confinement: classic/confinement: devmode/; s/^grade: stable/grade: devel/' snap/snapcraft.yaml
+      - uses: snapcore/action-build@v1
+        id: build
+      - name: Instalar y probar
+        run: |
+          sudo snap install --dangerous --devmode "${{ steps.build.outputs.snap }}"
+          sentinel-hids --help >/dev/null
+          sentinel-hids requisitos --json | python3 -c "import json,sys; assert json.load(sys.stdin)['requisitos']"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-snap-beta
+          path: ${{ steps.build.outputs.snap }}
+
   flatpak:
     name: Flatpak (solo panel)
     runs-on: ubuntu-24.04
