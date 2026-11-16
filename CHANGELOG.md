@@ -2,6 +2,12 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [2.11.2] - 2026-11-16
+
+### Corregido
+- **Falso positivo de «shell reversa»:** un script que solo usa `/dev/tcp/127.0.0.1/...` (o `localhost`/`::1`) para esperar a un servicio local, como el que usa el bouncer de CrowdSec, ya no se marca como ALTO. Si el mismo comando trae un destino externo o un patrón clásico (`bash -i >`, `nc -e`, `socat exec`…), sigue alertando.
+- Cuando sí alerta, el informe local ahora incluye el comando (recortado a 140 caracteres) para poder investigar sin abrir `/proc`. El correo no cambia. 2 pruebas nuevas.
+
 ## [2.11.1] - 2026-11-14
 
 ### Agregado

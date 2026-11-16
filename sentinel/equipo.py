@@ -61,6 +61,19 @@ def duenos_inseguros(rutas=DUENOS_ROOT, estat=os.stat) -> list[str]:
     return malos
 
 
+_DEV_RE = re.compile(r"/dev/(?:tcp|udp)/([^/\s]+)/")
+_RSH_OTROS = re.compile(r"bash -i >|sh -i >|mkfifo \S+ .*(nc|ncat) |(nc|ncat) .* -e |socat .*(exec|EXEC)|python[0-9.]* -c .*socket.*connect|perl -e .*socket")
+
+
+def solo_destinos_locales(cmd: str) -> bool:
+    """True si el único indicio es /dev/tcp o /dev/udp hacia esta misma máquina
+    (p. ej. un script que espera a que un servicio local responda): no es una shell reversa."""
+    if _RSH_OTROS.search(cmd):
+        return False
+    destinos = _DEV_RE.findall(cmd)
+    return bool(destinos) and all(x in ("127.0.0.1", "localhost", "::1", "[::1]") for x in destinos)
+
+
 @dataclass
 class Hallazgo:
     nivel: str
@@ -304,8 +317,8 @@ class Revision:
                     if link.startswith("socket:[") and link[8:-1] in tcp:
                         i.hall("ALTO", "shell reversa", f"PID {d} ({comm}) tiene un socket TCP como entrada o salida estándar (fd{fd})"); n += 1
                         break
-            if RSH_RE.search(cmd):
-                i.hall("ALTO", "shell reversa", f"Línea de comandos con patrón de shell reversa: PID {d} ({comm})"); n += 1
+            if RSH_RE.search(cmd) and not solo_destinos_locales(cmd):
+                i.hall("ALTO", "shell reversa", f"Línea de comandos con patrón de shell reversa: PID {d} ({comm}); comando: {' '.join(cmd.split())[:140]}"); n += 1
         if not n:
             i.linea("Sin indicadores de shell reversa.")
 
