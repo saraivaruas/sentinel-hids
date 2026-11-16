@@ -1,6 +1,8 @@
 #!/bin/sh
 # Primera instalación: carpetas y configuración (solo si no existen; una actualización jamás las pisa).
 set -e
+# En devmode (beta) no se puede escribir en /var/lib del sistema: el lanzador usará la carpeta del snap, no hay nada que preparar aquí
+if ! install -d -m 755 /etc/sentinel 2>/dev/null; then exit 0; fi
 install -d -m 755 /etc/sentinel
 install -d -m 750 -o root -g adm /var/lib/sentinel /var/log/sentinel 2>/dev/null || install -d -m 750 /var/lib/sentinel /var/log/sentinel
 [ -f /etc/sentinel/sentinel.conf ] || sed 's/^desktop_user = .*/desktop_user =/' "$SNAP/usr/share/sentinel/sentinel.conf.example" > /etc/sentinel/sentinel.conf

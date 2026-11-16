@@ -2,4 +2,10 @@
 # Lanzador de Sentinel dentro del snap: usa el Python del propio snap, aislado (-I) para ignorar el directorio actual y PYTHONPATH.
 D="$SNAP/opt/sentinel"
 export SENTINEL_SNAP=1
+# Modo devmode (canal beta): sin acceso de escritura a /var/lib del sistema, usa la carpeta propia del snap
+if [ -z "$SENTINEL_STATE" ] && ! { [ -d /var/lib/sentinel ] || mkdir -p /var/lib/sentinel 2>/dev/null; }; then
+  export SENTINEL_STATE="$SNAP_COMMON/estado" SENTINEL_LOG="$SNAP_COMMON/log" SENTINEL_CONF="$SNAP_COMMON/sentinel.conf"
+  mkdir -p "$SENTINEL_STATE" "$SENTINEL_LOG" 2>/dev/null
+  [ -f "$SENTINEL_CONF" ] || sed 's/^desktop_user = .*/desktop_user =/' "$SNAP/usr/share/sentinel/sentinel.conf.example" > "$SENTINEL_CONF" 2>/dev/null
+fi
 exec "$SNAP/usr/bin/python3" -I -c 'import sys; sys.path.insert(0, sys.argv[1]); sys.argv[0] = "sentinel"; from sentinel.cli import main; sys.exit(main(sys.argv[2:]))' "$D" "$@"
