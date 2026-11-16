@@ -1,19 +1,19 @@
 Package: sentinel
 Architecture: all
-Version: 2.11.0
+Version: 2.11.2
 Priority: optional
 Section: admin
 Maintainer: Jorge Luis Saraiva Ruas <28052181+saraivaruas@users.noreply.github.com>
-Installed-Size: 896
+Installed-Size: 900
 Depends: python3 (>= 3.8), systemd, procps, iproute2, util-linux, coreutils
 Recommends: inotify-tools, libnotify-bin, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, policykit-1 | polkitd, logrotate, ufw | firewalld | iptables
 Suggests: clamav, yara, crowdsec, crowdsec-firewall-bouncer-iptables, lynis, mailutils
-Filename: pool/main/sentinel_2.11.0_all.deb
-Size: 157946
-MD5sum: 3ff3962a96884b672eccc82ab5dfd605
-SHA1: f5e86f37bb1542170fb3ad882273ef34f9db4f21
-SHA256: eda102a494756cf6f0a78b9cc2686845fb6d9ac3312183645fa40c4253767328
-SHA512: c280abac508c52e1a3214455f158fab5106e2cd854cfd1d4a4e9c50f0348406c1907a6937ef9d12119551b07fd6367b61f8d4e5664facbff1da9fa3e61347786
+Filename: pool/main/sentinel_2.11.2_all.deb
+Size: 158688
+MD5sum: 01988150ed4a8f665e3d1c7aa5656f67
+SHA1: e703d5283dac0965f3521ef5cb4b1f2703ca7437
+SHA256: 746aa10097bea4f3ffb94022e3b6b0e322ccbadc40617adb8eee9b5821c9a3cd
+SHA512: 180ed144782ba0950ea705bd12ce37216b3517a1a0f8b20e6c29d1077361e748d3e48121bfb4128cb79e7ac667d38acec8cc2597a2b0333d7315d06f222239ae
 Description: Sentinel: detector de intrusiones y cambios para Linux
  Vigila la integridad de archivos críticos, detecta puertas traseras web,
  fuerza bruta, escaneos de puertos y procesos sospechosos, tiene puertos
