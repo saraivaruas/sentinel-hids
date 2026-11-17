@@ -48,8 +48,14 @@ jobs:
       - run: desktop-file-validate desktop/sentinel.desktop
 
   snap:
-    name: Snap (classic)
-    runs-on: ubuntu-24.04
+    name: Snap (classic, ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: amd64, runner: ubuntu-24.04}
+          - {arch: arm64, runner: ubuntu-24.04-arm}
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: snapcore/action-build@v1
@@ -62,12 +68,18 @@ jobs:
           sentinel-hids endurecer plan --json | python3 -c "import json,sys; assert json.load(sys.stdin)"
       - uses: actions/upload-artifact@v4
         with:
-          name: sentinel-snap
+          name: sentinel-snap-${{ matrix.arch }}
           path: ${{ steps.build.outputs.snap }}
 
   snap-beta:
-    name: Snap (devmode, canal beta)
-    runs-on: ubuntu-24.04
+    name: Snap (devmode, ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: amd64, runner: ubuntu-24.04}
+          - {arch: arm64, runner: ubuntu-24.04-arm}
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
       # Misma receta, pero en «devmode»: la tienda lo acepta en beta/edge sin revisión manual
@@ -84,7 +96,7 @@ jobs:
           sentinel-hids requisitos --json | python3 -c "import json,sys; assert json.load(sys.stdin)['requisitos']"
       - uses: actions/upload-artifact@v4
         with:
-          name: sentinel-snap-beta
+          name: sentinel-snap-beta-${{ matrix.arch }}
           path: ${{ steps.build.outputs.snap }}
 
   flatpak:
