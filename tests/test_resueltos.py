@@ -33,7 +33,7 @@ class SilencioTests(unittest.TestCase):
     def test_de_noche_solo_suenan_las_criticas(self):
         e = Env(); e.cfg.set("general", "enable_desktop", "yes"); e.cfg.set("general", "quiet_from", "00:00"); e.cfg.set("general", "quiet_to", "23:59")
         al = core.Alerter(e.cfg, quiet=False)
-        with m.patch.object(al, "desktop") as d, m.patch.object(al, "popup"):
+        with m.patch.object(al, "desktop") as d, m.patch.object(al, "popup"), m.patch.object(core, "in_quiet", return_value=True):
             al._channels(core.Event("high", "host", "x", "m")); self.assertFalse(d.called)             # en silencio: no
             al._channels(core.Event("critical", "host", "x", "m")); self.assertTrue(d.called)          # crítica: sí
         e.close()
