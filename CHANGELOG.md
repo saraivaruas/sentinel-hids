@@ -16,6 +16,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Las pruebas del estado de la captura de paquetes simulan `AF_PACKET` y corren también en macOS. La captura real en Mac (con BPF) queda pendiente: hoy el panel la mostrará como no disponible.
 - Las pruebas del instalador gráfico (`install-gui.sh`, con zenity y pkexec) se omiten en macOS: es el instalador de Linux. El de Mac (`.pkg` y `launchd`) queda pendiente.
 - Las pruebas de falsos positivos de procesos simulan `/proc`, así que prueban la clasificación (binario borrado, reinicio pendiente, Sentinel no se reporta a sí mismo) igual en Linux y en macOS. En la CI de Mac, de las 8 pruebas que fallaban solo quedaban estas 3.
+- **Sondeo de cambios para la vigilancia en vivo de macOS (`fim.cambios_rapidos`):** compara solo metadatos (tipo, permisos, dueño, tamaño, fecha, inodo) entre dos pasadas, sin leer ni calcular hashes, y respeta las exclusiones. Es la base de la vigilancia en vivo sin `inotifywait`. 2 pruebas nuevas.
 
 ## [2.11.2] - 2026-11-16
 
