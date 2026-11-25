@@ -37,7 +37,7 @@ class CapturaEstadoTests(unittest.TestCase):
 
     def test_sin_permiso_para_capturar_lo_dice_y_no_falla(self):
         w = self.watcher()
-        with mock.patch("socket.socket", side_effect=PermissionError):
+        with mock.patch("socket.socket", side_effect=PermissionError), mock.patch("socket.AF_PACKET", 17, create=True):   # AF_PACKET no existe en macOS
             w.run(lambda: True)
         s = core.read_json(estado_path())
         self.assertFalse(s["activo"]); self.assertEqual(s["motivo"], "PermissionError")
@@ -46,7 +46,7 @@ class CapturaEstadoTests(unittest.TestCase):
         w = self.watcher()
         sock = mock.Mock(); sock.recvfrom.side_effect = __import__("socket").timeout
         vistos = []
-        with mock.patch("socket.socket", return_value=sock):
+        with mock.patch("socket.socket", return_value=sock), mock.patch("socket.AF_PACKET", 17, create=True):
             def parar():
                 vistos.append(core.read_json(estado_path()))          # estado mientras corre
                 return True
