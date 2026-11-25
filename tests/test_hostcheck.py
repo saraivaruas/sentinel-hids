@@ -107,3 +107,15 @@ class SuidTests(unittest.TestCase):
             self.assertEqual(hostcheck.suid_files([d]), [os.path.join(d, "bueno")])
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+    def test_la_busqueda_en_python_equivale_a_find(self):
+        """Es la que usa macOS (su `find` no entiende -perm /6000); se prueba en todos los sistemas."""
+        d = tempfile.mkdtemp(prefix="sent_suid_")
+        try:
+            os.makedirs(os.path.join(d, "node_modules")); os.makedirs(os.path.join(d, "sub"))
+            for rel, modo in (("bueno", 0o4755), ("sub/grupo", 0o2755), ("normal", 0o755), ("node_modules/ignorado", 0o4755)):
+                p = os.path.join(d, rel); open(p, "w").write("x"); os.chmod(p, modo)
+            os.symlink(os.path.join(d, "bueno"), os.path.join(d, "enlace"))          # un enlace no es un archivo SUID
+            self.assertEqual(sorted(hostcheck._suid_en_python([d])), sorted([os.path.join(d, "bueno"), os.path.join(d, "sub", "grupo")]))
+        finally:
+            shutil.rmtree(d, ignore_errors=True)

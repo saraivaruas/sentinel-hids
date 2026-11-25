@@ -4,6 +4,7 @@ from __future__ import annotations
 import glob
 import os
 import re
+import stat
 import time
 
 from . import core, plataforma
@@ -86,11 +87,46 @@ def accounts() -> dict:
     return {"users": sorted(users), "uid0": uid0, "empty": empty}
 
 
+SUID_PODA = {"node_modules", ".git", ".cache"}
+
+
+def _suid_en_python(roots: list[str]) -> list[str]:
+    """Lo mismo que `find -perm /6000` pero en Python, porque el `find` de macOS no entiende `/6000`. No sale del disco de cada carpeta (como -xdev)."""
+    res = []
+    for root in roots:
+        try:
+            dev = os.stat(root).st_dev
+        except OSError:
+            continue
+        for cur, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in SUID_PODA and "/docker/" not in os.path.join(cur, d) + "/"
+                       and not os.path.join(cur, d).startswith("/snap/") and _mismo_disco(os.path.join(cur, d), dev)]
+            for f in files:
+                p = os.path.join(cur, f)
+                try:
+                    st = os.lstat(p)
+                except OSError:
+                    continue
+                if stat.S_ISREG(st.st_mode) and st.st_mode & 0o6000:
+                    res.append(p)
+    return res
+
+
+def _mismo_disco(path: str, dev: int) -> bool:
+    try:
+        return os.lstat(path).st_dev == dev
+    except OSError:
+        return False
+
+
 def suid_files(roots: list[str] | None = None) -> list[str]:
     """Archivos SUID/SGID en las carpetas indicadas (sin recorrer node_modules, .git, cachés ni contenedores)."""
-    roots = [r for r in (roots or ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/opt", "/etc", "/var/tmp", "/tmp", "/dev/shm", "/root", "/home"]) if os.path.isdir(r)]
+    roots = [r for r in (roots or (["/usr", "/bin", "/sbin", "/opt", "/etc", "/private/var/tmp", "/private/tmp", "/Users"] if plataforma.ES_MAC else
+                                   ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/opt", "/etc", "/var/tmp", "/tmp", "/dev/shm", "/root", "/home"])) if os.path.isdir(r)]
     if not roots:
         return []
+    if plataforma.ES_MAC:
+        return sorted(x for x in _suid_en_python(roots) if x.startswith("/"))
     cmd = ["find", *roots, "-xdev", "(", "-name", "node_modules", "-o", "-name", ".git", "-o", "-name", ".cache", "-o", "-path", "*/docker/*", "-o", "-path", "/snap/*", ")", "-prune", "-o", "-type", "f", "-perm", "/6000", "-print"]
     rc, out = core.run(cmd, 120)
     return sorted(x for x in out.splitlines() if x.startswith("/"))
