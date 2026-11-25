@@ -5,7 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
-- **Inicio del porte a macOS:** la CI corre ahora las pruebas también en macOS 13 y 14 (Python 3.10 y 3.12). Es informativo (`continue-on-error`) y no bloquea el resto: sirve para ver qué módulos dependen de Linux antes de reescribirlos.
+- **Inicio del porte a macOS:** la CI corre ahora las pruebas también en macOS (macOS 26 Tahoe y macOS 15 Sequoia, cada uno en Apple Silicon e Intel; Python 3.12, y 3.10 en Tahoe). macOS 14 y 13 ya no existen en GitHub Actions. Es informativo (`continue-on-error`) y no bloquea el resto: sirve para ver qué módulos dependen de Linux antes de reescribirlos.
 
 ## [2.11.2] - 2026-11-16
 
