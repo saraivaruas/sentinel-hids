@@ -6,7 +6,7 @@ import os
 import re
 import time
 
-from . import core
+from . import core, plataforma
 
 LISTEN_RE = re.compile(r'users:\(\("([^"]+)",pid=(\d+)')
 
@@ -96,10 +96,8 @@ def suid_files(roots: list[str] | None = None) -> list[str]:
     return sorted(x for x in out.splitlines() if x.startswith("/"))
 
 
-def proc_scan(exec_dirs: list[str], miners: list[str], skip: set[str]) -> list[dict]:
-    """Procesos que corren desde carpetas temporales, con el ejecutable borrado o con nombre de minero."""
-    found = []
-    me = os.getpid()
+def _procesos_proc(me: int):
+    """Procesos de Linux leídos de /proc: (pid, comm, exe, función que dice si es de Sentinel)."""
     for d in os.listdir("/proc"):
         if not d.isdigit() or int(d) == me:
             continue
@@ -112,15 +110,44 @@ def proc_scan(exec_dirs: list[str], miners: list[str], skip: set[str]) -> list[d
             comm = open(f"{base}/comm", encoding="utf-8").read().strip()
         except OSError:
             comm = os.path.basename(exe)
+        yield d, comm, exe, (lambda b=base: _es_de_sentinel(b))
+
+
+def _procesos_ps(me: int):
+    """Procesos de macOS leídos de `ps`: (pid, comm, exe, función que dice si es de Sentinel). Allí `comm` trae la ruta completa del programa."""
+    rc, out = core.run(["ps", "-axww", "-o", "pid=,comm="], 15)
+    if rc != 0:
+        return
+    rc2, out2 = core.run(["ps", "-axww", "-o", "pid=,command="], 15)
+    cmds = {}
+    for ln in out2.splitlines() if rc2 == 0 else []:
+        p = ln.strip().split(None, 1)
+        if len(p) == 2 and p[0].isdigit():
+            cmds[p[0]] = p[1]
+    for ln in out.splitlines():
+        p = ln.strip().split(None, 1)
+        if len(p) != 2 or not p[0].isdigit() or int(p[0]) == me or not p[1].startswith("/"):
+            continue                                       # sin ruta absoluta = proceso del núcleo o sin permiso
+        d, exe = p
+        yield d, os.path.basename(exe), exe, (lambda d=d: _cmd_es_de_sentinel(cmds.get(d, "").encode("utf-8", "replace").replace(b" ", b"\x00")))
+
+
+def proc_scan(exec_dirs: list[str], miners: list[str], skip: set[str]) -> list[dict]:
+    """Procesos que corren desde carpetas temporales, con el ejecutable borrado (solo Linux) o con nombre de minero."""
+    found = []
+    me = os.getpid()
+    # /tmp en macOS es un enlace a /private/tmp: se comparan las dos formas
+    dirs = [x.rstrip("/") + "/" for x in exec_dirs] + [os.path.realpath(x).rstrip("/") + "/" for x in exec_dirs]
+    for d, comm, exe, es_nuestro in (_procesos_proc(me) if plataforma.tiene_proc() else _procesos_ps(me)):
         name = os.path.basename(exe.replace(" (deleted)", ""))
         if comm in skip or name in skip:
             continue
-        if _es_de_sentinel(base):
+        if es_nuestro():
             continue                                       # Sentinel no se reporta a sí mismo
         sev = kind = msg = None
         if any(m == name.lower() or m == comm.lower() for m in miners):
             sev, kind, msg = "critical", "minero", f"proceso con nombre de minero de criptomonedas: {comm} (PID {d}, {exe})"
-        elif any(exe.startswith(x.rstrip("/") + "/") for x in exec_dirs):
+        elif any(exe.startswith(x) for x in dirs):
             sev, kind, msg = "high", "ejecuta_desde_temporal", f"{comm} (PID {d}) ejecuta un programa desde una carpeta temporal: {exe}"
         elif exe.endswith(" (deleted)"):
             if exe.startswith(("/tmp", "/var/tmp", "/dev/shm", "/run/user")) or (exe.startswith("/home") and not any(m in exe for m in DEV_MARKERS)):
@@ -142,6 +169,11 @@ def _es_de_sentinel(base: str) -> bool:
         cmd = open(f"{base}/cmdline", "rb").read()
     except OSError:
         return False
+    return _cmd_es_de_sentinel(cmd)
+
+
+def _cmd_es_de_sentinel(cmd: bytes) -> bool:
+    """La línea de comandos (argumentos separados por \\0) es de Sentinel."""
     return b"-m\x00sentinel" in cmd or b"/opt/sentinel/" in cmd or b"from sentinel.cli import main" in cmd or cmd.split(b"\x00", 1)[0].endswith(b"/sentinel")
 
 

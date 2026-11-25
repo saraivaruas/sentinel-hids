@@ -7,7 +7,7 @@ import time
 import unittest
 
 from helpers import Env, core
-from sentinel import hostcheck
+from sentinel import hostcheck, plataforma
 
 SS = """tcp   LISTEN 0 4096 127.0.0.1:631   0.0.0.0:* users:(("cupsd",pid=1,fd=7))
 tcp   LISTEN 0 511  0.0.0.0:80      0.0.0.0:* users:(("nginx",pid=2,fd=6))
@@ -76,6 +76,8 @@ class HostTests(unittest.TestCase):
             time.sleep(0.3)
             found = {x["kind"] for x in hostcheck.proc_scan(["/tmp"], [], set()) if x["pid"] == p.pid}
             self.assertIn("ejecuta_desde_temporal", found)
+            if not plataforma.tiene_proc():
+                return                                    # «ejecutable borrado» lo marca solo el kernel de Linux (/proc/PID/exe)
             os.remove(exe)
             found = {x["kind"] for x in hostcheck.proc_scan(["/nada"], [], set()) if x["pid"] == p.pid}
             self.assertIn("binario_borrado", found)
