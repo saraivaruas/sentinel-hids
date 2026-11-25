@@ -28,6 +28,24 @@ jobs:
       - name: Pruebas
         run: cd tests && python -W ignore -m unittest discover -s . -v
 
+  macos:
+    name: Python ${{ matrix.python }} en macOS (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # Informativo mientras se porta Sentinel a macOS: no bloquea el resto de la CI.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-13]
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Pruebas
+        run: cd tests && python -W ignore -m unittest discover -s . -v
+
   shell:
     name: Scripts de shell
     runs-on: ubuntu-24.04
