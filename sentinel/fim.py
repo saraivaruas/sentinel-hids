@@ -115,6 +115,19 @@ def snapshot(roots: list[str], excludes: list[str], hash_max: int, old: dict | N
     return snap
 
 
+def _huella_rapida(e: dict | None):
+    return None if e is None else (e["type"], e["mode"], e["uid"], e["gid"], e["size"], e["mtime"], e["ino"], e.get("link"))
+
+
+def cambios_rapidos(roots: list[str], excludes: list[str], prev: dict | None, max_files: int = 300000) -> tuple[set[str], dict]:
+    """Vigilancia en vivo por sondeo (para macOS, que no tiene inotify): compara solo los metadatos (tipo, permisos, dueño, tamaño, fecha, inodo), sin leer ni hashear archivos.
+    Devuelve (rutas que cambiaron desde la vez anterior, foto actual). La primera vez (prev=None) no hay con qué comparar y devuelve un conjunto vacío."""
+    now = snapshot(roots, excludes, 0, max_files=max_files)       # hash_max=0: nunca calcula SHA-256
+    if prev is None:
+        return set(), now
+    return {p for p in set(prev) | set(now) if _huella_rapida(prev.get(p)) != _huella_rapida(now.get(p))}, now
+
+
 def diff(old: dict, new: dict, www: list[str] | None = None) -> list[dict]:
     """Diferencias entre dos fotos. Cada una: {kind, path, sev, detail}."""
     www = www or []

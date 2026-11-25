@@ -73,6 +73,26 @@ class FimTests(unittest.TestCase):
         r = self.f.scan(paths=[a])
         self.assertEqual(self.kinds(r), [("modified", "a.txt")])
 
+    def test_sondeo_rapido_detecta_nuevo_modificado_y_eliminado(self):
+        a = self.e.write("a.txt", "uno"); b = self.e.write("b.txt", "dos")
+        roots = [self.e.tree]
+        cambios, foto = fim.cambios_rapidos(roots, [], None)
+        self.assertEqual(cambios, set())                             # la primera vez no hay con qué comparar
+        self.assertEqual(fim.cambios_rapidos(roots, [], foto)[0], set())      # sin cambios no avisa
+        with open(a, "w") as fh: fh.write("cambiado y más largo")
+        os.remove(b); c = self.e.write("c.txt", "nuevo")
+        cambios, foto = fim.cambios_rapidos(roots, [], foto)
+        self.assertTrue({a, b, c} <= cambios)
+        os.chmod(c, 0o600)
+        self.assertIn(c, fim.cambios_rapidos(roots, [], foto)[0])         # un cambio de permisos también cuenta
+
+    def test_sondeo_rapido_respeta_exclusiones_y_no_lee_contenido(self):
+        self.e.write("a.txt", "x")
+        _, foto = fim.cambios_rapidos([self.e.tree], ["*.log"], None)
+        self.e.write("ruido.log", "x")
+        self.assertEqual(fim.cambios_rapidos([self.e.tree], ["*.log"], foto)[0], set())
+        self.assertTrue(all(e.get("sha") != "(ilegible)" and len(e.get("sha", "")) != 64 for e in foto.values()))   # nunca calcula SHA-256
+
     def test_aceptar_actualiza_la_referencia(self):
         a = self.e.write("a.txt", "1"); self.f.init()
         with open(a, "w") as fh: fh.write("2")
