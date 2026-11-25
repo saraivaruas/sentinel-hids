@@ -5,6 +5,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 from helpers import Env, core
 from sentinel import hostcheck, plataforma
@@ -95,6 +96,56 @@ class HostTests(unittest.TestCase):
             self.assertEqual([x for x in hostcheck.proc_scan([], ["xmrig"], {"xmrig"}) if x["pid"] == p.pid], [])   # lista blanca
         finally:
             p.kill(); shutil.rmtree(d, ignore_errors=True)
+
+
+LSOF_ESCUCHA = """p312
+ccupsd
+f7
+PTCP
+n127.0.0.1:631
+f8
+PTCP
+n[::1]:631
+p501
+cnginx
+f6
+PTCP
+n*:80
+p77
+cmDNSResponder
+f9
+PUDP
+n*:5353
+"""
+LSOF_CONECTADOS = """p900
+cminerd
+f5
+PTCP
+n10.0.0.5:51000->203.0.113.7:4444 (ESTABLISHED)
+p901
+cSafari
+f6
+PTCP
+n10.0.0.5:51001->198.51.100.2:443 (ESTABLISHED)
+"""
+
+
+class LsofTests(unittest.TestCase):
+    """Salida de `lsof -F` (macOS) convertida al formato de `ss`; se prueba en todos los sistemas."""
+
+    def test_puertos_en_escucha(self):
+        r = hostcheck.parse_listeners(hostcheck.lsof_a_ss(LSOF_ESCUCHA))
+        self.assertEqual(r["tcp/631"]["scope"], "solo local"); self.assertEqual(r["tcp/631"]["proc"], "cupsd")
+        self.assertEqual(r["tcp/80"]["scope"], "todas las interfaces"); self.assertEqual(r["tcp/80"]["proc"], "nginx")
+        self.assertEqual(r["udp/5353"]["proc"], "mDNSResponder")
+
+    def test_conexiones_no_se_cuentan_como_escucha(self):
+        self.assertEqual(hostcheck.parse_listeners(hostcheck.lsof_a_ss(LSOF_CONECTADOS)), {})
+
+    def test_conexiones_sospechosas(self):
+        with mock.patch.object(hostcheck.plataforma, "ES_MAC", True), mock.patch.object(hostcheck.core, "run", return_value=(0, LSOF_CONECTADOS)):
+            self.assertEqual(hostcheck.suspicious_connections({4444}, set()), [{"remote": "203.0.113.7:4444", "proc": "minerd"}])
+            self.assertEqual(hostcheck.suspicious_connections({4444}, {"minerd"}), [])
 
 
 class SuidTests(unittest.TestCase):

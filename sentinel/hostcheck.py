@@ -40,7 +40,45 @@ def parse_listeners(text: str) -> dict[str, dict]:
     return out
 
 
+def lsof_a_ss(text: str, conectados: bool = False) -> str:
+    """Salida de `lsof -nP -F pcPtn` (macOS) -> líneas con el formato de `ss`, para reutilizar parse_listeners y las comparaciones.
+
+    En escucha:  «tcp LISTEN 0 0 <local> *:* users:(("prog",pid=N,fd=0))».
+    Conectados:  «0 0 <local> <remoto> users:(("prog",pid=N,fd=0))» (como `ss -tnp state established`, sin columna de protocolo)."""
+    out, pid, cmd, rec = [], "0", "?", {}
+
+    def vaciar():
+        nombre, proto = rec.get("n", ""), rec.get("P", "").lower()
+        if proto in ("tcp", "udp") and nombre:
+            nombre = nombre.split(" (")[0]
+            if conectados and "->" in nombre:
+                local, remoto = nombre.split("->", 1)
+                out.append(f'0 0 {local} {remoto} users:(("{cmd}",pid={pid},fd=0))')
+            elif not conectados and "->" not in nombre:
+                out.append(f'{proto} {"LISTEN" if proto == "tcp" else "UNCONN"} 0 0 {nombre} *:* users:(("{cmd}",pid={pid},fd=0))')
+        rec.clear()
+
+    for ln in text.splitlines():
+        if not ln:
+            continue
+        c, v = ln[0], ln[1:]
+        if c == "p":
+            vaciar(); pid = v
+        elif c == "c":
+            cmd = v.replace('"', "'")
+        elif c == "f":
+            vaciar()
+        elif c in "Pn":
+            rec[c] = v
+    vaciar()
+    return "\n".join(out) + "\n"
+
+
 def listeners() -> dict[str, dict]:
+    if plataforma.ES_MAC:
+        rc, tcp = core.run(["lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcPn"], 20)
+        rc2, udp = core.run(["lsof", "-nP", "-iUDP", "-F", "pcPn"], 20)
+        return parse_listeners(lsof_a_ss(tcp if rc in (0, 1) else "") + lsof_a_ss(udp if rc2 in (0, 1) else ""))
     rc, out = core.run(["ss", "-H", "-ltnup"], 10)
     return parse_listeners(out) if rc == 0 else {}
 
@@ -248,7 +286,11 @@ def hidden_pids() -> list[int]:
 
 
 def suspicious_connections(ports: set[int], skip: set[str]) -> list[dict]:
-    rc, out = core.run(["ss", "-H", "-tnp", "state", "established"], 10)
+    if plataforma.ES_MAC:
+        rc, out = core.run(["lsof", "-nP", "-iTCP", "-sTCP:ESTABLISHED", "-F", "pcPn"], 20)
+        out = lsof_a_ss(out if rc in (0, 1) else "", conectados=True)       # lsof sale con 1 cuando no encuentra nada
+    else:
+        rc, out = core.run(["ss", "-H", "-tnp", "state", "established"], 10)
     res = []
     for ln in out.splitlines():
         f = ln.split()
