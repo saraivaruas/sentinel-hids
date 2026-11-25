@@ -116,7 +116,11 @@ def snapshot(roots: list[str], excludes: list[str], hash_max: int, old: dict | N
 
 
 def _huella_rapida(e: dict | None):
-    return None if e is None else (e["type"], e["mode"], e["uid"], e["gid"], e["size"], e["mtime"], e["ino"], e.get("link"))
+    if e is None:
+        return None
+    if e["type"] == "d":
+        return ("d", e["mode"], e["uid"], e["gid"], e["ino"])      # la fecha y el tamaño de una carpeta cambian con cada archivo que entra o sale (aunque esté excluido): esos archivos ya se avisan solos
+    return (e["type"], e["mode"], e["uid"], e["gid"], e["size"], e["mtime"], e["ino"], e.get("link"))
 
 
 def cambios_rapidos(roots: list[str], excludes: list[str], prev: dict | None, max_files: int = 300000) -> tuple[set[str], dict]:

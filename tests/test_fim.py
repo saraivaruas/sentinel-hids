@@ -89,7 +89,8 @@ class FimTests(unittest.TestCase):
     def test_sondeo_rapido_respeta_exclusiones_y_no_lee_contenido(self):
         self.e.write("a.txt", "x")
         _, foto = fim.cambios_rapidos([self.e.tree], ["*.log"], None)
-        self.e.write("ruido.log", "x")
+        for i in range(5):
+            self.e.write(f"ruido{i}.log", "x")                        # crear archivos excluidos cambia la fecha de la carpeta, pero no debe contar
         self.assertEqual(fim.cambios_rapidos([self.e.tree], ["*.log"], foto)[0], set())
         self.assertTrue(all(e.get("sha") != "(ilegible)" and len(e.get("sha", "")) != 64 for e in foto.values()))   # nunca calcula SHA-256
 
