@@ -1,12 +1,14 @@
 import os
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+@unittest.skipIf(sys.platform == "darwin", "install-gui.sh es el instalador de Linux (zenity, pkexec); macOS tendrá el suyo")
 class GuiInstallerTests(unittest.TestCase):
     """Corre install-gui.sh con zenity y pkexec simulados: comprueba qué ventanas muestra y qué le pide al sistema."""
 
