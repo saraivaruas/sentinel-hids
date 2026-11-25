@@ -81,7 +81,7 @@ def fake_proc(exe, comm, cmdline=b"x\x00"):
 
 class ProcesosTests(unittest.TestCase):
     def scan(self, exe, comm="prog", cmdline=b"x\x00"):
-        ps = fake_proc(exe, comm, cmdline)
+        ps = fake_proc(exe, comm, cmdline) + [mock.patch.object(hostcheck.plataforma, "tiene_proc", return_value=True)]   # se simula /proc también en macOS
         for p in ps:
             p.start(); self.addCleanup(p.stop)
         return hostcheck.proc_scan(["/tmp", "/var/tmp", "/dev/shm", "/run/user"], ["xmrig"], set())
