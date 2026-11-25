@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 
-from . import authwatch, core, heartbeat, weblogs, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, update
+from . import authwatch, core, heartbeat, weblogs, firewall, fim, pin, honeypot, hostcheck, intel as intel_mod, packets, plataforma, update
 
 
 class Monitor:
@@ -54,17 +54,35 @@ class Monitor:
             if keep(path):
                 self.q.put(path)
 
+    def _sondeo(self, keep) -> None:
+        """Vigilancia en vivo sin inotify (macOS): cada pocos segundos compara los metadatos de lo vigilado y encola lo que cambió."""
+        prev = None
+        while not self.stop.is_set():
+            try:
+                cambios, prev = fim.cambios_rapidos(self.fim.roots(), self.fim.excludes, prev, self.fim.max_files)
+                for p in sorted(cambios):
+                    if keep(p):
+                        self.q.put(p)
+            except Exception as e:
+                self.alerter.emit("low", "monitor", "error", f"El sondeo de archivos falló ({type(e).__name__})", key="mon:err:sondeo")
+            self.stop.wait(max(1, self.cfg.getint("fim", "poll_seconds", fallback=10)))
+
     def live_fim(self) -> bool:
-        if not shutil.which("inotifywait"):
-            return False
-        roots = self.fim.roots()
-        dirs = [r for r in roots if os.path.isdir(r) and not os.path.islink(r)]
-        files = {r for r in roots if r not in dirs}
-        parents = sorted({os.path.dirname(f) for f in files})
         ex = self.fim.excludes
 
         def ok(path: str) -> bool:
             return not any(fnmatch.fnmatch(path, x) for x in ex) and not self.allow.path_ignored(path) and not path.endswith((".swp", ".swx", "~", ".tmp"))
+
+        if not shutil.which("inotifywait"):
+            if not plataforma.ES_MAC:
+                return False
+            threading.Thread(target=self._sondeo, args=(ok,), daemon=True).start()
+            threading.Thread(target=self._consume, daemon=True).start()
+            return True
+        roots = self.fim.roots()
+        dirs = [r for r in roots if os.path.isdir(r) and not os.path.islink(r)]
+        files = {r for r in roots if r not in dirs}
+        parents = sorted({os.path.dirname(f) for f in files})
 
         if dirs:
             threading.Thread(target=self._watch, args=(["-r", *dirs], ok), daemon=True).start()
