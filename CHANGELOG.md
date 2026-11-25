@@ -2,6 +2,11 @@
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Agregado
+- **Inicio del porte a macOS:** la CI corre ahora las pruebas también en macOS 13 y 14 (Python 3.10 y 3.12). Es informativo (`continue-on-error`) y no bloquea el resto: sirve para ver qué módulos dependen de Linux antes de reescribirlos.
+
 ## [2.11.2] - 2026-11-16
 
 ### Corregido
