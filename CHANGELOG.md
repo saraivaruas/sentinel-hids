@@ -14,6 +14,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Cuentas en macOS:** se leen con `pwd` (el servicio de directorio) y siguen avisando de cuentas nuevas con acceso y de un segundo usuario con UID 0. «Cuenta sin contraseña» no se revisa en Mac (no hay `/etc/shadow`). 2 pruebas nuevas.
 - **La revisión del equipo ya no se cae en macOS:** las revisiones que dependen de `/proc` (lectores de teclado y procesos ocultos, solo Linux) quedan desactivadas en Mac en lugar de fallar. USB y módulos del kernel todavía no se vigilan en Mac. 1 prueba nueva.
 - Las pruebas del estado de la captura de paquetes simulan `AF_PACKET` y corren también en macOS. La captura real en Mac (con BPF) queda pendiente: hoy el panel la mostrará como no disponible.
+- Las pruebas del instalador gráfico (`install-gui.sh`, con zenity y pkexec) se omiten en macOS: es el instalador de Linux. El de Mac (`.pkg` y `launchd`) queda pendiente.
 
 ## [2.11.2] - 2026-11-16
 
