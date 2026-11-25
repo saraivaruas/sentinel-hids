@@ -9,6 +9,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 - **Módulo `plataforma`:** un solo lugar donde se decide si el equipo es Linux o macOS y si existe `/proc`; los detectores preguntan ahí en vez de mirar el sistema por su cuenta. 3 pruebas nuevas.
 - **Procesos sospechosos en macOS:** sin `/proc`, `hostcheck` lee los procesos con `ps` y sigue detectando mineros y programas que corren desde carpetas temporales (comparando `/tmp` con `/private/tmp`). El «ejecutable borrado» se queda solo en Linux, porque macOS no lo informa.
+- **Archivos SUID en macOS:** el `find` de macOS no entiende `-perm /6000`, así que allí la búsqueda se hace en Python (mismas exclusiones: `node_modules`, `.git`, cachés, contenedores; no cruza de disco). Carpetas por defecto de Mac: `/usr`, `/bin`, `/sbin`, `/opt`, `/etc`, `/private/tmp`, `/Users`. 1 prueba nueva.
 
 ## [2.11.2] - 2026-11-16
 
