@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import glob
 import os
+import pwd
 import re
 import stat
 import time
@@ -102,7 +103,20 @@ def kernel_modules() -> list[str]:
         return []
 
 
+def _cuentas_pwd() -> dict:
+    """Cuentas leídas con `pwd` (en macOS /etc/passwd no trae los usuarios reales: los guarda el servicio de directorio). No se puede saber si falta la contraseña sin pedir permisos extra."""
+    users, uid0 = [], []
+    for p in pwd.getpwall():
+        if not p.pw_shell.endswith(("nologin", "false")):
+            users.append(p.pw_name)
+        if p.pw_uid == 0 and p.pw_name != "root":
+            uid0.append(p.pw_name)
+    return {"users": sorted(users), "uid0": uid0, "empty": []}
+
+
 def accounts() -> dict:
+    if plataforma.ES_MAC:
+        return _cuentas_pwd()
     users, uid0, empty = [], [], []
     try:
         for ln in open("/etc/passwd", encoding="utf-8"):

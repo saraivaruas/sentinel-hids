@@ -1,4 +1,5 @@
 import os
+import pwd
 import shutil
 import subprocess
 import sys
@@ -146,6 +147,19 @@ class LsofTests(unittest.TestCase):
         with mock.patch.object(hostcheck.plataforma, "ES_MAC", True), mock.patch.object(hostcheck.core, "run", return_value=(0, LSOF_CONECTADOS)):
             self.assertEqual(hostcheck.suspicious_connections({4444}, set()), [{"remote": "203.0.113.7:4444", "proc": "minerd"}])
             self.assertEqual(hostcheck.suspicious_connections({4444}, {"minerd"}), [])
+
+
+class CuentasMacTests(unittest.TestCase):
+    def test_cuentas_con_pwd(self):
+        P = lambda n, uid, sh: pwd.struct_passwd((n, "*", uid, uid, "", "/", sh))
+        falsas = [P("root", 0, "/bin/sh"), P("jorge", 501, "/bin/zsh"), P("_www", 70, "/usr/bin/false"), P("intruso", 0, "/bin/zsh"), P("nobody", -2, "/usr/bin/false")]
+        with mock.patch.object(hostcheck.pwd, "getpwall", return_value=falsas):
+            r = hostcheck._cuentas_pwd()
+        self.assertEqual(r["users"], ["intruso", "jorge", "root"]); self.assertEqual(r["uid0"], ["intruso"]); self.assertEqual(r["empty"], [])
+
+    def test_accounts_usa_pwd_en_macos(self):
+        with mock.patch.object(hostcheck.plataforma, "ES_MAC", True), mock.patch.object(hostcheck, "_cuentas_pwd", return_value={"users": ["x"], "uid0": [], "empty": []}):
+            self.assertEqual(hostcheck.accounts()["users"], ["x"])
 
 
 class SuidTests(unittest.TestCase):
