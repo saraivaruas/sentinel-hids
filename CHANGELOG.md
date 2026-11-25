@@ -17,6 +17,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Las pruebas del instalador gráfico (`install-gui.sh`, con zenity y pkexec) se omiten en macOS: es el instalador de Linux. El de Mac (`.pkg` y `launchd`) queda pendiente.
 - Las pruebas de falsos positivos de procesos simulan `/proc`, así que prueban la clasificación (binario borrado, reinicio pendiente, Sentinel no se reporta a sí mismo) igual en Linux y en macOS. En la CI de Mac, de las 8 pruebas que fallaban solo quedaban estas 3.
 - **Sondeo de cambios para la vigilancia en vivo de macOS (`fim.cambios_rapidos`):** compara solo metadatos (tipo, permisos, dueño, tamaño, fecha, inodo) entre dos pasadas, sin leer ni calcular hashes, y respeta las exclusiones. En las carpetas ignora fecha y tamaño (cambian con cada archivo que entra o sale, aunque esté excluido, y provocarían revisiones de más). Es la base de la vigilancia en vivo sin `inotifywait`. 2 pruebas nuevas.
+- **Vigilancia de archivos en vivo en macOS:** sin `inotifywait`, el monitor revisa cada 10 segundos (`[fim] poll_seconds`) qué archivos vigilados cambiaron y manda a comprobar solo esos, en vez de esperar la revisión periódica de 15 minutos. En Linux no cambia nada. 3 pruebas nuevas.
 
 ## [2.11.2] - 2026-11-16
 
