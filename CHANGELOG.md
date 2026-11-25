@@ -13,6 +13,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Puertos y conexiones en macOS:** `ss` no existe allí; se usa `lsof` y su salida se convierte al formato de `ss`, de modo que las alertas de puerto nuevo, puerto expuesto y conexión a puertos de troyanos funcionan igual. En macOS el monitor necesita correr como administrador para ver todos los procesos. 3 pruebas nuevas (con muestras escritas a mano; falta contrastarlas con un Mac real).
 - **Cuentas en macOS:** se leen con `pwd` (el servicio de directorio) y siguen avisando de cuentas nuevas con acceso y de un segundo usuario con UID 0. «Cuenta sin contraseña» no se revisa en Mac (no hay `/etc/shadow`). 2 pruebas nuevas.
 - **La revisión del equipo ya no se cae en macOS:** las revisiones que dependen de `/proc` (lectores de teclado y procesos ocultos, solo Linux) quedan desactivadas en Mac en lugar de fallar. USB y módulos del kernel todavía no se vigilan en Mac. 1 prueba nueva.
+- Las pruebas del estado de la captura de paquetes simulan `AF_PACKET` y corren también en macOS. La captura real en Mac (con BPF) queda pendiente: hoy el panel la mostrará como no disponible.
 
 ## [2.11.2] - 2026-11-16
 
