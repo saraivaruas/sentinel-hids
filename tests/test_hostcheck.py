@@ -149,6 +149,13 @@ class LsofTests(unittest.TestCase):
             self.assertEqual(hostcheck.suspicious_connections({4444}, {"minerd"}), [])
 
 
+class SinProcTests(unittest.TestCase):
+    def test_sin_proc_no_se_cae(self):
+        with mock.patch.object(hostcheck.plataforma, "tiene_proc", return_value=False):
+            self.assertEqual(hostcheck.input_readers(set()), [])
+            self.assertEqual(hostcheck.hidden_pids(), [])
+
+
 class CuentasMacTests(unittest.TestCase):
     def test_cuentas_con_pwd(self):
         P = lambda n, uid, sh: pwd.struct_passwd((n, "*", uid, uid, "", "/", sh))

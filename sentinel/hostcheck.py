@@ -267,6 +267,8 @@ def _cmd_es_de_sentinel(cmd: bytes) -> bool:
 
 def input_readers(skip: set[str]) -> list[dict]:
     """Procesos con un dispositivo de teclado/ratón abierto que no son del sistema gráfico (posible keylogger). Solo informa; nunca detiene procesos."""
+    if not plataforma.tiene_proc():
+        return []          # en macOS no hay /dev/input ni /proc: no se puede saber quién lee el teclado con estas herramientas
     found = []
     for d in os.listdir("/proc"):
         if not d.isdigit():
@@ -289,6 +291,8 @@ def input_readers(skip: set[str]) -> list[dict]:
 
 def hidden_pids() -> list[int]:
     """PIDs visibles en /proc pero ausentes de `ps` en dos muestras seguidas (posible rootkit)."""
+    if not plataforma.tiene_proc():
+        return []          # sin /proc no hay con qué comparar la lista de `ps`
     def sample():
         proc = {int(d) for d in os.listdir("/proc") if d.isdigit()}
         rc, out = core.run(["ps", "-e", "-o", "pid="], 10)
