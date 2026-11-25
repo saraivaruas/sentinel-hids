@@ -8,6 +8,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Inicio del porte a macOS:** la CI corre ahora las pruebas también en macOS (macOS 26 Tahoe y macOS 15 Sequoia, cada uno en Apple Silicon e Intel; Python 3.12, y 3.10 en Tahoe). macOS 14 y 13 ya no existen en GitHub Actions. Es informativo (`continue-on-error`) y no bloquea el resto: sirve para ver qué módulos dependen de Linux antes de reescribirlos.
 
 - **Módulo `plataforma`:** un solo lugar donde se decide si el equipo es Linux o macOS y si existe `/proc`; los detectores preguntan ahí en vez de mirar el sistema por su cuenta. 3 pruebas nuevas.
+- **Procesos sospechosos en macOS:** sin `/proc`, `hostcheck` lee los procesos con `ps` y sigue detectando mineros y programas que corren desde carpetas temporales (comparando `/tmp` con `/private/tmp`). El «ejecutable borrado» se queda solo en Linux, porque macOS no lo informa.
 
 ## [2.11.2] - 2026-11-16
 
