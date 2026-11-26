@@ -1,0 +1,28 @@
+# Prueba real en macOS del monitor completo (como correrá instalado): cambios en carpetas de arranque,
+# accesos fallidos y los comandos principales. Solo en equipos desechables de GitHub.
+name: mac-monitor
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/mac-monitor.yml", "sentinel/**", "tools/prueba-mac-monitor.py"]
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    name: Monitor completo en ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-26-intel, macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Arrancar el monitor y provocar alertas
+        run: |
+          sudo systemsetup -setremotelogin on || true
+          sudo GITHUB_ACTIONS=true python3 tools/prueba-mac-monitor.py
