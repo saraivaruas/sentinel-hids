@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **`sudo sentinel identidad retirar` y `devolver` (Linux):** quitan el método antiguo de rotar MAC e IP (tareas de cron, `macchanger.service`, scripts `change-mac`/`change-ip` y sus registros). Muestra la lista, pide confirmación y PIN, guarda una copia antes de tocar nada y respeta las demás tareas. 7 pruebas nuevas.
 - La hoja de ruta marca los requisitos de macOS como pendientes de su prueba real.
 - La hoja de ruta muestra pieza por pieza qué tiene macOS igual que Linux, qué espera su prueba real y qué falta.
 - La prueba del instalador en macOS activa los señuelos, los toca, comprueba su usuario sin privilegios y muestra los USB y extensiones que lee.

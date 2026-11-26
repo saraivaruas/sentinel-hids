@@ -19,7 +19,7 @@ Reemplaza a los scripts sueltos (`change-mac.sh` y `change-ip.sh`).
 | 1.1 | 🟡 | `sentinel identidad estado` | Solo lee: interfaz, MAC actual y de fábrica, IP, si se envía el nombre del equipo y si hay otros programas rotando. Hecho y probado en un equipo real; falta que pase por la CI. |
 | 1.2 | 🟡 | `sentinel identidad rotar` y `restaurar` | MAC aleatoria a través de NetworkManager y dirección IP nueva por DHCP, sin enviar el nombre. Si la red deja de responder, vuelve sola a lo anterior. Hecho y probado con una red simulada; falta probarlo en un equipo real y en la CI. |
 | 1.3 | 🟡 | Rotación programada | `activar` y `desactivar`, cada cuántas horas, con un temporizador de systemd. Apagado por defecto. Hecho y probado con una red simulada; falta probarlo en un equipo real y en la CI. |
-| 1.4 | ⬜ | Retirar los scripts antiguos | Quitar la tarea de `cron` y `macchanger.service`, con confirmación y copia de respaldo. |
+| 1.4 | 🟡 | Retirar los scripts antiguos | `sudo sentinel identidad retirar` (con confirmación y copia) y `devolver`. Probado con archivos de ejemplo; falta ejecutarlo en un equipo real y que pase por la CI. |
 | 1.5 | 🟡 | Apartado en Ajustes del panel | «Privacidad de red»: estado, activar o apagar, intervalo, «Cambiar ahora» y volver a la MAC de fábrica. Hecho y visto en el navegador; falta usar sus botones en un equipo real y que pase por la CI. |
 
 La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la de otro equipo o quedar fuera del rango de la red.
