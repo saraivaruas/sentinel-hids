@@ -1,4 +1,5 @@
 import os
+import socket
 import unittest
 from unittest import mock
 
@@ -39,6 +40,25 @@ class FimTests(unittest.TestCase):
         self.assertIn(("modified", "passwd"), self.kinds(self.f.scan()))
         with open(p, "a") as fh: fh.write("otro:x:1000\n")                 # y una edición posterior también
         self.assertIn(("modified", "passwd"), self.kinds(self.f.scan()))
+
+    def test_los_sockets_del_agente_ssh_no_alertan(self):
+        self.e.write(".ssh/authorized_keys", "x")
+        self.f.init()
+        agente = os.path.join(self.e.tree, ".ssh", "agent")
+        os.mkdir(agente)
+        antes = os.getcwd()
+        s = socket.socket(socket.AF_UNIX)
+        try:
+            os.chdir(agente)             # nombre corto: la ruta de un socket tiene un límite
+            s.bind("s.abc.agent.xyz")
+        finally:
+            os.chdir(antes)
+        try:
+            self.assertEqual(self.f.scan(), [])
+            self.e.write(".ssh/agent/escondido.sh", "#!/bin/sh")        # un archivo de verdad ahí sí se avisa
+            self.assertEqual(self.kinds(self.f.scan()), [("added", "escondido.sh")])
+        finally:
+            s.close()
 
     def test_permisos_y_setuid(self):
         p = self.e.write("bin/x", "#!/bin/sh\n", 0o755)

@@ -71,6 +71,14 @@ def _entry(path: str, st: os.stat_result, hash_max: int, old: dict | None, rehas
     return e
 
 
+def _es_del_agente_ssh(path: str, st: os.stat_result) -> bool:
+    """OpenSSH reciente (el de macOS 26) crea y borra en ~/.ssh/agent los «sockets» de cada sesión. Se ignoran la carpeta
+    y los sockets, que no guardan nada; un archivo cualquiera que aparezca ahí dentro sí se avisa."""
+    if stat.S_ISDIR(st.st_mode):
+        return path.endswith("/.ssh/agent")
+    return stat.S_ISSOCK(st.st_mode) and "/.ssh/agent/" in path
+
+
 def snapshot(roots: list[str], excludes: list[str], hash_max: int, old: dict | None = None, rehash: bool = False, max_files: int = 300000) -> dict:
     """Recorre las rutas sin seguir enlaces simbólicos y devuelve {ruta: atributos}."""
     snap: dict[str, dict] = {}
@@ -86,6 +94,8 @@ def snapshot(roots: list[str], excludes: list[str], hash_max: int, old: dict | N
         try:
             st = os.lstat(p)
         except OSError:
+            return
+        if _es_del_agente_ssh(p, st):
             return
         snap[p] = _entry(p, st, hash_max, old.get(p), rehash)
 
