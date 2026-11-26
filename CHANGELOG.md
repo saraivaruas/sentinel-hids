@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Servicios en macOS (`launchd`):** definición de las cuatro tareas (monitor siempre encendido, revisión cada 30 minutos, informe semanal e informe del equipo) y cómo cargarlas, consultarlas y detenerlas. Python corre aislado y sin carpetas modificables por usuarios en el PATH. 5 pruebas nuevas.
 - **Falsa alerta del agente SSH:** las versiones recientes de OpenSSH (la de macOS 26, y las nuevas de Linux) crean sockets en `~/.ssh/agent` en cada sesión y salían como alerta ALTA. Se ignoran la carpeta y los sockets; cualquier archivo que aparezca dentro se sigue avisando. 1 prueba nueva.
 - **Prueba del monitor completo en macOS (`mac-monitor`):** lo arranca como administrador con las rutas reales, crea un programa de arranque, provoca accesos fallidos, ejecuta los comandos principales y exige que no haya errores.
 - En macOS los registros y el estado quedan legibles para el grupo `admin` (allí no existe `adm`), para que el panel pueda leerlos. 1 prueba nueva.
