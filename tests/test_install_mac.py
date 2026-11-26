@@ -31,6 +31,13 @@ class InstalarMacTests(unittest.TestCase):
         self.assertEqual(d["CFBundleExecutable"], "Sentinel")
         self.assertTrue(os.access(os.path.join(ROOT, "packaging", "macos", "abrir-panel"), os.X_OK))
 
+    def test_icono_de_la_barra_de_menu_antes_de_la_referencia(self):
+        s = self.correr("Darwin", "--dry-run").stdout
+        self.assertLess(s.index("sentinel-barra"), s.index("bin/sentinel baseline "))     # así su arranque no sale como programa nuevo
+        with open(os.path.join(ROOT, "packaging", "macos", "barra.plist"), "rb") as f:
+            d = plistlib.load(f)
+        self.assertEqual(d["ProgramArguments"], ["/opt/sentinel/bin/sentinel-barra"]); self.assertEqual(d["LimitLoadToSessionType"], "Aqua"); self.assertNotIn("UserName", d)
+
 
 if __name__ == "__main__":
     unittest.main()

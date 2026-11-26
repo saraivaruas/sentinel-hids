@@ -13,6 +13,10 @@ if [ -x "$DEST/bin/sentinel" ]; then
   fi
   instalado "from sentinel import servicio; sys.exit(1 if servicio.detener() else 0)" || { echo "No pude detener Sentinel." >&2; exit 1; }
 fi
+for u in $(ps -axo uid=,command= | awk '/\/opt\/sentinel\/bin\/sentinel-barra/ {print $1}' | sort -u); do
+  launchctl bootout "gui/$u/io.github.saraivaruas.sentinel.barra" >/dev/null 2>&1 || true
+done
+rm -f /Library/LaunchAgents/io.github.saraivaruas.sentinel.barra.plist
 rm -f /Library/LaunchDaemons/io.github.saraivaruas.sentinel.*.plist /usr/local/bin/sentinel /etc/newsyslog.d/sentinel.conf
 rm -rf "$DEST" /Applications/Sentinel.app
 dscl . -delete /Users/_sentinel >/dev/null 2>&1 || true

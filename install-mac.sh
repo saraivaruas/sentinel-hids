@@ -87,6 +87,14 @@ do_ cp "$AQUI/packaging/macos/Info.plist" "$APP/Info.plist"
 do_ cp "$AQUI/packaging/macos/abrir-panel" "$APP/MacOS/Sentinel"
 do_ chmod 755 "$APP/MacOS/Sentinel"
 
+# Icono en la barra de menú (se compila aquí; si no se puede, Sentinel funciona igual)
+BARRA=/Library/LaunchAgents/io.github.saraivaruas.sentinel.barra.plist
+if [ "$DRY" = 1 ]; then echo "  [simulación] compilar sentinel-barra e instalar $BARRA"
+elif xcrun -f swiftc >/dev/null 2>&1 && xcrun swiftc -O -o "$DEST/bin/sentinel-barra" "$AQUI/packaging/macos/barra.swift"; then
+  chmod 755 "$DEST/bin/sentinel-barra"
+  cp "$AQUI/packaging/macos/barra.plist" "$BARRA"; chown root:wheel "$BARRA"; chmod 644 "$BARRA"
+else echo "  Aviso: no pude compilar el icono de la barra de menú (hacen falta las herramientas de Apple: xcode-select --install)."; fi
+
 paso "3/5 Tareas de launchd"
 modulo "servicio.instalar(sys.argv[1])" "$PY"
 
@@ -95,6 +103,12 @@ paso "4/5 Referencia inicial de integridad"
 if [ -e /var/lib/sentinel/fim_baseline.json ]; then do_ "$DEST/bin/sentinel" baseline accept; else do_ "$DEST/bin/sentinel" baseline init; fi
 
 paso "5/5 Arrancar"
+# el icono aparece ya para quien está usando el equipo (y solo, al iniciar sesión, para los demás)
+if [ "$DRY" = 0 ] && [ -e "$BARRA" ] && [ -n "$USUARIO" ]; then
+  uid="$(id -u "$USUARIO")"
+  launchctl bootout "gui/$uid/io.github.saraivaruas.sentinel.barra" >/dev/null 2>&1 || true
+  launchctl bootstrap "gui/$uid" "$BARRA" >/dev/null 2>&1 || echo "  El icono de la barra aparecerá cuando vuelvas a iniciar sesión."
+fi
 modulo "e = servicio.iniciar(); print(chr(10).join(e)); sys.exit(1 if e else 0)"
 
 echo; echo "Listo. Comprueba con:  sentinel status"
