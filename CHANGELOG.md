@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Endurecimiento en macOS:** las medidas son de Linux, así que ya no se evalúan ni se aplican en un Mac; la línea de comandos y el panel lo dicen y remiten a la auditoría. 1 prueba nueva.
 - **Actualizar en macOS** descarga y verifica el paquete y ejecuta `install-mac.sh` (antes habría ejecutado el instalador de Linux). Las publicaciones anteriores no lo traen: en ese caso lo dice y no instala nada. 2 pruebas nuevas.
 - La prueba en simulación del instalador de macOS ya no depende de si el equipo que la corre tiene Sentinel instalado.
 - La prueba del instalador en macOS comprueba que con PIN no se reinstala ni desinstala sin escribirlo, y que una actualización autorizada sí termina.
