@@ -46,6 +46,16 @@ comprobar "el informe programado se genera" sh -c 'ls /var/lib/sentinel/informes
 echo "== reinstalar encima"; "$AQUI/install-mac.sh" >/dev/null; comprobar "reinstalar funciona" test $? = 0
 comprobar "sigue corriendo tras reinstalar" esperar 60 corriendo
 
+echo "== con PIN"
+printf '\nsecreto-123\n' | /usr/local/bin/sentinel --pin-stdin pin establecer; comprobar "se puede poner un PIN" test $? = 0
+comprobar "sin escribir el PIN no se reinstala" sh -c "! '$AQUI/install-mac.sh' </dev/null"
+comprobar "sin escribir el PIN no se desinstala" sh -c "! '$AQUI/uninstall-mac.sh' </dev/null"
+comprobar "y sigue corriendo" corriendo
+echo secreto-123 | /usr/local/bin/sentinel --pin-stdin pin verificar; comprobar "con el PIN se autoriza" test $? = 0
+"$AQUI/install-mac.sh" </dev/null >/dev/null; comprobar "una actualización autorizada no vuelve a pedir el PIN" test $? = 0
+comprobar "sigue corriendo tras actualizar" esperar 60 corriendo
+printf 'secreto-123\n' | /usr/local/bin/sentinel --pin-stdin pin verificar >/dev/null
+
 echo "== registros"; tail -n 40 /var/log/sentinel/*.salida.log
 echo "== eventos"; /usr/bin/python3 -I -c 'import json
 for l in open("/var/log/sentinel/events.jsonl"):
