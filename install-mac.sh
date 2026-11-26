@@ -106,13 +106,19 @@ do_ cp "$AQUI/packaging/macos/Info.plist" "$APP/Info.plist"
 do_ cp "$AQUI/packaging/macos/abrir-panel" "$APP/MacOS/Sentinel"
 do_ chmod 755 "$APP/MacOS/Sentinel"
 
-# Icono en la barra de menú (se compila aquí; si no se puede, Sentinel funciona igual)
+# Icono en la barra de menú (viene compilado en el .pkg; desde el código se compila aquí. Si no se puede, Sentinel funciona igual)
 BARRA=/Library/LaunchAgents/io.github.saraivaruas.sentinel.barra.plist
-if [ "$DRY" = 1 ]; then echo "  [simulación] compilar sentinel-barra e instalar $BARRA"
-elif xcrun -f swiftc >/dev/null 2>&1 && xcrun swiftc -O -o "$DEST/bin/sentinel-barra" "$AQUI/packaging/macos/barra.swift"; then
+HECHO="$AQUI/prebuilt/sentinel-barra"
+preparar_barra() {
+  if [ -f "$HECHO" ]; then cp "$HECHO" "$DEST/bin/sentinel-barra"
+  else xcrun -f swiftc >/dev/null 2>&1 && xcrun swiftc -O -o "$DEST/bin/sentinel-barra" "$AQUI/packaging/macos/barra.swift"; fi
+}
+if [ "$DRY" = 1 ]; then
+  if [ -f "$HECHO" ]; then echo "  [simulación] copiar el icono ya compilado (sentinel-barra) e instalar $BARRA"; else echo "  [simulación] compilar sentinel-barra e instalar $BARRA"; fi
+elif preparar_barra; then
   chmod 755 "$DEST/bin/sentinel-barra"
   cp "$AQUI/packaging/macos/barra.plist" "$BARRA"; chown root:wheel "$BARRA"; chmod 644 "$BARRA"
-else echo "  Aviso: no pude compilar el icono de la barra de menú (hacen falta las herramientas de Apple: xcode-select --install)."; fi
+else echo "  Aviso: no pude preparar el icono de la barra de menú (desde el código hacen falta las herramientas de Apple: xcode-select --install)."; fi
 
 paso "3/5 Tareas de launchd"
 modulo "servicio.instalar(sys.argv[1])" "$PY"

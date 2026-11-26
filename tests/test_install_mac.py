@@ -51,6 +51,15 @@ class InstalarMacTests(unittest.TestCase):
         self.assertLess(s.index("instalar el Python incluido"), s.index("precompilar")); self.assertLess(s.index("precompilar"), s.index("bin/sentinel baseline "))
         self.assertLess(s.index("rm -rf /opt/sentinel"), s.index("instalar el Python incluido"))      # no se borra después de copiarlo
 
+    def test_con_el_icono_ya_compilado_no_se_compila(self):
+        with tempfile.TemporaryDirectory() as d:
+            shutil.copy(os.path.join(ROOT, "install-mac.sh"), d)
+            os.makedirs(os.path.join(d, "prebuilt"))
+            open(os.path.join(d, "prebuilt", "sentinel-barra"), "w").close()
+            s = subprocess.run(["bash", os.path.join(d, "install-mac.sh"), "--dry-run"], capture_output=True, text=True, timeout=30, env=dict(os.environ, SENTINEL_FAKE_UNAME="Darwin")).stdout
+        self.assertIn("copiar el icono ya compilado", s)
+        self.assertIn("compilar sentinel-barra", self.correr("Darwin", "--dry-run").stdout)       # desde el código se sigue compilando
+
     def test_sin_python_incluido_sigue_usando_el_del_sistema(self):
         s = self.correr("Darwin", "--dry-run").stdout
         self.assertNotIn("runtime", s); self.assertIn("precompilar", s)

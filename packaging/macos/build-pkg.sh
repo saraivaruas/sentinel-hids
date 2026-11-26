@@ -10,6 +10,12 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/scripts/sentinel-src" "$AQUI/dist"
 cp -R "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/packaging" "$AQUI/README.md" "$AQUI/LICENSE" "$AQUI/install-mac.sh" "$AQUI/uninstall-mac.sh" "$TMP/scripts/sentinel-src/"
 find "$TMP/scripts" -name __pycache__ -prune -exec rm -rf {} +
+# el icono de la barra de menú, compilado para Apple Silicon e Intel: quien instala no necesita compilador
+mkdir -p "$TMP/scripts/sentinel-src/prebuilt"
+for arq in arm64 x86_64; do
+  xcrun swiftc -O -target "$arq-apple-macos13" -o "$TMP/barra-$arq" "$AQUI/packaging/macos/barra.swift"
+done
+lipo -create -o "$TMP/scripts/sentinel-src/prebuilt/sentinel-barra" "$TMP/barra-arm64" "$TMP/barra-x86_64"
 cp "$AQUI/packaging/macos/postinstall" "$TMP/scripts/postinstall"; chmod 755 "$TMP/scripts/postinstall"
 SALIDA="$AQUI/dist/sentinel-$VER-macos.pkg"
 FIRMA=(); [ -n "${SENTINEL_PKG_IDENTIDAD:-}" ] && FIRMA=(--sign "$SENTINEL_PKG_IDENTIDAD")
