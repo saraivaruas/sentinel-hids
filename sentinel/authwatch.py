@@ -16,6 +16,7 @@ RE_SUDO_FAIL = re.compile(r"(\S+)\s*: (\d+) incorrect password attempts?")
 RE_SUDO_ROOT = re.compile(r"(\S+)\s*: .*USER=root ; COMMAND=(.*)")
 RE_UFW = re.compile(r"\[UFW BLOCK\].*?SRC=(\S+).*?PROTO=(\S+)(?:.*?DPT=(\d+))?")
 RE_SU_FAIL = re.compile(r"FAILED SU \(to (\S+)\) (\S+) on")
+RE_SU_FAIL_MAC = re.compile(r"BAD SU (\S+) to (\S+) on")
 
 
 class AuthWatch:
@@ -71,7 +72,14 @@ class AuthWatch:
             return
         m = RE_SU_FAIL.search(msg)
         if m:
-            self.alerter.emit("medium", "auth", "su_fallido", f"Intento fallido de «su» hacia {m.group(1)} por {m.group(2)}", key=f"auth:su:{m.group(2)}:{int(t // 3600)}")
+            self._su_fallido(m.group(1), m.group(2), t)
+            return
+        m = RE_SU_FAIL_MAC.search(msg)
+        if m and ident == "su":
+            self._su_fallido(m.group(2), m.group(1), t)
+
+    def _su_fallido(self, destino: str, origen: str, t: float) -> None:
+        self.alerter.emit("medium", "auth", "su_fallido", f"Intento fallido de «su» hacia {destino} por {origen}", key=f"auth:su:{origen}:{int(t // 3600)}")
 
     def _portscan(self, ip: str, port: int, t: float) -> None:
         d = self.ports[ip]

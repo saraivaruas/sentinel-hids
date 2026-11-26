@@ -56,6 +56,12 @@ class AuthTests(unittest.TestCase):
         ev = [x for x in self.e.events() if x["kind"] == "escaneo_de_puertos"]
         self.assertEqual([x["sev"] for x in ev], ["low"])
 
+    def test_su_fallido_de_macos(self):
+        self.a.handle("su", "BAD SU ana to root on /dev/ttys001", 1)
+        ev = [x for x in self.e.events() if x["kind"] == "su_fallido"]
+        self.assertEqual(len(ev), 1)
+        self.assertIn("hacia root por ana", ev[0]["msg"])
+
     def test_sudo_fallido(self):
         self.a.handle("sudo", "ana : 3 incorrect password attempts ; TTY=pts/0 ; PWD=/home/ana ; USER=root ; COMMAND=/bin/ls", 1)
         self.assertIn("sudo_fallido", self.kinds())
