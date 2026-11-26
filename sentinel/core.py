@@ -601,7 +601,7 @@ class Alerter:
 
     def popup(self, ev: Event, force: bool = False) -> bool:
         """Muestra una ventana emergente de alerta con botón para abrir el panel. Limita cuántas aparecen por minuto."""
-        if not shutil.which("zenity"):
+        if not shutil.which("osascript" if plataforma.ES_MAC else "zenity"):
             return False
         tgt = self.desktop_target()
         if not tgt:
@@ -613,15 +613,38 @@ class Alerter:
             return False
         self._pop.append(t)
         user, uid = tgt
-        cmd = self.popup_cmd(ev, user, uid, is_root())
+        cmd = (self.popup_mac_cmd if plataforma.ES_MAC else self.popup_cmd)(ev, user, uid, is_root())
         self.last_popup = threading.Thread(target=self._spawn_popup, args=(cmd, user, uid), daemon=True)
         self.last_popup.start()
         return True
+
+    @staticmethod
+    def en_sesion_mac(cmd: list[str], user: str, uid: int, root: bool) -> list[str]:
+        """Ejecuta un comando en la pantalla del usuario (un servicio de root no la ve)."""
+        return ["launchctl", "asuser", str(uid), "sudo", "-u", user, *cmd] if root else cmd
+
+    def popup_mac_cmd(self, ev: Event, user: str, uid: int, root: bool) -> list[str]:
+        """Ventana de alerta de macOS con botón «Abrir panel». El texto (que puede venir de un atacante) va como argumento, no dentro del guion."""
+        crit = ev.sev == "critical"
+        secs = self.cfg.getint("general", "popup_seconds", fallback=120)
+        texto = f"{ev.msg}\n\nMódulo: {ev.source}/{ev.kind}\nHora: {ev.ts[:19].replace('T', ' ')}"[:900]
+        cierre = f" giving up after {secs}" if secs > 0 and not crit else ""
+        guion = ('display dialog (item 2 of argv) with title (item 1 of argv) buttons {"Cerrar", "Abrir panel"} default button "Cerrar" with icon '
+                 + ("stop" if crit else "caution") + cierre)
+        cmd = ["osascript", "-e", "on run argv", "-e", guion, "-e", "end run", "--", f"Sentinel · ALERTA {SEV_ES[ev.sev]}", texto]
+        return self.en_sesion_mac(cmd, user, uid, root)
 
     def _spawn_popup(self, cmd: list[str], user: str, uid: int) -> None:
         try:
             r = subprocess.run(cmd, capture_output=True, timeout=3600, check=False)
         except (OSError, subprocess.SubprocessError):
+            return
+        if plataforma.ES_MAC:
+            if r.returncode == 0 and b"Abrir panel" in (r.stdout or b""):
+                try:
+                    subprocess.Popen(self.en_sesion_mac(["open", "-a", "Sentinel"], user, uid, is_root()), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                except OSError:
+                    pass
             return
         if r.returncode == 0:      # pulsó «Abrir panel»
             env = [f"{k}={v}" for k, v in self.desktop_env(uid).items()]
