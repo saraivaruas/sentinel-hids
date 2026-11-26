@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Instalador `.pkg` para macOS** (`packaging/macos/build-pkg.sh`), que ejecuta el mismo instalador de siempre. Sale sin firmar: macOS avisará al abrirlo hasta firmarlo y notarizarlo con una cuenta de Apple Developer. 2 pruebas nuevas.
 - La prueba del instalador en macOS comprueba que el icono se compila, lee el estado y queda corriendo.
 - **Icono en la barra de menú de macOS:** un escudo del color del estado, con «Abrir panel». El instalador lo compila y lo arranca; el desinstalador lo quita. 1 prueba nueva.
 - **PIN sin terminal en macOS:** se pide con una ventana del sistema (antes dependía de `zenity`, que no existe en Mac). 2 pruebas nuevas.
