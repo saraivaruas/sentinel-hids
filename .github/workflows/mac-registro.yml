@@ -1,0 +1,73 @@
+# Muestras reales del registro de macOS al fallar accesos (SSH, sudo, su), para escribir y revisar
+# el detector de fuerza bruta. Solo en equipos desechables de GitHub: crea un usuario y enciende SSH.
+name: mac-registro
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/mac-registro.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  muestras:
+    name: Registro en ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-15]
+    steps:
+      - name: Encender SSH y crear un usuario de prueba
+        run: |
+          sw_vers; ssh -V
+          sudo sysadminctl -addUser sentinelprueba -password 'Clave-Buena-123'
+          sudo systemsetup -setremotelogin on || true
+          sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist || true
+          sudo dseditgroup -o edit -a sentinelprueba -t user com.apple.access_ssh || true
+          sleep 3
+          nc -z 127.0.0.1 22 && echo "SSH escuchando" || echo "SSH NO escucha"
+      - name: Provocar accesos y capturar el registro
+        run: |
+          filtro='process BEGINSWITH "sshd" OR process == "sudo" OR process == "su"'
+          sudo log stream --style ndjson --level info --predicate "$filtro" > "$RUNNER_TEMP/vivo.ndjson" &
+          sleep 5
+          intento() { # usuario clave
+            printf '#!/bin/sh\necho "%s"\n' "$2" > "$RUNNER_TEMP/clave.sh"; chmod +x "$RUNNER_TEMP/clave.sh"
+            SSH_ASKPASS="$RUNNER_TEMP/clave.sh" SSH_ASKPASS_REQUIRE=force ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o NumberOfPasswordPrompts=2 \
+              "$1@127.0.0.1" true </dev/null; echo "ssh $1 -> $?"
+          }
+          intento noexiste mala
+          intento sentinelprueba mala
+          intento sentinelprueba Clave-Buena-123
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes sentinelprueba@127.0.0.1 true; echo "ssh sin clave -> $?"
+          printf 'a\nb\nc\n' | sudo -u sentinelprueba sudo -k -S true; echo "sudo malo -> $?"
+          echo mala | sudo -u sentinelprueba su root -c true; echo "su malo -> $?"
+          sleep 8
+          sudo pkill -f "log stream" || true
+          sudo log show --last 3m --info --style ndjson --predicate "$filtro" > "$RUNNER_TEMP/guardado.ndjson"
+      - name: Mostrar las muestras
+        run: |
+          for f in vivo guardado; do
+            echo "===== $f ($(wc -l < "$RUNNER_TEMP/$f.ndjson") líneas)"
+            python3 - "$RUNNER_TEMP/$f.ndjson" <<'EOF'
+          import json, sys
+          claves = None
+          for linea in open(sys.argv[1], encoding="utf-8", errors="replace"):
+              try:
+                  r = json.loads(linea)
+              except ValueError:
+                  print("NO-JSON:", linea.rstrip()[:200]); continue
+              if not isinstance(r, dict) or "eventMessage" not in r:
+                  print("OTRO:", linea.rstrip()[:200]); continue
+              if claves is None:
+                  claves = sorted(r); print("CAMPOS:", claves)
+              msg = r["eventMessage"]
+              if r.get("processImagePath", "").endswith("sudo") or any(p in msg.lower() for p in ("fail", "invalid", "accept", "password", "preauth", "auth", "incorrect")):
+                  print(json.dumps([r.get("processImagePath"), r.get("senderImagePath"), r.get("subsystem"), r.get("category"), r.get("messageType"), msg[:300]], ensure_ascii=False))
+          EOF
+          done
