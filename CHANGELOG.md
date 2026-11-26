@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- En macOS el instalador deja **Sentinel** en Aplicaciones (abre el panel) y el desinstalador lo quita. 1 prueba nueva.
 - **Los botones del panel funcionan en macOS:** en vez de `pkexec` (que no existe allí) usan `sudo` con una ventana de contraseña del sistema; el PIN sigue viajando por la entrada estándar. 4 pruebas nuevas.
 - **Avisos en pantalla en macOS:** las alertas salen como notificaciones del sistema en la sesión de quien usa el equipo (antes no aparecía nada). El texto de la alerta viaja como dato, nunca dentro del guion, para que un atacante no pueda ejecutar nada. 2 pruebas nuevas.
 - Las pruebas del horario del informe y de `status` simulan `systemd`; en la CI de Mac fallaban desde que existe el manejo con `launchd`.
