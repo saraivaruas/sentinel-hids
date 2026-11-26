@@ -1,7 +1,10 @@
 import hashlib
 import http.client
+import io
 import json
 import os
+import subprocess
+import tarfile
 import threading
 import unittest
 import urllib.error
@@ -117,6 +120,41 @@ class InstallTests(unittest.TestCase):
     def test_archivo_de_otro_servidor_en_la_publicacion_se_rechaza(self):
         self.info["asset_urls"]["sentinel_2.2.0_all.deb"] = "https://evil.example/sentinel_2.2.0_all.deb"
         (ok, msg), apt = self.run_install(); self.assertFalse(ok); self.assertFalse(apt.called)
+
+
+class InstallMacTests(unittest.TestCase):
+    """En macOS no hay .deb: se baja el paquete comprimido, se verifica y se ejecuta su instalador de Mac."""
+
+    def setUp(self):
+        self.e = Env(); self.addCleanup(self.e.close)
+
+    def instalar(self, archivos):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as t:
+            for nombre in archivos:
+                info = tarfile.TarInfo("sentinel-2.2.0/" + nombre); info.size = 2; info.mode = 0o755
+                t.addfile(info, io.BytesIO(b"#!"))
+        tgz = buf.getvalue()
+        base = f"https://github.com/{REPO}/releases/download/v2.2.0/"
+        info = {"current": "2.1.0", "latest": "2.2.0", "available": True, "enabled": True,
+                "asset_urls": {n: base + n for n in ("sentinel-2.2.0.tar.gz", "SHA256SUMS")}}
+        sums = hashlib.sha256(tgz).hexdigest() + "  sentinel-2.2.0.tar.gz\n"
+        get = lambda url, t=8, limit=0: sums.encode() if url.endswith("SHA256SUMS") else tgz
+        correr = mock.Mock(return_value=mock.Mock(returncode=0, stdout="", stderr=""))
+        self.e.cfg.set("update", "require_signature", "no")
+        with mock.patch.object(update.plataforma, "ES_MAC", True), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(update, "check", return_value=info), \
+             mock.patch.object(update, "_get", side_effect=get), mock.patch.object(update.shutil, "which", return_value=None), mock.patch.object(subprocess, "run", correr):
+            return update.install(self.e.cfg, log=lambda *a: None), correr
+
+    def test_usa_el_instalador_de_mac(self):
+        (ok, msg), correr = self.instalar(["install.sh", "install-mac.sh"])
+        self.assertTrue(ok, msg)
+        cmd = correr.call_args[0][0]
+        self.assertEqual(len(cmd), 1); self.assertTrue(cmd[0].endswith("install-mac.sh"))
+
+    def test_una_publicacion_sin_instalador_de_mac_no_ejecuta_el_de_linux(self):
+        (ok, msg), correr = self.instalar(["install.sh"])
+        self.assertFalse(ok); self.assertIn("macOS", msg); correr.assert_not_called()
 
 
 class UiUpdateTests(unittest.TestCase):

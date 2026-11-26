@@ -14,7 +14,7 @@ import tempfile
 import urllib.error
 import urllib.request
 
-from . import core
+from . import core, plataforma
 
 TTL = 6 * 3600
 MAX_BYTES = 30 * 1024 * 1024
@@ -160,7 +160,10 @@ def install(cfg=None, log=print) -> tuple[bool, str]:
             with tarfile.open(path) as t:
                 t.extractall(tmp, filter="data") if hasattr(tarfile, "data_filter") else t.extractall(tmp)
             d = next(os.path.join(tmp, x) for x in os.listdir(tmp) if x.startswith("sentinel-") and os.path.isdir(os.path.join(tmp, x)))
-            r = subprocess.run([os.path.join(d, "install.sh"), "--sin-limpiar"], capture_output=True, text=True, timeout=900, check=False)
+            instalador = [os.path.join(d, "install-mac.sh")] if plataforma.ES_MAC else [os.path.join(d, "install.sh"), "--sin-limpiar"]
+            if plataforma.ES_MAC and not os.path.isfile(instalador[0]):
+                return False, f"La publicación {ver} todavía no trae el instalador de macOS. No se instaló nada."
+            r = subprocess.run(instalador, capture_output=True, text=True, timeout=900, check=False)
             if r.returncode != 0:
                 return False, "La instalación falló:\n" + (r.stdout + r.stderr)[-600:]
         core.atomic_write_json(cache_path(), dict(info, current=ver, available=False), 0o644)
