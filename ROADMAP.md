@@ -33,7 +33,7 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 2.3 | 🟡 | No contestar a ping | Solo la petición de eco en IPv4 e IPv6; ARP y el descubrimiento de vecinos se mantienen. Afecta también al ping desde la VPN y el propio equipo. Hecho y probado con un sistema simulado; falta un equipo real y la CI. |
 | 2.4 | ⬜ | Entrada cerrada | Con el módulo cortafuegos: nada abierto desde fuera, sin respuesta a lo no pedido. |
 | 2.5 | 🟡 | Modo discreto | `sentinel discrecion aplicar` y `revertir`: aplica 2.2 y 2.3 y se puede deshacer. Falta sumar 2.4 y comprobarlo en un equipo real. |
-| 2.6 | ⬜ | Página en el panel | |
+| 2.6 | 🟡 | Apartado en Ajustes del panel | «Modo discreto en la red»: hallazgos, elegir medidas y deshacer. Hecho y visto en el navegador; falta usar sus botones en un equipo real y que pase por la CI. |
 
 ### Fase 3: más adelante
 
