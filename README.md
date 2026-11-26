@@ -213,6 +213,7 @@ Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` �
 | `sentinel requisitos [--instalar]` | qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta |
 | `sentinel endurecer plan\|aplicar\|revertir [--perfil basico\|recomendado\|estricto]` | endurecimiento guiado, reversible |
 | `sentinel identidad estado` | MAC e IP en uso, si se envía el nombre del equipo y otros programas que las cambian |
+| `sudo sentinel identidad rotar\|restaurar` | MAC e IP nuevas sin enviar el nombre (vuelve atrás si falla) · volver a la MAC de fábrica |
 
 Configuración: `/etc/sentinel/sentinel.conf` (parte de `etc/sentinel.conf.example`). Registros: `/var/log/sentinel/`.
 

@@ -7,6 +7,8 @@ from __future__ import annotations
 import glob
 import os
 import re
+import secrets
+import time
 
 from . import core, plataforma
 
@@ -97,3 +99,102 @@ def estado(cfg, run=core.run) -> dict:
             "aleatoria": actual != fabrica, "ip": direccion(dev, run), "puerta": puerta(dev, run),
             "metodo": v.get("ipv4.method", ""), "envia_nombre": v.get("ipv4.dhcp-send-hostname", "") != "no",
             "otros": otros, "cron_revisado": completo}
+
+
+def mac_aleatoria() -> str:
+    """Dirección al azar marcada como «administrada localmente» y de un solo equipo: no pertenece a ningún fabricante."""
+    b = bytearray(secrets.token_bytes(6))
+    b[0] = (b[0] & 0xFC) | 0x02
+    return ":".join(f"{x:02x}" for x in b)
+
+
+def _archivo() -> str:
+    return os.path.join(core.state_dir(), "identidad.json")
+
+
+def _guardado() -> dict:
+    d = core.read_json(_archivo(), {}) or {}
+    d.setdefault("originales", {})
+    return d
+
+
+def _aplicar(uuid: str, dev: str, valores: dict, run) -> tuple[bool, str]:
+    """Escribe los valores en la conexión y la vuelve a activar (la red se corta unos segundos)."""
+    rc, out = run(["nmcli", "connection", "modify", uuid, *[x for par in valores.items() for x in par]], 20)
+    if rc == 0:
+        rc, out = run(["nmcli", "--wait", "45", "connection", "up", "uuid", uuid, "ifname", dev], 60)
+    return rc == 0, out.strip()
+
+
+def _responde(ip: str, run, intentos: int = 4, espera: float = 2.0) -> bool:
+    for i in range(intentos):
+        if ip and run(["ping", "-c", "1", "-W", "2", ip], 5)[0] == 0:
+            return True
+        if i + 1 < intentos:
+            time.sleep(espera)
+    return False
+
+
+def _fallo(e: dict, mac: str, ping_antes: bool, run) -> str:
+    """¿Qué quedó mal tras el cambio? Vacío = todo bien."""
+    if macs(e["interfaz"], run)[0] != mac:
+        return "la interfaz no tomó la MAC nueva"
+    if not direccion(e["interfaz"], run):
+        return "la red no entregó una dirección IP"
+    if ping_antes and not _responde(puerta(e["interfaz"], run), run):
+        return "la puerta de salida dejó de responder"
+    return ""
+
+
+def rotar(cfg, alerter, run=core.run) -> dict:
+    """Cambia la MAC (y con ella la IP que da el DHCP) sin enviar el nombre del equipo. Si algo falla, vuelve atrás."""
+    e = estado(cfg, run)
+    if e["error"]:
+        return {"ok": False, "mensaje": e["error"]}
+    uuid, dev, prop = e["conexion"], e["interfaz"], e["tipo"] + ".cloned-mac-address"
+    previo = leer(uuid, [prop, "ipv4.dhcp-client-id", "ipv4.dhcp-send-hostname", "ipv6.dhcp-send-hostname"], run)
+    if previo is None:
+        return {"ok": False, "mensaje": "No pude leer la conexión actual; no se cambió nada."}
+    d = _guardado()
+    d["originales"].setdefault(uuid, previo)              # solo la primera vez: es a lo que vuelve «restaurar»
+    d["ultimo_intento"] = core.now()
+    core.atomic_write_json(_archivo(), d)
+    ping_antes = _responde(e["puerta"], run, 2)           # hay redes cuya puerta nunca contesta: eso no es un fallo
+    mac = mac_aleatoria()
+    nuevo = {prop: mac, "ipv4.dhcp-client-id": "mac", "ipv4.dhcp-send-hostname": "no", "ipv6.dhcp-send-hostname": "no"}
+    ok, salida = _aplicar(uuid, dev, nuevo, run)
+    motivo = _fallo(e, mac, ping_antes, run) if ok else (salida or "NetworkManager no pudo activar la conexión")
+    if motivo:
+        # sin MAC definida NetworkManager conservaría la nueva: se activa con la anterior y luego se deja como estaba
+        vuelta, _ = _aplicar(uuid, dev, {**previo, prop: previo[prop] or e["mac"]}, run)
+        if not previo[prop]:
+            run(["nmcli", "connection", "modify", uuid, prop, ""], 20)
+        msg = f"No se cambió la identidad de {dev}: {motivo}. " + ("Se volvió a la anterior." if vuelta else "TAMPOCO pude volver atrás: revisa la red (sudo sentinel identidad restaurar).")
+        alerter.emit("medium" if vuelta else "high", "identidad", "rotacion_fallida", msg, key=f"identidad:fallo:{int(core.now())}")
+        return {"ok": False, "mensaje": msg}
+    ip = direccion(dev, run)
+    msg = f"Identidad cambiada en {dev}: MAC {e['mac']} → {mac} · IP {e['ip'] or 'ninguna'} → {ip}"
+    alerter.emit("info", "identidad", "rotada", msg, key=f"identidad:ok:{int(core.now())}")
+    return {"ok": True, "mensaje": msg, "mac": mac, "ip": ip}
+
+
+def restaurar(cfg, alerter, run=core.run) -> dict:
+    """Vuelve a la MAC de fábrica y a los ajustes que tenía la conexión antes de la primera rotación."""
+    e = estado(cfg, run)
+    if e["error"]:
+        return {"ok": False, "mensaje": e["error"]}
+    uuid, dev, prop = e["conexion"], e["interfaz"], e["tipo"] + ".cloned-mac-address"
+    d = _guardado()
+    original = d["originales"].get(uuid)
+    if original is None:
+        return {"ok": False, "mensaje": "Sentinel no ha cambiado esta conexión: no hay nada que restaurar."}
+    ok, salida = _aplicar(uuid, dev, {**original, prop: original[prop] or "permanent"}, run)
+    if not ok:
+        return {"ok": False, "mensaje": f"No pude restaurar {dev}: {salida}"}
+    if not original[prop]:
+        run(["nmcli", "connection", "modify", uuid, prop, ""], 20)
+    del d["originales"][uuid]
+    core.atomic_write_json(_archivo(), d)
+    msg = f"Identidad restaurada en {dev}: MAC {macs(dev, run)[0]} · IP {direccion(dev, run) or 'ninguna'}"
+    alerter.emit("info", "identidad", "restaurada", msg, key=f"identidad:rest:{int(core.now())}")
+    return {"ok": True, "mensaje": msg}

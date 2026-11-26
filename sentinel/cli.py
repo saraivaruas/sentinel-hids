@@ -385,8 +385,17 @@ def cmd_endurecer(a) -> int:
 
 
 def cmd_identidad(a) -> int:
-    """MAC e IP del equipo en la red: `estado` (solo lectura)."""
-    e = identidad.estado(core.load_config())
+    """MAC e IP del equipo en la red: `estado` (solo lectura), `rotar` y `restaurar`."""
+    cfg = core.load_config()
+    if a.accion in ("rotar", "restaurar"):
+        if not core.is_root():
+            print(f"Necesita administrador: ejecuta  sudo sentinel identidad {a.accion}", file=sys.stderr); return 1
+        if not a.si and sys.stdin.isatty() and input("La red se cortará unos segundos (y se cierran las conexiones abiertas, también SSH). ¿Seguir? [s/N]: ").strip().lower() not in ("s", "si", "sí", "y"):
+            print("No se cambió nada."); return 0
+        r = getattr(identidad, a.accion)(cfg, core.Alerter(cfg))
+        print(r["mensaje"], file=sys.stdout if r["ok"] else sys.stderr)
+        return 0 if r["ok"] else 1
+    e = identidad.estado(cfg)
     if a.json:
         print(json.dumps(e, ensure_ascii=False, indent=1)); return 1 if e["error"] else 0
     if e["error"]:
@@ -642,7 +651,7 @@ def _protected(a) -> bool:
     n = a.fn.__name__
     if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender", "cmd_resolver"):
         return True
-    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_ia" and a.accion in ("configurar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
+    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_identidad" and a.accion in ("rotar", "restaurar")) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_ia" and a.accion in ("configurar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
             or (n == "cmd_pin" and a.accion in ("establecer", "quitar")))
 
@@ -830,7 +839,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("endurecer", help="endurecimiento guiado del equipo: plan (solo lectura), aplicar (con copia y comprobación), revertir"); s.add_argument("accion", nargs="?", default="plan", choices=["plan", "estado", "aplicar", "revertir"])
     s.add_argument("--perfil", default="recomendado", choices=list(endurecer.PERFILES), help="basico (sin efectos visibles), recomendado (CIS nivel 1) o estricto (servidores)"); s.add_argument("--solo", help="solo estas medidas, separadas por coma")
     s.add_argument("--si", action="store_true", help="no preguntar antes de aplicar"); s.add_argument("--tanda", help="revertir: carpeta de la tanda (por defecto la última)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_endurecer)
-    s = sub.add_parser("identidad", help="MAC e IP del equipo en la red: estado"); s.add_argument("accion", nargs="?", default="estado", choices=["estado"]); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_identidad)
+    s = sub.add_parser("identidad", help="MAC e IP del equipo en la red: estado, rotar (MAC e IP nuevas), restaurar"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "rotar", "restaurar"]); s.add_argument("--json", action="store_true"); s.add_argument("--si", action="store_true", help="no preguntar antes de cortar la red"); s.set_defaults(fn=cmd_identidad)
     s = sub.add_parser("requisitos", help="qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta"); s.add_argument("--instalar", action="store_true", help="instala lo que falta (pregunta antes y pide tu contraseña de administrador)")
     s.add_argument("--si", action="store_true", help="instala sin preguntar (lo usa el panel)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_requisitos)
     s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])
