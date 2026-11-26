@@ -49,6 +49,12 @@ comprobar "el informe programado se genera" sh -c 'ls /var/lib/sentinel/informes
 echo "== reinstalar encima"; "$AQUI/install-mac.sh" >/dev/null; comprobar "reinstalar funciona" test $? = 0
 comprobar "sigue corriendo tras reinstalar" esperar 60 corriendo
 
+echo "== icono de la barra de menú"
+comprobar "el icono se compiló" test -x /opt/sentinel/bin/sentinel-barra
+sudo -u "$SUDO_USER" /opt/sentinel/bin/sentinel-barra --una-vez | tee /tmp/barra.txt
+comprobar "el icono lee el estado real" grep -Eq '^(protegido|revision|atencion|peligro)\|' /tmp/barra.txt
+comprobar "el icono queda en la barra de quien usa el equipo" esperar 30 pgrep -u "$SUDO_USER" -f /opt/sentinel/bin/sentinel-barra
+
 echo "== señuelos"
 comprobar "los señuelos se activan" /usr/local/bin/sentinel senuelos activar
 comprobar "quedan escuchando" esperar 30 nc -z 127.0.0.1 2222
@@ -84,6 +90,7 @@ comprobar "ningún programa se cayó" sh -c '! grep -q Traceback /var/log/sentin
 echo "== desinstalar"; "$AQUI/uninstall-mac.sh" --todo; comprobar "el desinstalador termina bien" test $? = 0
 comprobar "no queda el servicio" sh -c "! launchctl print $SVC.monitor"
 comprobar "no quedan procesos" sh -c "! pgrep -f '/opt/sentinel monitor'"
+comprobar "no queda el icono" sh -c '! pgrep -f /opt/sentinel/bin/sentinel-barra'
 comprobar "no queda el usuario de los señuelos" sh -c '! dscl . -read /Users/_sentinel'
 for r in /opt/sentinel /etc/sentinel /var/lib/sentinel /var/log/sentinel /usr/local/bin/sentinel; do comprobar "no queda $r" test ! -e "$r"; done
 rm -f /Library/LaunchDaemons/com.ejemplo.intruso.plist
