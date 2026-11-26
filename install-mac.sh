@@ -32,10 +32,13 @@ if [ -z "$PY" ]; then
 fi
 modulo() { do_ "$PY" -I -c "import sys; sys.path.insert(0, '$DEST'); from sentinel import servicio; $1" "${@:2}"; }
 
-# Una instalación anterior con PIN solo se reemplaza con el PIN
+# Una instalación anterior con PIN solo se reemplaza con el PIN. Una actualización ya lo comprobó y no lo vuelve a pedir.
+anterior() { "$PY" -I -c "import sys; sys.path.insert(0, '$DEST'); $1"; }
 if [ "$DRY" = 0 ] && [ -x "$DEST/bin/sentinel" ]; then
-  "$DEST/bin/sentinel" pin verificar || { echo "Sentinel está protegido con PIN: no se reinstala sin el PIN correcto." >&2; exit 1; }
-  "$DEST/bin/sentinel" detener >/dev/null || true
+  if ! anterior "from sentinel import pin; sys.exit(0 if not pin.required() or pin.stop_authorized() else 1)"; then
+    "$DEST/bin/sentinel" pin verificar || { echo "Sentinel está protegido con PIN: no se reinstala sin el PIN correcto." >&2; exit 1; }
+  fi
+  anterior "from sentinel import servicio; sys.exit(1 if servicio.detener() else 0)" || { echo "No pude detener la versión anterior." >&2; exit 1; }
 fi
 
 paso "1/5 Programa en $DEST (solo el administrador puede modificarlo)"
@@ -68,7 +71,8 @@ paso "3/5 Tareas de launchd"
 modulo "servicio.instalar(sys.argv[1])" "$PY"
 
 paso "4/5 Referencia inicial de integridad"
-do_ "$DEST/bin/sentinel" baseline init
+# al reinstalar se acepta la referencia anterior (con PIN, «accept» no vuelve a preguntarlo)
+if [ -e /var/lib/sentinel/fim_baseline.json ]; then do_ "$DEST/bin/sentinel" baseline accept; else do_ "$DEST/bin/sentinel" baseline init; fi
 
 paso "5/5 Arrancar"
 modulo "e = servicio.iniciar(); print(chr(10).join(e)); sys.exit(1 if e else 0)"
