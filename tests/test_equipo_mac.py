@@ -1,4 +1,7 @@
 import json
+import os
+import plistlib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -48,9 +51,9 @@ class InformeMacTests(unittest.TestCase):
         self.assertNotIn("(falló)", self.texto); self.assertNotIn("/proc", self.texto)
 
     def test_no_da_por_bueno_lo_que_no_revisa(self):
-        for frase in ("coinciden con su hash original", "Actualizaciones de seguridad pendientes: 0"):
+        for frase in ("coinciden con su hash original", "Actualizaciones de seguridad pendientes: 0", "No hay actualizaciones pendientes"):
             self.assertNotIn(frase, self.texto)
-        self.assertIn(equipo_mac.NO_REVISADO, self.texto)
+        self.assertIn("No se pudo consultar si hay actualizaciones", self.texto)          # aquí softwareupdate no responde nada reconocible
 
     def test_lee_los_accesos_fallidos_del_registro_de_macos(self):
         self.assertIn("Fallos remotos (SSH): 11 · fallos locales (sudo y su): 2", self.texto)
@@ -60,6 +63,50 @@ class InformeMacTests(unittest.TestCase):
         self.assertTrue(any("198.51.100.7:4444" in t and "Curioso" in t for t in self.hallazgos("conexiones")))
         self.assertTrue(any("(nc)" in t for t in self.hallazgos("shell reversa")))
         self.assertTrue(any("ngrok" in t for t in self.hallazgos("túneles")))
+
+
+class SeccionesMacTests(unittest.TestCase):
+    def revision(self, respuestas):
+        e = Env(); self.addCleanup(e.close)
+
+        def run(c, t=20):
+            return respuestas.get(c[0], (0, ""))
+        for p in (mock.patch.object(core, "run", side_effect=run), mock.patch.object(plataforma, "ES_MAC", True)):
+            p.start(); self.addCleanup(p.stop)
+        return equipo_mac.RevisionMac(e.cfg)
+
+    def test_firma_de_los_programas_de_arranque(self):
+        d = tempfile.TemporaryDirectory(); self.addCleanup(d.cleanup)
+
+        def archivo(nombre, datos):
+            p = os.path.join(d.name, nombre)
+            with open(p, "wb") as f:
+                f.write(datos)
+            return p
+        binario, guion = archivo("espia", b"\xcf\xfa\xed\xfe"), archivo("tarea.sh", b"#!/bin/sh\n")
+        for nombre, programa in (("com.x.espia", binario), ("com.x.guion", guion), ("com.x.viejo", "/no/existe")):
+            with open(os.path.join(d.name, nombre + ".plist"), "wb") as f:
+                plistlib.dump({"Label": nombre, "ProgramArguments": [programa]}, f)
+        archivo("roto.plist", b"esto no es un plist")
+        r = self.revision({"codesign": (1, "code object is not signed at all")})
+        with mock.patch.object(equipo_mac, "CARPETAS_ARRANQUE", (d.name,)), mock.patch.object(r, "_casas", return_value=[]):
+            r.paquetes()
+        textos = {h.nivel: h.texto for h in r.inf.unicos()}
+        self.assertIn("espia", textos["MEDIO"]); self.assertNotIn("tarea.sh", textos["MEDIO"]); self.assertIn("tarea.sh", textos["BAJO"])
+        self.assertIn("ya no existe", equipo.a_texto(r.inf))
+
+    def test_actualizaciones_pendientes_y_al_dia(self):
+        r = self.revision({"softwareupdate": (0, "Software Update found the following new or updated software:\n* Label: macOS Tahoe 26.8-25H1\n\tTitle: macOS Tahoe, Size: 1K\n")})
+        r.actualizaciones()
+        self.assertIn("macOS Tahoe 26.8", r.inf.unicos()[0].texto)
+        r = self.revision({"softwareupdate": (0, "Software Update Tool\nNo new software available.\n")})
+        r.actualizaciones()
+        self.assertEqual(r.inf.unicos(), []); self.assertIn("No hay actualizaciones pendientes", equipo.a_texto(r.inf))
+
+    def test_sip_desactivado_es_alto(self):
+        r = self.revision({"csrutil": (0, "System Integrity Protection status: disabled."), "spctl": (0, "assessments enabled")})
+        r.integridad_extra()
+        self.assertEqual([(h.nivel, h.area) for h in r.inf.unicos()], [("ALTO", "SIP")])
 
 
 if __name__ == "__main__":

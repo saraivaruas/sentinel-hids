@@ -1,6 +1,6 @@
 """El informe del equipo en macOS: las mismas secciones, leídas con las herramientas de Apple.
 
-Lo que todavía no se revisa en Mac lo dice con esas palabras: nunca da algo por bueno sin haberlo mirado.
+Nunca da algo por bueno sin haberlo mirado: si no puede comprobar algo, lo dice.
 """
 from __future__ import annotations
 
@@ -9,12 +9,13 @@ import glob
 import hashlib
 import os
 import platform
+import plistlib
 import re
 import time
 
-from . import authwatch, core, equipo, hostcheck, servicio
+from . import audit, audit_mac, authwatch, core, equipo, hostcheck, servicio
 
-NO_REVISADO = "No se revisa en macOS todavía."
+CARPETAS_ARRANQUE = ("/Library/LaunchDaemons", "/Library/LaunchAgents")
 DUENOS_ROOT = ("/", "/private/etc", "/usr", "/usr/bin", "/usr/sbin", "/bin", "/sbin", "/Library", "/Library/LaunchDaemons", "/Library/LaunchAgents",
                "/private/etc/sudoers", "/private/etc/sudoers.d", "/private/etc/passwd", "/private/etc/group", "/private/etc/ssh", "/private/etc/pam.d")
 DE_HOMEBREW = ("/usr/local/bin", "/usr/local/sbin")
@@ -46,10 +47,6 @@ class RevisionMac(equipo.Revision):
             p = ln.strip().split(None, 1)
             if len(p) == 2 and p[0].isdigit() and int(p[0]) != os.getpid():
                 yield p[0], os.path.basename(p[1].split()[0]).lstrip("-"), p[1][:300]
-
-    def _sin_revisar(self, titulo: str) -> None:
-        self.inf.sec(titulo)
-        self.inf.linea(NO_REVISADO)
 
     # ------------------------------------------------------------------ comprobaciones
     def contexto(self) -> None:
@@ -116,8 +113,48 @@ class RevisionMac(equipo.Revision):
         if not n:
             i.linea("Ninguno.")
 
+    def _programas_de_arranque(self):
+        """(archivo .plist, programa) de lo que macOS arranca solo y no es de Apple."""
+        for carpeta in CARPETAS_ARRANQUE + tuple(os.path.join(c, "Library", "LaunchAgents") for c in self._casas()):
+            for plist in sorted(glob.glob(os.path.join(carpeta, "*.plist"))):
+                if os.path.basename(plist).startswith(servicio.PREFIJO):
+                    continue
+                try:
+                    with open(plist, "rb") as f:
+                        d = plistlib.load(f)
+                    programa = d.get("Program") or (d.get("ProgramArguments") or [""])[0]
+                except Exception:                      # un .plist ilegible o roto no debe parar la revisión
+                    programa = ""
+                yield plist, str(programa)
+
     def paquetes(self) -> None:
-        self._sin_revisar("Integridad de los programas instalados")
+        """macOS no tiene un «dpkg -V»: se comprueba la firma de los programas que arrancan solos, que es donde se esconde lo malicioso."""
+        i = self.inf
+        i.sec("Firma de los programas que arrancan solos")
+        revisados, sin_firma, guiones, ausentes = 0, [], [], []
+        for plist, programa in self._programas_de_arranque():
+            if not programa.startswith("/"):
+                continue
+            revisados += 1
+            if not os.path.exists(programa):
+                ausentes.append(f"{plist} → {programa}")
+                continue
+            try:
+                with open(programa, "rb") as f:
+                    es_guion = f.read(2) == b"#!"
+            except OSError:
+                es_guion = False
+            if es_guion:                                    # un guion de texto no se firma: se informa aparte
+                guiones.append(programa)
+            elif core.run(["codesign", "--verify", "--strict", programa], 60)[0] != 0:
+                sin_firma.append(f"{programa} ({os.path.basename(plist)})")
+        i.linea(f"Programas de arranque revisados: {revisados}")
+        if sin_firma:
+            i.hall("MEDIO", "integridad", f"{len(sin_firma)} programa(s) que arrancan solos sin firma válida: " + ", ".join(sin_firma[:4]))
+        if guiones:
+            i.hall("BAJO", "integridad", f"{len(guiones)} guion(es) arrancan solos (no llevan firma, revisa que sean tuyos): " + ", ".join(sorted(set(guiones))[:4]))
+        for x in ausentes[:5]:
+            i.linea(f"  apunta a un programa que ya no existe: {x}")
 
     def cuentas(self) -> None:
         import grp
@@ -187,7 +224,23 @@ class RevisionMac(equipo.Revision):
                 i.hall("MEDIO", "herramientas", f"La tarea «sentinel-{n}» está instalada pero no está activa (sudo sentinel iniciar)")
 
     def integridad_extra(self) -> None:
-        self._sin_revisar("Protección de integridad del sistema (SIP) y antivirus")
+        i = self.inf
+        i.sec("Protecciones de macOS (SIP y Gatekeeper)")
+        for revisar, area in ((audit_mac.c_sip, "SIP"), (audit_mac.c_gatekeeper, "Gatekeeper")):
+            estado, detalle, arreglo = revisar(self.cfg)
+            if estado == audit.FAIL:
+                i.hall("ALTO", area, f"{detalle}. {arreglo}")
+            else:
+                i.linea(detalle)
 
     def actualizaciones(self) -> None:
-        self._sin_revisar("Actualizaciones y reinicio pendiente")
+        i = self.inf
+        i.sec("Actualizaciones pendientes")
+        rc, out = core.run(["softwareupdate", "--list"], 240)
+        pendientes = re.findall(r"^\s*\* (?:Label: )?(.+)$", out, re.M)
+        if pendientes:
+            i.hall("BAJO", "actualizaciones", f"{len(pendientes)} actualización(es) pendiente(s): " + ", ".join(p.strip() for p in pendientes[:4]) + " (Ajustes del Sistema > General > Actualización de software)")
+        elif rc == 0 and "No new software available" in out:
+            i.linea("No hay actualizaciones pendientes.")
+        else:
+            i.linea("No se pudo consultar si hay actualizaciones (¿sin conexión?).")
