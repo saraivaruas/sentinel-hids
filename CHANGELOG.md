@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Cortafuegos de puertos en macOS:** `sentinel firewall` y la página del panel muestran el plan, aplican a prueba con reversión automática, confirman y restauran. Solo rechaza conexiones nuevas desde fuera (lo ya iniciado y lo que sale siguen; loopback, ping, DHCP, mDNS y Tailscale pasan) y el monitor lo repone tras reiniciar. Por defecto un Mac no abre ningún puerto salvo SSH si está encendido. 7 pruebas nuevas.
 - La preparación de `pf` en macOS sirve ahora para cualquier ancla de Sentinel, no solo la del bloqueo de IPs.
 - **El informe del equipo en macOS completa sus secciones:** firma de los programas que arrancan solos, SIP y Gatekeeper, y actualizaciones pendientes. 3 pruebas nuevas.
 - La hoja de ruta marca como probados en Mac real la captura, el panel y los requisitos, y como escritos el `.pkg`, el icono de la barra y las ventanas.
