@@ -68,7 +68,8 @@ class PfTests(unittest.TestCase):
         self.e = Env()
         self.e.cfg.set("ban", "backend", "pf")
         self.principal, self.cargado, self.encendido, self.tabla, self.calls = 'anchor "com.apple/*" all\n', False, False, set(), []
-        for p in (mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", side_effect=self.pfctl)):
+        hay_pf = mock.patch.object(core.shutil, "which", side_effect=lambda n: "/sbin/pfctl" if n == "pfctl" else None)    # igual en cualquier equipo
+        for p in (hay_pf, mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", side_effect=self.pfctl)):
             p.start(); self.addCleanup(p.stop)
         self.b = core.Banner(self.e.cfg, self.e.alerter, self.e.allow)
 
