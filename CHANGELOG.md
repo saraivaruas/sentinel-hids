@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- La prueba del instalador en macOS comprueba que con PIN no se reinstala ni desinstala sin escribirlo, y que una actualización autorizada sí termina.
 - **Reinstalar o actualizar en macOS con PIN** ya no pide el PIN varias veces ni se queda a medias sin terminal: se comprueba una vez, se detiene el servicio y la referencia anterior se conserva con `baseline accept`.
 - La prueba del instalador en macOS abre además cada página del panel, pulsa «Revisar ahora», envía una notificación y comprueba requisitos y alertas de prueba.
 - En macOS el instalador deja **Sentinel** en Aplicaciones (abre el panel) y el desinstalador lo quita. 1 prueba nueva.
