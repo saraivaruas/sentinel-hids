@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **USB y extensiones en macOS:** avisa de dispositivos USB nuevos y de extensiones del núcleo o del sistema que no son de Apple (donde se instalan cortafuegos, VPN… o programas espía). 4 pruebas nuevas.
 - **`sentinel discrecion` (Linux):** revisa qué delata al equipo en la red (nombre enviado por DHCP, programas que anuncian o buscan equipos, puertos que escuchan hacia la red y respuesta a ping). Solo lee; lo que no puede asegurar lo marca «por comprobar». 5 pruebas nuevas.
 - **Prueba real de la captura (`mac-captura`):** un escaneo de puertos de verdad que debe detectarse, y tráfico normal que no debe confundirse con un ataque.
 - **Captura de paquetes en macOS (BPF):** detecta escaneos de puertos, sigilosos e inundaciones en la interfaz por la que el equipo sale a la red, y la sigue si cambia. Antes salía «no disponible». 6 pruebas nuevas.
