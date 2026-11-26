@@ -417,7 +417,10 @@ def revertir(carpeta: str | None = None, ctx: Contexto | None = None, alerter=No
         for cmd in (m.despues(ctx) if m and m.despues and not m.deshacer else []):
             if tuple(cmd) not in visto:
                 visto.add(tuple(cmd)); ctx.run(cmd, 60)
+    # un interruptor puede negarse a volver atrás (macOS reciente no deja apagar Gatekeeper por comando): se mira, no se supone
+    siguen = [(m.id, m.titulo) for m in (por_id.get(e["id"]) for e in man["medidas"] if e.get("deshacer")) if m and m.estado(ctx)[0] == APLICADA]
+    ids = [i for i in ids if i not in {x for x, _ in siguen}]
     os.rename(os.path.join(base_dir(), nombre, "manifiesto.json"), os.path.join(base_dir(), nombre, "manifiesto.revertido.json"))
     if alerter:
         alerter.emit("info", "endurecer", "revertida", f"Endurecimiento revertido ({nombre}): {', '.join(ids)}", key=f"hard:rev:{nombre}")
-    return {"revertidas": ids, "error": ""}
+    return {"revertidas": ids, "sin_deshacer": siguen, "error": ""}

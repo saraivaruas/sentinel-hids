@@ -1,12 +1,14 @@
 """Endurecimiento en macOS sobre un sistema simulado y una carpeta temporal: nunca toca el equipo real."""
+import io
 import os
 import shutil
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest import mock
 
 from helpers import Env, core
-from sentinel import endurecer as en, endurecer_mac as mac, plataforma
+from sentinel import cli, endurecer as en, endurecer_mac as mac, pin, plataforma
 
 
 class MacSimulado:
@@ -83,6 +85,22 @@ class EndurecerMacTests(unittest.TestCase):
         self.assertTrue(os.path.exists(conf))
         self.assertEqual(en.revertir(ctx=self.ctx)["error"], "")
         self.assertEqual(self.sis.foto(), antes); self.assertFalse(os.path.exists(conf))
+
+    def test_si_algo_no_se_puede_deshacer_se_dice_y_no_se_finge(self):
+        en.aplicar(en.plan("basico", ["mac-cortafuegos", "mac-gatekeeper"], ctx=self.ctx), self.ctx)
+        original = self.sis.__call__
+
+        def gatekeeper_terco(c, t=30):                       # como macOS reciente: no deja apagarlo por comando
+            if c == ["spctl", "--master-disable"]:
+                return 0, "Globally disabling the assessment system needs to be confirmed in System Settings."
+            return original(c, t)
+        r = en.revertir(ctx=en.Contexto(self.raiz, gatekeeper_terco))
+        self.assertEqual([x for x, _ in r["sin_deshacer"]], ["mac-gatekeeper"]); self.assertEqual(r["revertidas"], ["mac-cortafuegos"])
+        self.assertFalse(self.sis.fw); self.assertTrue(self.sis.gk)
+        out = io.StringIO()
+        with mock.patch.object(core, "is_root", return_value=True), mock.patch.object(pin, "required", return_value=False), mock.patch.object(en, "revertir", return_value=r), redirect_stdout(out):
+            self.assertEqual(cli.main(["endurecer", "revertir"]), 1)
+        self.assertIn("sigue aplicada", out.getvalue()); self.assertNotIn("Todo quedó como estaba", out.getvalue())
 
     def test_si_el_sistema_no_acepta_un_cambio_se_dice_y_se_deshace(self):
         self.sis.terco = True

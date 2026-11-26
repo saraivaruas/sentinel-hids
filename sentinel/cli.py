@@ -347,8 +347,13 @@ def cmd_endurecer(a) -> int:
         if not core.is_root():
             print("Necesita administrador: ejecuta  sudo sentinel endurecer revertir", file=sys.stderr); return 1
         r = endurecer.revertir(a.tanda, alerter=core.Alerter(core.load_config()))
-        print(r["error"] or "Revertido: " + ", ".join(r["revertidas"]) + ". Todo quedó como estaba antes.")
-        return 1 if r["error"] else 0
+        if r["error"]:
+            print(r["error"]); return 1
+        siguen = r.get("sin_deshacer") or []
+        print("Revertido: " + (", ".join(r["revertidas"]) or "nada") + "." + ("" if siguen else " Todo quedó como estaba antes."))
+        for _, titulo in siguen:
+            print(col(f" ✖ sigue aplicada: {titulo} — el sistema no dejó deshacerla por comando; cámbiala a mano en Ajustes si la necesitas apagada", "fallo"))
+        return 1 if siguen else 0
     if a.json:
         print(json.dumps([{"id": i.medida.id, "titulo": i.medida.titulo, "estado": i.codigo, "detalle": i.detalle, "riesgo": i.medida.riesgo, "perfil": i.medida.perfil} for i in items], ensure_ascii=False, indent=1))
         return 0
