@@ -61,6 +61,7 @@ class PaquetesTests(unittest.TestCase):
         self.assertTrue(any(f["kind"] == "escaneo_udp" for f in found))
 
     def test_lee_los_puertos_udp_en_uso(self):
+        linux = mock.patch.object(packets.plataforma, "ES_MAC", False); linux.start(); self.addCleanup(linux.stop)     # lee /proc
         packets._bound["t"] = 0
         txt = "  sl  local_address rem_address\n  0: 00000000:1F90 00000000:0000 07\n  1: 0100007F:0035 00000000:0000 07\n"
         with mock.patch("builtins.open", mock.mock_open(read_data=txt)):

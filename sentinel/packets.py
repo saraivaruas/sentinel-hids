@@ -1,7 +1,7 @@
 """Captura y análisis de paquetes de red (solo lectura, sin tcpdump ni librerías): detecta escaneos de puertos, escaneos sigilosos, inundaciones y pings masivos.
 
 Solo mira lo «no solicitado» (intentos de conexión, paquetes raros, pings); el tráfico normal de tus conexiones se ignora al instante. No guarda el contenido
-de los paquetes, solo quién los mandó, a qué puerta, de qué clase y cuántos. Necesita root (socket AF_PACKET)."""
+de los paquetes, solo quién los mandó, a qué puerta, de qué clase y cuántos. Necesita root (socket AF_PACKET en Linux, BPF en macOS)."""
 from __future__ import annotations
 
 import collections
@@ -12,7 +12,7 @@ import struct
 import threading
 import time
 
-from . import core, explain
+from . import bpf, core, explain, plataforma
 
 FLAGS = ((0x01, "FIN"), (0x02, "SYN"), (0x04, "RST"), (0x08, "PSH"), (0x10, "ACK"), (0x20, "URG"))
 ETH_P_ALL = 0x0003
@@ -91,6 +91,12 @@ def bound_udp_ports(ttl: float = 5.0) -> set:
     """Puertos UDP en que este equipo tiene un programa (Chrome, Meet, syncthing…). Un paquete hacia ellos responde a algo que el equipo inició;
     un escaneo real golpea puertos donde no hay nada, y esos siguen contando."""
     t = time.time()
+    if plataforma.ES_MAC:
+        if t - _bound["t"] > max(ttl, 20.0):          # lsof es más caro que leer /proc
+            rc, out = core.run(["lsof", "-nP", "-iUDP", "-Fn"], 20)
+            puertos = (ln[1:].split("->")[0].rsplit(":", 1)[-1] for ln in out.splitlines() if ln.startswith("n"))
+            _bound.update(t=t, ports={int(x) for x in puertos if x.isdigit()})
+        return _bound["ports"]
     if t - _bound["t"] > ttl:
         ports = set()
         for f in ("/proc/net/udp", "/proc/net/udp6"):
@@ -161,6 +167,9 @@ class PacketWatcher:
     @staticmethod
     def _local_addrs() -> set[str]:
         import re
+        if plataforma.ES_MAC:
+            rc, out = core.run(["ifconfig", "-a"], 5)
+            return set(re.findall(r"^\s+inet6? ([0-9a-fA-F:.]+)", out, re.M)) if rc == 0 else set()
         rc, out = core.run(["ip", "-o", "addr"], 5)
         return set(re.findall(r"inet6? ([0-9a-fA-F:.]+)/", out)) if rc == 0 else set()
 
@@ -235,14 +244,33 @@ class PacketWatcher:
         except Exception:
             pass
 
+    def _no_disponible(self, e: Exception) -> None:
+        self.alerter.emit("low", "packets", "no_disponible", f"Captura de paquetes no disponible ({type(e).__name__}): se usan los registros del cortafuegos", key="pkt:nodisp")
+        self.stats.update(activo=False, motivo=type(e).__name__)
+        self.guardar_estado()
+
+    def _trama(self, data: bytes, tipo: int, t: float) -> None:
+        sec = int(t)
+        if sec != self._sec:
+            self._sec, self._cnt = sec, 0
+        self._cnt += 1
+        if self._cnt > self.max_pps and self._cnt % 8:           # sobrecarga: se mira 1 de cada 8
+            self.stats["muestreados"] += 1
+            return
+        p = parse_frame(data, tipo)
+        if p:
+            self.refresh_known()
+            self.handle(p, t)
+
     def run(self, stop=lambda: False) -> None:
         """Bucle de captura. Termina si no hay permiso o la captura no está disponible."""
+        if plataforma.ES_MAC:
+            self._run_mac(stop)
+            return
         try:
             s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(ETH_P_ALL))
         except (AttributeError, PermissionError, OSError) as e:
-            self.alerter.emit("low", "packets", "no_disponible", f"Captura de paquetes no disponible ({type(e).__name__}): se usan los registros del cortafuegos", key="pkt:nodisp")
-            self.stats.update(activo=False, motivo=type(e).__name__)
-            self.guardar_estado()
+            self._no_disponible(e)
             return
         s.settimeout(1.0)
         try:
@@ -264,20 +292,52 @@ class PacketWatcher:
                 break
             t = time.time()
             if data is not None and addr[2] != 4:                      # 4 = paquete saliente
-                sec = int(t)
-                if sec != self._sec:
-                    self._sec, self._cnt = sec, 0
-                self._cnt += 1
-                if self._cnt > self.max_pps and self._cnt % 8:           # sobrecarga: se mira 1 de cada 8
-                    self.stats["muestreados"] += 1
-                else:
-                    p = parse_frame(data, addr[3])
-                    if p:
-                        self.refresh_known()
-                        self.handle(p, t)
+                self._trama(data, addr[3], t)
             if t - last > 5:
                 last = t
                 self.flush()
         self.stats["activo"] = False
         self.guardar_estado()
         s.close()
+
+    # ---------- macOS
+    @staticmethod
+    def interfaz_mac() -> str:
+        """La interfaz por la que sale el equipo a la red (Wi-Fi o cable)."""
+        for ln in core.run(["route", "-n", "get", "default"], 5)[1].splitlines():
+            campo, _, valor = ln.strip().partition(": ")
+            if campo == "interface":
+                return valor.strip()
+        return "en0"
+
+    def _run_mac(self, stop) -> None:
+        fija = self.cfg.get("packets", "interface", fallback="")
+        iface = fija or self.interfaz_mac()
+        try:
+            captura = bpf.Captura(iface)
+        except (ImportError, OSError) as e:
+            self._no_disponible(e)
+            return
+        self.stats.update(activo=True, motivo="")
+        self.guardar_estado()
+        last = revisada = time.time()
+        try:
+            while not stop():
+                for data, tipo in captura.leer(1.0):
+                    self._trama(data, tipo, time.time())
+                t = time.time()
+                if t - last > 5:
+                    last = t
+                    self.flush()
+                if t - revisada > 60:
+                    revisada = t
+                    self.local = self._local_addrs()          # cambiar de red cambia las direcciones propias
+                    if not fija and self.interfaz_mac() != iface:
+                        break                                 # cambió la salida a la red: el monitor vuelve a arrancar la captura
+        except OSError as e:
+            self._no_disponible(e)
+        finally:
+            captura.cerrar()
+        self.stats["activo"] = False
+        self.guardar_estado()
+

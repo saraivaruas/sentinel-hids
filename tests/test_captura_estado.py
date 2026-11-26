@@ -11,6 +11,10 @@ def estado_path():
     return os.path.join(core.state_dir(), "packets_stats.json")
 
 
+def setUpModule():
+    p = mock.patch.object(packets.plataforma, "ES_MAC", False); p.start(); unittest.addModuleCleanup(p.stop)     # simulan el socket de Linux
+
+
 class CapturaEstadoTests(unittest.TestCase):
     def watcher(self):
         e = Env()
