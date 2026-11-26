@@ -11,6 +11,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- La hoja de ruta recoge que el `.pkg` ya lleva Python y el icono, y que falta firmarlo.
 - La prueba del instalador en macOS comprueba que el `.pkg` funciona con su propio Python y el icono precompilado, sin alertar por sus archivos, y que luego se puede actualizar desde el código.
 - Quien instaló con el `.pkg` en macOS puede actualizar sin las herramientas de Apple: se conservan el Python propio y el icono.
 - El `.pkg` de macOS incluye Python 3.12 para Apple Silicon e Intel (python-build-standalone, con la huella SHA-256 fijada en el repositorio): instalarlo ya no exige las herramientas de Apple. 1 prueba nueva.
