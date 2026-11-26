@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import json
 import os
+import pwd
 import re
 import shutil
 import subprocess
@@ -36,8 +37,8 @@ def cmd_status(a) -> int:
     veredicto = {"protegido": col("PROTEGIDO", "ok"), "atencion": col("REQUIERE ATENCIÓN", "high")}.get(ov["level"], col(str(ov["level"]).upper(), "aviso"))
     print(f"Sentinel {core.VERSION} — {veredicto}: {ov['why']}")
     for n in ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"):
-        if plataforma.ES_MAC and n == "sentinel-honeypot":
-            continue                                   # los señuelos todavía no existen en macOS
+        if plataforma.ES_MAC and n == "sentinel-honeypot" and not os.path.exists(servicio.ruta("honeypot")):
+            continue                                   # señuelos sin activar
         st = servicio.estado(n)
         print(f"  {n:<24} {col(st, 'ok' if st == 'active' else 'fallo')}")
     hb = core.read_json(os.path.join(core.state_dir(), "heartbeat.json"))
@@ -669,7 +670,7 @@ def cmd_config(a) -> int:
 
 def cmd_senuelos(a) -> int:
     if plataforma.ES_MAC:
-        print("Los señuelos todavía no están disponibles en macOS: están apagados."); return 0 if a.accion == "estado" else 1
+        return _senuelos_mac(a)
     if a.accion == "estado":
         on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 5)[1].strip() == "active"
         print("Señuelos:", "activos" if on else "apagados"); return 0
@@ -679,6 +680,32 @@ def cmd_senuelos(a) -> int:
     rc, out = core.run(cmd, 30)
     print(("Señuelos activados: abren los puertos " + ", ".join(core.csv(core.load_config().get("honeypot", "ports", fallback=""))) + " en este equipo (el firewall los mantiene cerrados hacia afuera salvo que los abras tú)." if a.accion == "activar" else "Señuelos apagados: sus puertos se cerraron.") if rc == 0 else out.strip())
     return 0 if rc == 0 else 1
+
+
+def _senuelos_mac(a) -> int:
+    if a.accion == "estado":
+        print("Señuelos:", "activos" if servicio.estado("sentinel-honeypot") == "active" else "apagados"); return 0
+    if not core.is_root():
+        print("Necesita administrador: ejecuta  sudo sentinel senuelos " + a.accion); return 1
+    if a.accion == "activar":
+        try:
+            pwd.getpwnam(servicio.USUARIO_SENUELOS)
+        except KeyError:
+            print("Falta el usuario de los señuelos: vuelve a instalar con  sudo ./install-mac.sh"); return 1
+        errores = servicio.activar_senuelos(sys.executable)
+    else:
+        errores = servicio.desactivar_senuelos()
+    if errores:
+        print("; ".join(errores)); return 1
+    cfg, al, allow, _ = build()
+    f = fim.Fim(cfg, al, allow)
+    if f.load() is not None:               # los archivos que Sentinel acaba de crear o quitar no son un ataque
+        f.accept([servicio.ruta("honeypot"), servicio.conf_senuelos()])
+    if a.accion == "activar":
+        print("Señuelos activados: abren los puertos " + ", ".join(core.csv(cfg.get("honeypot", "ports", fallback=""))) + " en este equipo.")
+    else:
+        print("Señuelos apagados: sus puertos se cerraron.")
+    return 0
 
 
 def _protected(a) -> bool:

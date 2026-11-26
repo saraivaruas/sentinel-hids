@@ -69,8 +69,8 @@ class Data:
             return self._svc[1]
         res = {}
         for u in UNITS:
-            if plataforma.ES_MAC and u == "sentinel-honeypot":
-                continue                               # los señuelos todavía no existen en macOS
+            if plataforma.ES_MAC and u == "sentinel-honeypot" and not os.path.exists(servicio.ruta("honeypot")):
+                continue                               # señuelos sin activar
             res[u] = servicio.estado(u) or "desconocido"
         self._svc = (time.time(), res)
         return res

@@ -60,6 +60,26 @@ do_ install -d -m 750 -o root -g admin /var/lib/sentinel /var/log/sentinel
 do_ mkdir -p /etc/newsyslog.d
 do_ cp "$AQUI/packaging/macos/newsyslog.conf" /etc/newsyslog.d/sentinel.conf
 
+# Usuario sin privilegios para los puertos señuelo (apagados hasta que los actives)
+crear_usuario() {
+  dscl . -read /Users/_sentinel >/dev/null 2>&1 && return 0
+  local id=300
+  while { dscl . -list /Users UniqueID; dscl . -list /Groups PrimaryGroupID; } | awk '{print $2}' | grep -qx "$id"; do id=$((id+1)); done
+  dscl . -create /Groups/_sentinel
+  dscl . -create /Groups/_sentinel PrimaryGroupID "$id"
+  dscl . -create /Users/_sentinel
+  dscl . -create /Users/_sentinel UniqueID "$id"
+  dscl . -create /Users/_sentinel PrimaryGroupID "$id"
+  dscl . -create /Users/_sentinel UserShell /usr/bin/false
+  dscl . -create /Users/_sentinel NFSHomeDirectory /var/empty
+  dscl . -create /Users/_sentinel RealName "Sentinel (puertos señuelo)"
+  dscl . -create /Users/_sentinel IsHidden 1
+}
+if [ "$DRY" = 1 ]; then echo "  [simulación] crear el usuario _sentinel"; else crear_usuario; fi
+do_ chmod 755 /etc/sentinel
+do_ chmod 751 /var/log/sentinel          # el usuario de los señuelos solo puede pasar hasta su carpeta, no listar ni leer
+do_ install -d -m 770 -o root -g _sentinel /var/log/sentinel/decoy
+
 # El panel como aplicación, para abrirlo desde el Launchpad o Aplicaciones
 APP="/Applications/Sentinel.app/Contents"
 do_ mkdir -p "$APP/MacOS"

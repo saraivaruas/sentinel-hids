@@ -105,6 +105,26 @@ class ServicioTests(unittest.TestCase):
         errores = servicio.detener(lambda c, t=20: (0, ""), ["monitor"], espera=0, dormir=lambda s: None)
         self.assertEqual(len(errores), 1); self.assertIn("monitor", errores[0])
 
+    def test_senuelos_con_usuario_sin_privilegios_y_su_propia_configuracion(self):
+        e = helpers.Env(extra="[honeypot]\nports = 2222,3390\n"); self.addCleanup(e.close)
+        for n in servicio.TAREAS:
+            servicio.escribir(n, "/usr/bin/python3")
+        with self.mac():
+            self.assertEqual(servicio.activar_senuelos("/usr/bin/python3", run=self.launchctl), [])
+            with open(servicio.ruta("honeypot"), "rb") as f:
+                d = plistlib.load(f)
+            self.assertEqual((d["UserName"], d["GroupName"]), ("_sentinel", "_sentinel")); self.assertEqual(d["ProgramArguments"][-1], "honeypot")
+            conf = d["EnvironmentVariables"]["SENTINEL_CONF"]
+            self.assertEqual(os.stat(conf).st_mode & 0o777, 0o644)
+            self.assertEqual(core.load_config(conf).get("honeypot", "ports"), "2222,3390")
+            with open(conf, encoding="utf-8") as f:
+                self.assertNotIn("[smtp]", f.read())
+            self.assertEqual(servicio.estado("sentinel-honeypot", self.launchctl), "active")
+            servicio.detener(self.launchctl); self.assertEqual(self.cargadas, set())
+            servicio.iniciar(self.launchctl); self.assertIn("honeypot", self.cargadas)       # sigue activado tras detener e iniciar
+            self.assertEqual(servicio.desactivar_senuelos(self.launchctl), [])
+            self.assertFalse(os.path.exists(servicio.ruta("honeypot"))); self.assertEqual(servicio.estado("sentinel-honeypot", self.launchctl), "not-found")
+
     def test_en_linux_sigue_preguntando_a_systemd(self):
         with self.mac(False):
             self.assertEqual(servicio.estado("sentinel-monitor", lambda c, t=20: (self.calls.append(c) or (0, "active\n"))), "active")
