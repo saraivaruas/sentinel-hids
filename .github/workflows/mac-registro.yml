@@ -28,10 +28,13 @@ jobs:
           sudo systemsetup -setremotelogin on || true
           sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist || true
           sudo dseditgroup -o edit -a sentinelprueba -t user com.apple.access_ssh || true
+          sudo dscl . -passwd /Users/sentinelprueba 'Clave-Buena-123'
+          dscl . -authonly sentinelprueba 'Clave-Buena-123' && echo "clave de prueba correcta"
           sleep 3
           nc -z 127.0.0.1 22 && echo "SSH escuchando" || echo "SSH NO escucha"
       - name: Provocar accesos y capturar el registro
         run: |
+          set +e  # los accesos fallidos son lo que se quiere provocar
           filtro='process BEGINSWITH "sshd" OR process == "sudo" OR process == "su"'
           sudo log stream --style ndjson --level info --predicate "$filtro" > "$RUNNER_TEMP/vivo.ndjson" &
           sleep 5
