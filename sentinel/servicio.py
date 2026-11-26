@@ -55,6 +55,14 @@ def escribir(nombre: str, python: str, destino: str = DESTINO, horas=HORAS_EQUIP
     return p
 
 
+def instalar(python: str, destino: str = DESTINO) -> None:
+    """Escribe las tareas con las horas que diga la configuración (no las arranca)."""
+    from . import equipo
+    horas = equipo.horas_validas(core.load_config().get("equipo", "horas", fallback="")) or list(HORAS_EQUIPO)
+    for n in TAREAS:
+        escribir(n, python, destino, horas)
+
+
 def estado(unidad: str, run=None) -> str:
     """Como «systemctl is-active»: «active», «inactive» o «not-found». Una tarea programada está activa si está cargada."""
     run = run or core.run

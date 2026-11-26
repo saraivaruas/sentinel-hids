@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Instala Sentinel en macOS (para Linux usa ./install.sh).
+# Uso: sudo ./install-mac.sh [--dry-run]
+#   --dry-run   muestra lo que haría sin cambiar nada
+set -euo pipefail
+
+DRY=0
+for a in "$@"; do case "$a" in --dry-run) DRY=1;; -h|--help) sed -n 2,4p "$0"; exit 0;; *) echo "Opción desconocida: $a"; exit 1;; esac; done
+
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+DEST=/opt/sentinel
+USUARIO="${SUDO_USER:-}"
+do_() { if [ "$DRY" = 1 ]; then echo "  [simulación] $*"; else "$@"; fi; }
+paso() { echo; echo "== $*"; }
+
+[ "${SENTINEL_FAKE_UNAME:-$(uname -s)}" = Darwin ] || { echo "Este instalador es para macOS. En Linux usa ./install.sh"; exit 1; }
+[ "$DRY" = 1 ] || [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo:  sudo ./install-mac.sh"; exit 1; }
+
+# Sentinel corre como administrador: solo se usa un Python que un usuario corriente no pueda cambiar (no el de Homebrew).
+buscar_python() {
+  local p
+  for p in /usr/bin/python3 /Library/Frameworks/Python.framework/Versions/Current/bin/python3; do
+    [ -x "$p" ] || continue
+    [ "$p" = /usr/bin/python3 ] && ! xcode-select -p >/dev/null 2>&1 && continue   # sin las herramientas de Apple es solo un aviso
+    "$p" -I -c 'import sys; sys.exit(sys.version_info < (3, 8))' 2>/dev/null && { echo "$p"; return 0; }
+  done
+  return 1
+}
+PY="$(buscar_python || true)"
+if [ -z "$PY" ]; then
+  [ "$DRY" = 1 ] && PY=/usr/bin/python3 || { echo "Falta Python 3. Instala las herramientas de Apple con:  xcode-select --install   y vuelve a ejecutar este instalador."; exit 1; }
+fi
+modulo() { do_ "$PY" -I -c "import sys; sys.path.insert(0, '$DEST'); from sentinel import servicio; $1" "${@:2}"; }
+
+# Una instalación anterior con PIN solo se reemplaza con el PIN
+if [ "$DRY" = 0 ] && [ -x "$DEST/bin/sentinel" ]; then
+  "$DEST/bin/sentinel" pin verificar || { echo "Sentinel está protegido con PIN: no se reinstala sin el PIN correcto." >&2; exit 1; }
+  "$DEST/bin/sentinel" detener >/dev/null || true
+fi
+
+paso "1/5 Programa en $DEST (solo el administrador puede modificarlo)"
+echo "  Python: $PY"
+do_ rm -rf "$DEST"; do_ mkdir -p "$DEST" /usr/local/bin
+do_ cp -R "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$DEST/"
+do_ find "$DEST" -name __pycache__ -prune -exec rm -rf {} +
+if [ "$DRY" = 0 ]; then echo "$PY" > "$DEST/python"; fi
+do_ chown -R root:wheel "$DEST"; do_ chmod -R go-w "$DEST"; do_ chmod -R a+rX "$DEST"
+do_ ln -sf "$DEST/bin/sentinel" /usr/local/bin/sentinel
+
+paso "2/5 Configuración, estado y registros"
+do_ mkdir -p /etc/sentinel
+if [ -e /etc/sentinel/sentinel.conf ]; then echo "  /etc/sentinel/sentinel.conf ya existe: no se toca"; else
+  do_ cp "$AQUI/packaging/macos/sentinel.conf" /etc/sentinel/sentinel.conf
+  do_ sed -i '' "s/^desktop_user =.*/desktop_user = $USUARIO/" /etc/sentinel/sentinel.conf; fi
+do_ chown root:admin /etc/sentinel/sentinel.conf; do_ chmod 640 /etc/sentinel/sentinel.conf
+do_ install -d -m 750 -o root -g admin /var/lib/sentinel /var/log/sentinel
+do_ mkdir -p /etc/newsyslog.d
+do_ cp "$AQUI/packaging/macos/newsyslog.conf" /etc/newsyslog.d/sentinel.conf
+
+paso "3/5 Tareas de launchd"
+modulo "servicio.instalar(sys.argv[1])" "$PY"
+
+paso "4/5 Referencia inicial de integridad"
+do_ "$DEST/bin/sentinel" baseline init
+
+paso "5/5 Arrancar"
+modulo "e = servicio.iniciar(); print(chr(10).join(e)); sys.exit(1 if e else 0)"
+
+echo; echo "Listo. Comprueba con:  sentinel status"
+echo "Para ver todos los archivos del sistema, da «Acceso total al disco» a $PY en Ajustes > Privacidad y seguridad."
