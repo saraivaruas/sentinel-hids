@@ -1,0 +1,9 @@
+[Unit]
+Description=Sentinel: cambio programado de MAC e IP
+After=NetworkManager.service
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/opt/sentinel
+ExecStart=/usr/bin/python3 -m sentinel identidad rotar --programado
+TimeoutStartSec=300

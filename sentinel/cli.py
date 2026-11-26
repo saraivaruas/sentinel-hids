@@ -385,8 +385,22 @@ def cmd_endurecer(a) -> int:
 
 
 def cmd_identidad(a) -> int:
-    """MAC e IP del equipo en la red: `estado` (solo lectura), `rotar` y `restaurar`."""
+    """MAC e IP del equipo en la red: `estado` (solo lectura), `rotar`, `restaurar`, `activar` y `desactivar`."""
     cfg = core.load_config()
+    if a.accion == "rotar" and a.programado:                  # lo lanza el temporizador: sin preguntas
+        if not core.is_root():
+            print("Necesita administrador.", file=sys.stderr); return 1
+        r = identidad.programada(cfg, core.Alerter(cfg))
+        if r is not None:
+            print(r["mensaje"])
+        return 0 if r is None or r["ok"] else 1
+    if a.accion in ("activar", "desactivar"):
+        if not core.is_root():
+            print(f"Necesita administrador: ejecuta  sudo sentinel identidad {a.accion}", file=sys.stderr); return 1
+        al = core.Alerter(cfg)
+        r = identidad.activar(cfg, a.cada or identidad.cada_horas(cfg), al) if a.accion == "activar" else identidad.desactivar(cfg, al)
+        print(r["mensaje"], file=sys.stdout if r["ok"] else sys.stderr)
+        return 0 if r["ok"] else 1
     if a.accion in ("rotar", "restaurar"):
         if not core.is_root():
             print(f"Necesita administrador: ejecuta  sudo sentinel identidad {a.accion}", file=sys.stderr); return 1
@@ -406,6 +420,7 @@ def cmd_identidad(a) -> int:
     print(f" IP:              {e['ip'] or 'sin dirección'}  ({'automática por DHCP' if e['metodo'] == 'auto' else 'fija: no cambia al rotar'})")
     print(f" Puerta de salida: {e['puerta'] or 'ninguna'}")
     print(f" Nombre del equipo: {col('se envía a la red', 'aviso') if e['envia_nombre'] else col('no se envía', 'ok')}")
+    print(f" Cambio programado: {'cada ' + str(e['cada_horas']) + ' h' if e['activo'] else 'apagado'}")
     if e["otros"]:
         print(col("\n Otros programas que también cambian la MAC o la IP:", "aviso"))
         for x in e["otros"]:
@@ -651,7 +666,7 @@ def _protected(a) -> bool:
     n = a.fn.__name__
     if n in ("cmd_allow", "cmd_config", "cmd_baseline", "cmd_detener", "cmd_aprender", "cmd_resolver"):
         return True
-    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_identidad" and a.accion in ("rotar", "restaurar")) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_ia" and a.accion in ("configurar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
+    return ((n == "cmd_endurecer" and a.accion in ("aplicar", "revertir")) or (n == "cmd_identidad" and (a.accion in ("restaurar", "activar", "desactivar") or (a.accion == "rotar" and not a.programado))) or (n == "cmd_smtp" and a.accion in ("configurar", "importar", "quitar")) or (n == "cmd_ia" and a.accion in ("configurar", "quitar")) or (n == "cmd_equipo" and (a.aceptar or a.horario)) or (n == "cmd_bans" and a.action == "unban") or (n == "cmd_senuelos" and a.accion == "desactivar") or (n == "cmd_update" and a.instalar)
             or (n == "cmd_firewall" and (a.accion in ("aplicar", "config") or (a.accion == "restaurar" and not a.pendiente)))
             or (n == "cmd_pin" and a.accion in ("establecer", "quitar")))
 
@@ -839,7 +854,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("endurecer", help="endurecimiento guiado del equipo: plan (solo lectura), aplicar (con copia y comprobación), revertir"); s.add_argument("accion", nargs="?", default="plan", choices=["plan", "estado", "aplicar", "revertir"])
     s.add_argument("--perfil", default="recomendado", choices=list(endurecer.PERFILES), help="basico (sin efectos visibles), recomendado (CIS nivel 1) o estricto (servidores)"); s.add_argument("--solo", help="solo estas medidas, separadas por coma")
     s.add_argument("--si", action="store_true", help="no preguntar antes de aplicar"); s.add_argument("--tanda", help="revertir: carpeta de la tanda (por defecto la última)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_endurecer)
-    s = sub.add_parser("identidad", help="MAC e IP del equipo en la red: estado, rotar (MAC e IP nuevas), restaurar"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "rotar", "restaurar"]); s.add_argument("--json", action="store_true"); s.add_argument("--si", action="store_true", help="no preguntar antes de cortar la red"); s.set_defaults(fn=cmd_identidad)
+    s = sub.add_parser("identidad", help="MAC e IP del equipo en la red: estado, rotar (MAC e IP nuevas), restaurar, activar o desactivar el cambio programado"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "rotar", "restaurar", "activar", "desactivar"]); s.add_argument("--cada", type=int, help="activar: cada cuántas horas (1 a 168)"); s.add_argument("--programado", action="store_true", help="rotar: modo del temporizador (solo si está activado y toca)"); s.add_argument("--json", action="store_true"); s.add_argument("--si", action="store_true", help="no preguntar antes de cortar la red"); s.set_defaults(fn=cmd_identidad)
     s = sub.add_parser("requisitos", help="qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta"); s.add_argument("--instalar", action="store_true", help="instala lo que falta (pregunta antes y pide tu contraseña de administrador)")
     s.add_argument("--si", action="store_true", help="instala sin preguntar (lo usa el panel)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_requisitos)
     s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])

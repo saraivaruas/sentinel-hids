@@ -7,7 +7,7 @@ if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
     exit 1
   fi
   if [ -d /run/systemd/system ]; then
-    systemctl disable --now sentinel-monitor.service sentinel-honeypot.service sentinel-scan.timer sentinel-report.timer sentinel-equipo.timer 2>/dev/null || true
+    systemctl disable --now sentinel-monitor.service sentinel-honeypot.service sentinel-scan.timer sentinel-report.timer sentinel-equipo.timer sentinel-identidad.timer 2>/dev/null || true
   fi
 fi
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then

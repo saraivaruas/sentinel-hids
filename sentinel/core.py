@@ -204,6 +204,9 @@ informes_max = 30
 [identidad]
 ; interfaz cuya MAC e IP se cambian (vacío = la de la salida a internet). Ver: sentinel identidad estado
 interfaz =
+; cambio programado de MAC e IP, apagado por defecto. Se enciende con: sudo sentinel identidad activar --cada 2 (o desde Ajustes del panel)
+activo = no
+cada_horas = 2
 """
 
 
@@ -276,6 +279,8 @@ EDITABLE = {
     ("equipo", "conexiones_permitidas"): lambda v: bool(re.fullmatch(r"[\w.@+-]{1,64}(,[\w.@+-]{1,64})*", v.replace(" ", ""))) or v == "",
     ("equipo", "enviar_correo"): lambda v: v in ("yes", "no"),
     ("equipo", "horas"): lambda v: bool(re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d(,([01]\d|2[0-3]):[0-5]\d){0,5}", v)),
+    ("identidad", "activo"): lambda v: v in ("yes", "no"),
+    ("identidad", "cada_horas"): lambda v: v.isdigit() and 1 <= int(v) <= 168,
     ("alerts", "heartbeat_url"): lambda v: v == "" or __import__("sentinel.heartbeat", fromlist=["valid"]).valid(v),
 }
 

@@ -4,7 +4,7 @@ import unittest
 from unittest import mock
 
 import helpers
-from sentinel import cli, identidad, plataforma
+from sentinel import cli, core, identidad, plataforma
 
 DEV, UUID = "enx0001", "1111-2222"
 FABRICA = "00:e0:4c:00:00:01"
@@ -19,6 +19,7 @@ class Red:
         self.ip = "10.20.37.22/24"
         self.tipo = "802-3-ethernet"
         self.entrega_ip = True                       # ¿el DHCP da dirección a una MAC nueva?
+        self.hay_temporizador = True
         self.contesta = True                         # ¿la puerta responde al ping?
         self.perfil = {"802-3-ethernet.cloned-mac-address": "", "ipv4.method": "auto", "ipv4.dhcp-client-id": "",
                        "ipv4.dhcp-send-hostname": "yes", "ipv6.dhcp-send-hostname": "yes"}
@@ -48,6 +49,8 @@ class Red:
             return (4, "Error: no se pudo activar") if not self.ip else (0, "")
         if c[0] == "ping":
             return (0 if self.contesta and self.ip else 1), ""
+        if c[:2] in (["systemctl", "enable"], ["systemctl", "disable"]):
+            return (0, "") if self.hay_temporizador else (1, "Unit file sentinel-identidad.timer does not exist.")
         if c[0] == "systemctl":
             return 1, "disabled\n"
         raise AssertionError(f"comando inesperado: {c}")
@@ -143,9 +146,70 @@ class RotarTests(unittest.TestCase):
         self.assertFalse(identidad.restaurar(self.env.cfg, self.env.alerter, self.red)["ok"])   # ya no queda nada
 
     def test_cambiar_la_identidad_pide_el_pin(self):
-        for accion, protegido in (("estado", False), ("rotar", True), ("restaurar", True)):
-            a = mock.Mock(accion=accion, fn=cli.cmd_identidad)
+        for accion, protegido in (("estado", False), ("rotar", True), ("restaurar", True), ("activar", True), ("desactivar", True)):
+            a = mock.Mock(accion=accion, fn=cli.cmd_identidad, programado=False)
             self.assertEqual(cli._protected(a), protegido, accion)
+        self.assertFalse(cli._protected(mock.Mock(accion="rotar", fn=cli.cmd_identidad, programado=True)))   # el temporizador no puede escribir un PIN
+
+
+class ProgramadaTests(unittest.TestCase):
+    def setUp(self):
+        self.env = helpers.Env(); self.addCleanup(self.env.close)
+        self.red = Red()
+        self.otros = []
+        for p in (mock.patch.object(plataforma, "ES_MAC", False), mock.patch.object(identidad.time, "sleep"),
+                  mock.patch.object(identidad, "otros_rotadores", lambda run=None: (self.otros, True))):
+            p.start(); self.addCleanup(p.stop)
+
+    def cfg(self):
+        return core.load_config()
+
+    def ordenes(self, verbo):
+        return [c for c in self.red.calls if c[:2] == ["systemctl", verbo]]
+
+    def test_apagada_por_defecto_no_toca_nada(self):
+        self.assertFalse(identidad.activa(self.cfg()))
+        self.assertIsNone(identidad.programada(self.cfg(), self.env.alerter, self.red))
+        self.assertEqual(self.red.calls, [])
+
+    def test_activar_enciende_el_temporizador_y_espera_el_intervalo(self):
+        antes = self.red.mac
+        r = identidad.activar(self.cfg(), 4, self.env.alerter, self.red)
+        self.assertTrue(r["ok"], r)
+        self.assertEqual((identidad.activa(self.cfg()), identidad.cada_horas(self.cfg())), (True, 4))
+        self.assertEqual(self.ordenes("enable"), [["systemctl", "enable", "--now", "sentinel-identidad.timer"]])
+        self.assertIsNone(identidad.programada(self.cfg(), self.env.alerter, self.red))      # activar no corta la red
+        self.assertEqual(self.red.mac, antes)
+        with mock.patch.object(core, "now", return_value=core.now() + 4 * 3600):
+            self.assertTrue(identidad.programada(self.cfg(), self.env.alerter, self.red)["ok"])
+        self.assertNotEqual(self.red.mac, antes)
+
+    def test_no_se_activa_si_otro_programa_ya_rota(self):
+        self.otros = ["/etc/cron.d/x: change-mac.sh"]
+        r = identidad.activar(self.cfg(), 2, self.env.alerter, self.red)
+        self.assertFalse(r["ok"]); self.assertIn("change-mac.sh", r["mensaje"])
+        self.assertFalse(identidad.activa(self.cfg())); self.assertEqual(self.ordenes("enable"), [])
+
+    def test_sin_temporizador_instalado_queda_apagada(self):
+        self.red.hay_temporizador = False
+        self.assertFalse(identidad.activar(self.cfg(), 2, self.env.alerter, self.red)["ok"])
+        self.assertFalse(identidad.activa(self.cfg()))
+
+    def test_intervalo_fuera_de_rango(self):
+        for horas in (0, 169):
+            self.assertFalse(identidad.activar(self.cfg(), horas, self.env.alerter, self.red)["ok"], horas)
+
+    def test_desactivar(self):
+        identidad.activar(self.cfg(), 2, self.env.alerter, self.red)
+        self.assertTrue(identidad.desactivar(self.cfg(), self.env.alerter, self.red)["ok"])
+        self.assertFalse(identidad.activa(self.cfg()))
+        self.assertEqual(self.ordenes("disable"), [["systemctl", "disable", "--now", "sentinel-identidad.timer"]])
+
+    def test_el_paquete_apaga_el_temporizador_al_desinstalar(self):
+        raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        for f in ("uninstall.sh", "packaging/debian/prerm"):
+            with open(os.path.join(raiz, f), encoding="utf-8") as h:
+                self.assertIn("sentinel-identidad.timer", h.read(), f)
 
 
 if __name__ == "__main__":

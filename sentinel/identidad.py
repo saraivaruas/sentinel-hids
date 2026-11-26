@@ -15,6 +15,9 @@ from . import core, plataforma
 TIPOS = ("802-3-ethernet", "802-11-wireless")
 ROTADORES = re.compile(r"change[-_]?(mac|ip)|macchanger", re.I)
 CRON = ("/etc/crontab", "/etc/cron.d/*", "/var/spool/cron/crontabs/*")
+TEMPORIZADOR = "sentinel-identidad.timer"
+ENLACE = "/etc/systemd/system/timers.target.wants/" + TEMPORIZADOR
+HORAS = (1, 168)                                           # entre una hora y una semana
 
 
 def interfaz(cfg, run=core.run) -> str:
@@ -77,25 +80,38 @@ def otros_rotadores(run=core.run, patrones=CRON) -> tuple[list[str], bool]:
     return hallados, completo
 
 
+def cada_horas(cfg) -> int:
+    try:
+        n = cfg.getint("identidad", "cada_horas", fallback=2)
+    except ValueError:
+        n = 2
+    return max(HORAS[0], min(HORAS[1], n))
+
+
+def activa(cfg) -> bool:
+    return cfg.get("identidad", "activo", fallback="no").strip().lower() == "yes"
+
+
 def estado(cfg, run=core.run) -> dict:
     """Foto de solo lectura. Con «error» no vacío, no se puede rotar."""
+    plan = {"activo": activa(cfg), "cada_horas": cada_horas(cfg), "ultimo_intento": _guardado().get("ultimo_intento", 0)}
     if plataforma.ES_MAC:
-        return {"error": "La rotación de MAC e IP todavía no está disponible en macOS."}
+        return {**plan, "error": "La rotación de MAC e IP todavía no está disponible en macOS."}
     dev = interfaz(cfg, run)
     if not dev:
-        return {"error": "No encuentro la interfaz de red con salida a internet. Indícala en [identidad] interfaz."}
+        return {**plan, "error": "No encuentro la interfaz de red con salida a internet. Indícala en [identidad] interfaz."}
     rc, out = run(["nmcli", "-g", "GENERAL.CON-UUID", "device", "show", dev], 10)
     uuid = out.strip()
     if rc != 0 or not uuid:
-        return {"error": f"NetworkManager no administra {dev} (hace falta «nmcli» y una conexión activa)."}
+        return {**plan, "error": f"NetworkManager no administra {dev} (hace falta «nmcli» y una conexión activa)."}
     base = leer(uuid, ["connection.type"], run) or {}
     tipo = base.get("connection.type", "")
     if tipo not in TIPOS:
-        return {"error": f"{dev} no es una conexión por cable ni Wi-Fi ({tipo or 'tipo desconocido'})."}
+        return {**plan, "error": f"{dev} no es una conexión por cable ni Wi-Fi ({tipo or 'tipo desconocido'})."}
     v = leer(uuid, ["ipv4.method", "ipv4.dhcp-send-hostname"], run) or {}
     actual, fabrica = macs(dev, run)
     otros, completo = otros_rotadores(run)
-    return {"error": "", "interfaz": dev, "conexion": uuid, "tipo": tipo, "mac": actual, "mac_fabrica": fabrica,
+    return {**plan, "error": "", "interfaz": dev, "conexion": uuid, "tipo": tipo, "mac": actual, "mac_fabrica": fabrica,
             "aleatoria": actual != fabrica, "ip": direccion(dev, run), "puerta": puerta(dev, run),
             "metodo": v.get("ipv4.method", ""), "envia_nombre": v.get("ipv4.dhcp-send-hostname", "") != "no",
             "otros": otros, "cron_revisado": completo}
@@ -158,7 +174,7 @@ def rotar(cfg, alerter, run=core.run) -> dict:
     d = _guardado()
     d["originales"].setdefault(uuid, previo)              # solo la primera vez: es a lo que vuelve «restaurar»
     d["ultimo_intento"] = core.now()
-    core.atomic_write_json(_archivo(), d)
+    core.atomic_write_json(_archivo(), d, share=True)
     ping_antes = _responde(e["puerta"], run, 2)           # hay redes cuya puerta nunca contesta: eso no es un fallo
     mac = mac_aleatoria()
     nuevo = {prop: mac, "ipv4.dhcp-client-id": "mac", "ipv4.dhcp-send-hostname": "no", "ipv6.dhcp-send-hostname": "no"}
@@ -194,7 +210,58 @@ def restaurar(cfg, alerter, run=core.run) -> dict:
     if not original[prop]:
         run(["nmcli", "connection", "modify", uuid, prop, ""], 20)
     del d["originales"][uuid]
-    core.atomic_write_json(_archivo(), d)
+    core.atomic_write_json(_archivo(), d, share=True)
     msg = f"Identidad restaurada en {dev}: MAC {macs(dev, run)[0]} · IP {direccion(dev, run) or 'ninguna'}"
     alerter.emit("info", "identidad", "restaurada", msg, key=f"identidad:rest:{int(core.now())}")
+    return {"ok": True, "mensaje": msg}
+
+
+def programada(cfg, alerter, run=core.run) -> dict | None:
+    """La llama el temporizador: rota solo si la rotación está activada y ya pasó el intervalo. None = no tocaba."""
+    if not activa(cfg) or core.now() - _guardado().get("ultimo_intento", 0) < cada_horas(cfg) * 3600 - 60:
+        return None
+    return rotar(cfg, alerter, run)
+
+
+def _aceptar_cambios(cfg, alerter) -> None:
+    """Lo que Sentinel cambia por orden del usuario no se reporta como ataque."""
+    from . import fim
+    vigia = fim.Fim(cfg, alerter, core.Allow(cfg))
+    if vigia.load() is not None:
+        vigia.accept([core.conf_path(), ENLACE])
+
+
+def activar(cfg, horas: int, alerter, run=core.run) -> dict:
+    """Enciende la rotación cada `horas`. El primer cambio llega al cumplirse el intervalo, no en este momento."""
+    e = estado(cfg, run)
+    if e["error"]:
+        return {"ok": False, "mensaje": e["error"]}
+    if not HORAS[0] <= horas <= HORAS[1]:
+        return {"ok": False, "mensaje": f"El intervalo va de {HORAS[0]} a {HORAS[1]} horas."}
+    if e["otros"]:
+        return {"ok": False, "mensaje": "No se activó: otros programas ya cambian la MAC o la IP y se pisarían. Quítalos primero:\n- " + "\n- ".join(e["otros"])}
+    core.set_setting("identidad", "cada_horas", str(horas))
+    core.set_setting("identidad", "activo", "yes")
+    d = _guardado()
+    d["ultimo_intento"] = core.now()
+    core.atomic_write_json(_archivo(), d, share=True)
+    rc, out = run(["systemctl", "enable", "--now", TEMPORIZADOR], 30)
+    if rc != 0:
+        core.set_setting("identidad", "activo", "no")
+    _aceptar_cambios(cfg, alerter)
+    if rc != 0:
+        return {"ok": False, "mensaje": f"No se activó: no pude encender el temporizador ({out.strip() or 'sin detalle'})."}
+    msg = f"Cambio de MAC e IP activado: cada {horas} h. El primero será dentro de {horas} h."
+    alerter.emit("info", "identidad", "activada", msg, key=f"identidad:on:{int(core.now())}")
+    return {"ok": True, "mensaje": msg}
+
+
+def desactivar(cfg, alerter, run=core.run) -> dict:
+    core.set_setting("identidad", "activo", "no")
+    rc, out = run(["systemctl", "disable", "--now", TEMPORIZADOR], 30)
+    _aceptar_cambios(cfg, alerter)
+    msg = "Cambio programado de MAC e IP apagado. La MAC actual se mantiene; para volver a la de fábrica: sudo sentinel identidad restaurar"
+    if rc != 0:
+        msg += f" (aviso: no pude apagar el temporizador: {out.strip() or 'sin detalle'}; aunque siga, no cambiará nada)"
+    alerter.emit("info", "identidad", "desactivada", msg, key=f"identidad:off:{int(core.now())}")
     return {"ok": True, "mensaje": msg}

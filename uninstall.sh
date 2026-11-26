@@ -5,7 +5,7 @@ set -euo pipefail
 # con PIN configurado, desinstalar Sentinel exige el PIN
 SB="$(command -v sentinel || true)"
 if [ -n "$SB" ] && ! "$SB" pin verificar; then echo "Sentinel está protegido con PIN: no se desinstala sin el PIN correcto." >&2; exit 1; fi
-systemctl disable --now sentinel-monitor.service sentinel-honeypot.service sentinel-scan.timer sentinel-report.timer sentinel-equipo.timer 2>/dev/null || true
+systemctl disable --now sentinel-monitor.service sentinel-honeypot.service sentinel-scan.timer sentinel-report.timer sentinel-equipo.timer sentinel-identidad.timer 2>/dev/null || true
 rm -f /etc/systemd/system/sentinel-*.service /etc/systemd/system/sentinel-*.timer /usr/local/bin/sentinel /etc/logrotate.d/sentinel
 rm -rf /opt/sentinel
 rm -f /usr/share/applications/sentinel.desktop /usr/share/icons/hicolor/scalable/apps/sentinel.svg
