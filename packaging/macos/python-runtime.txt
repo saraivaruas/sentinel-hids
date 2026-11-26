@@ -1,0 +1,4 @@
+# Python 3.12 que va dentro del .pkg (python-build-standalone, publicación 20261110). Su licencia viene dentro de cada paquete.
+# tipo de procesador (uname -m)  huella SHA-256  dirección. Para cambiar de versión: copiar las huellas del archivo SHA256SUMS de la publicación.
+arm64 2f11b8aa3726bdbd87dd9eb76568412faddf4f47e26913fa45d6a2e424972acd https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz
+x86_64 b78a4c479f1964ec484880bee567568266f68da102269fb93a05fe8716b45f91 https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-apple-darwin-install_only_stripped.tar.gz

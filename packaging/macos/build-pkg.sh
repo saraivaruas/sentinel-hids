@@ -16,6 +16,18 @@ for arq in arm64 x86_64; do
   xcrun swiftc -O -target "$arq-apple-macos13" -o "$TMP/barra-$arq" "$AQUI/packaging/macos/barra.swift"
 done
 lipo -create -o "$TMP/scripts/sentinel-src/prebuilt/sentinel-barra" "$TMP/barra-arm64" "$TMP/barra-x86_64"
+# Python propio, uno por tipo de procesador. Se usa solo si su huella coincide con la anotada.
+CACHE="$AQUI/dist/descargas"; mkdir -p "$CACHE" "$TMP/scripts/sentinel-src/runtime"
+while read -r arq huella url; do
+  case "$arq" in ""|\#*) continue;; esac
+  archivo="$CACHE/$huella.tar.gz"
+  [ -f "$archivo" ] || curl -fsSL --retry 3 -o "$archivo" "$url"
+  if ! echo "$huella  $archivo" | shasum -a 256 -c - >/dev/null; then
+    rm -f "$archivo"; echo "La huella de Python para $arq no coincide: no se genera el paquete." >&2; exit 1
+  fi
+  cp "$archivo" "$TMP/scripts/sentinel-src/runtime/$arq.tar.gz"
+done < "$AQUI/packaging/macos/python-runtime.txt"
+for arq in arm64 x86_64; do [ -f "$TMP/scripts/sentinel-src/runtime/$arq.tar.gz" ] || { echo "Falta Python para $arq en python-runtime.txt" >&2; exit 1; }; done
 cp "$AQUI/packaging/macos/postinstall" "$TMP/scripts/postinstall"; chmod 755 "$TMP/scripts/postinstall"
 SALIDA="$AQUI/dist/sentinel-$VER-macos.pkg"
 FIRMA=(); [ -n "${SENTINEL_PKG_IDENTIDAD:-}" ] && FIRMA=(--sign "$SENTINEL_PKG_IDENTIDAD")
