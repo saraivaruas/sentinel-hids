@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Cambio programado de MAC e IP (Linux), apagado por defecto:** `sudo sentinel identidad activar --cada 2` y `desactivar`, con un temporizador de systemd. El primer cambio llega al cumplirse el intervalo y no se activa si otro programa ya cambia la MAC o la IP. Piden el PIN. 7 pruebas nuevas.
 - **`sentinel requisitos` en macOS** comprueba `launchd`, el registro del sistema, `lsof`, `pf` y `ssh-keygen`; antes pedía instalar `systemd`, `iproute2` y otras piezas de Linux. 1 prueba nueva.
 - **Informe del equipo en macOS:** usa `lsof`, `ps` y el registro del sistema para puertos, conexiones, accesos fallidos, shells reversas, túneles, cuentas, dueños y persistencia. Antes inventaba una conexión a partir de un error y daba por revisados paquetes, accesos y actualizaciones que no había mirado: lo que no se revisa en Mac ahora lo dice. 4 pruebas nuevas.
 - **Detener e iniciar en macOS:** `launchd` responde antes de terminar, así que `sentinel iniciar` justo después de `detener` no hacía nada y el desinstalador fallaba al borrar carpetas en uso. Ahora se espera a que el servicio termine. Encontrado con la prueba real. 2 pruebas nuevas.
