@@ -36,7 +36,9 @@ sudo -u "$SUDO_USER" -H /usr/bin/python3 -I "$AQUI/tools/prueba-mac-panel.py"; c
 comprobar "la auditoría reconoce las protecciones de macOS" sh -c 'grep -q "SIP" /tmp/audit.txt && ! grep -Eq "no se pudo revisar|ufw|auditd" /tmp/audit.txt'
 echo "== endurecimiento"
 FW=/usr/libexec/ApplicationFirewall/socketfilterfw
-foto() { "$FW" --getglobalstate; "$FW" --getstealthmode; defaults read /Library/Preferences/com.apple.loginwindow GuestEnabled 2>/dev/null || echo "sin invitado"; }
+foto() { "$FW" --getglobalstate; "$FW" --getstealthmode; defaults read /Library/Preferences/com.apple.loginwindow GuestEnabled 2>/dev/null || echo "sin invitado"
+  defaults read /Library/Preferences/com.apple.SoftwareUpdate 2>/dev/null | grep -E '(AutomaticCheckEnabled|AutomaticDownload|CriticalUpdateInstall|ConfigDataInstall) =' | sort
+  ls /etc/ssh/sshd_config.d/ 2>/dev/null; }
 foto > /tmp/antes.txt; spctl --status
 /usr/local/bin/sentinel endurecer plan --perfil recomendado
 /usr/local/bin/sentinel endurecer aplicar --perfil recomendado --si | tee /tmp/aplicar.txt
