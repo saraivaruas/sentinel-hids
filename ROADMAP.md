@@ -46,6 +46,8 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 
 «Probado en la CI» significa que pasan las pruebas automáticas en los equipos macOS de GitHub Actions (macOS 26 Tahoe y 15 Sequoia, Apple Silicon e Intel). Ninguna pieza se da por buena como producto hasta probarla en un Mac real.
 
+«Probado en la CI» se marca solo cuando la prueba real de esa pieza pasó en GitHub. 🟡 incluye lo escrito y probado solo con simulaciones, o cuya prueba real aún no termina.
+
 ## Base del porte a macOS
 
 | Estado | Pieza |
@@ -54,23 +56,30 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | ✅ | Módulo `plataforma` (decide si es Linux o macOS) |
 | ✅ | Procesos sospechosos con `ps` |
 | ✅ | Archivos SUID |
-| ✅ | Puertos y conexiones con `lsof` (probado con muestras escritas a mano) |
+| ✅ | Puertos y conexiones con `lsof` |
 | ✅ | Cuentas del sistema |
-| ⬜ | USB y módulos del kernel |
+| 🟡 | USB y extensiones del núcleo y del sistema (falta la prueba real) |
 
-## Lo que falta para un Sentinel completo en Mac
-
-En orden de importancia.
+## Paridad con Linux
 
 | N.º | Estado | Pieza | Detalle |
 |---|---|---|---|
-| 1 | 🟡 | Vigilancia de archivos | Funciona en vivo por sondeo cada 10 s. Faltan las rutas críticas de macOS (ver punto 6). |
-| 2 | ✅ | Fuerza bruta (`authwatch`) | Lee el registro unificado de macOS. La prueba real (`mac-registro`) detecta ataques por SSH, `sudo` y `su`. El bloqueo de la IP depende del punto 3. |
-| 3 | ⬜ | Bloqueo de IP y firewall | Con `pf` en lugar de `ufw`/`iptables`. |
-| 4 | ⬜ | Servicio e instalación | `launchd`, instalador `.pkg` e icono en la barra de menú. |
-| 5 | ⬜ | Captura de paquetes | Con BPF. |
-| 6 | ⬜ | Configuración por defecto para Mac | Rutas vigiladas propias (`/etc/sudoers`, `/Library/LaunchDaemons`, `~/.ssh`, `/etc/pf.conf`…). |
-| 7 | ⬜ | API y app de iOS | La app solo acompaña: alertas, estado de los equipos y bloquear o liberar IPs. iOS no permite que una app vigile el sistema. |
+| 1 | ✅ | Vigilancia de archivos | En vivo por sondeo cada 10 s, con las rutas críticas de macOS. |
+| 2 | ✅ | Fuerza bruta | Lee el registro unificado: SSH, `sudo` y `su` (`mac-registro`). |
+| 3 | ✅ | Bloqueo de IP | Con `pf`, repuesto tras reiniciar (`mac-bloqueo`). |
+| 3b | ⬜ | Administrar puertos del cortafuegos | Abrir y cerrar puertos con plan, copia y reversión, como con `ufw`. |
+| 4a | ✅ | Servicio e instalador | `install-mac.sh` y `launchd`: instalar, detener, iniciar y desinstalar (`mac-instalar`). PIN: falta la prueba real. |
+| 4b | ⬜ | Instalador `.pkg` firmado | Firmarlo y notarizarlo requiere la cuenta de Apple Developer. |
+| 4c | ⬜ | Icono en la barra de menú | |
+| 5 | 🟡 | Captura de paquetes | Con BPF; la prueba real (`mac-captura`) está pendiente. |
+| 6 | ✅ | Configuración, `status` y requisitos propios de macOS | |
+| 7 | 🟡 | Panel | Avisos, permisos de administrador y aplicación en Aplicaciones; falta la prueba real y probar la ventana de contraseña en un Mac con pantalla. |
+| 8 | 🟡 | Informe del equipo y auditoría | Propios de macOS. El informe aún no revisa integridad de programas, cortafuegos ni actualizaciones. |
+| 9 | 🟡 | Señuelos | Con usuario propio sin privilegios; falta la prueba real. |
+| 10 | 🟡 | Actualizaciones | Usan el instalador de Mac; hace falta publicar una versión que lo incluya. |
+| 11 | ⬜ | Endurecimiento guiado | Las medidas actuales son de Linux; en Mac se indica que no está disponible. |
+| 12 | ⬜ | Ventana grande de alerta y PIN sin terminal | Hoy usan `zenity`, que no existe en macOS. |
+| 13 | ⬜ | API y app de iOS | La app solo acompaña: alertas, estado de los equipos y bloquear o liberar IPs. iOS no permite que una app vigile el sistema. |
 
 ## Cómo se prueba
 
