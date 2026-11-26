@@ -26,9 +26,21 @@ buscar_python() {
   done
   return 1
 }
-PY="$(buscar_python || true)"
-if [ -z "$PY" ]; then
-  [ "$DRY" = 1 ] && PY=/usr/bin/python3 || { echo "Falta Python 3. Instala las herramientas de Apple con:  xcode-select --install   y vuelve a ejecutar este instalador."; exit 1; }
+# El instalador .pkg trae su propio Python (uno por tipo de procesador): así no hacen falta las herramientas de Apple.
+INCLUIDO="$AQUI/runtime/$(uname -m).tar.gz"; TMPPY=""
+if [ -f "$INCLUIDO" ]; then
+  if [ "$DRY" = 1 ]; then PY="$DEST/runtime/bin/python3"; echo "  [simulación] usar el Python incluido en el paquete"
+  else
+    TMPPY="$(mktemp -d)"; trap 'rm -rf "$TMPPY"' EXIT
+    tar -xzf "$INCLUIDO" -C "$TMPPY"
+    PY="$TMPPY/python/bin/python3"
+    "$PY" -I -c 'import ssl, sqlite3, plistlib' || { echo "El Python incluido no funciona en este equipo."; exit 1; }
+  fi
+else
+  PY="$(buscar_python || true)"
+  if [ -z "$PY" ]; then
+    [ "$DRY" = 1 ] && PY=/usr/bin/python3 || { echo "Falta Python 3. Instala las herramientas de Apple con:  xcode-select --install   y vuelve a ejecutar este instalador."; exit 1; }
+  fi
 fi
 modulo() { do_ "$PY" -I -c "import sys; sys.path.insert(0, '$DEST'); from sentinel import servicio; $1" "${@:2}"; }
 
@@ -46,6 +58,13 @@ echo "  Python: $PY"
 do_ rm -rf "$DEST"; do_ mkdir -p "$DEST" /usr/local/bin
 do_ cp -R "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$DEST/"
 do_ find "$DEST" -name __pycache__ -prune -exec rm -rf {} +
+if [ -f "$INCLUIDO" ]; then
+  if [ "$DRY" = 1 ]; then echo "  [simulación] instalar el Python incluido en $DEST/runtime"
+  else mv "$TMPPY/python" "$DEST/runtime"; PY="$DEST/runtime/bin/python3"; fi
+fi
+# se compila todo ahora: si Python lo hiciera después, Sentinel vería aparecer archivos nuevos en su propia carpeta
+if [ "$DRY" = 1 ]; then echo "  [simulación] precompilar $DEST"
+else "$PY" -I -m compileall -q "$DEST" >/dev/null 2>&1 || true; fi
 if [ "$DRY" = 0 ]; then echo "$PY" > "$DEST/python"; fi
 do_ chown -R root:wheel "$DEST"; do_ chmod -R go-w "$DEST"; do_ chmod -R a+rX "$DEST"
 do_ ln -sf "$DEST/bin/sentinel" /usr/local/bin/sentinel
