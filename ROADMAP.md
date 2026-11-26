@@ -69,16 +69,16 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 3 | ✅ | Bloqueo de IP | Con `pf`, repuesto tras reiniciar (`mac-bloqueo`). |
 | 3b | ⬜ | Administrar puertos del cortafuegos | Abrir y cerrar puertos con plan, copia y reversión, como con `ufw`. |
 | 4a | ✅ | Servicio e instalador | `install-mac.sh` y `launchd`: instalar, detener, iniciar y desinstalar (`mac-instalar`). PIN: falta la prueba real. |
-| 4b | ⬜ | Instalador `.pkg` firmado | Firmarlo y notarizarlo requiere la cuenta de Apple Developer. |
-| 4c | ⬜ | Icono en la barra de menú | |
-| 5 | 🟡 | Captura de paquetes | Con BPF; la prueba real (`mac-captura`) está pendiente. |
-| 6 | 🟡 | Configuración, `status` y requisitos propios de macOS | Configuración y `status` probados; falta la prueba real de los requisitos. |
-| 7 | 🟡 | Panel | Avisos, permisos de administrador y aplicación en Aplicaciones; falta la prueba real y probar la ventana de contraseña en un Mac con pantalla. |
+| 4b | 🟡 | Instalador `.pkg` | Escrito, sin firmar; falta su prueba real. Firmarlo y notarizarlo requiere la cuenta de Apple Developer. |
+| 4c | 🟡 | Icono en la barra de menú | Escrito; falta su prueba real y verlo en un Mac con pantalla. |
+| 5 | ✅ | Captura de paquetes | Con BPF; detecta un escaneo real (`mac-captura`). |
+| 6 | ✅ | Configuración, `status` y requisitos propios de macOS | Probados con el servicio instalado. |
+| 7 | ✅ | Panel | Páginas, acciones, avisos y aplicación en Aplicaciones probados (`mac-instalar`). Falta ver la ventana de contraseña en un Mac con pantalla. |
 | 8 | 🟡 | Informe del equipo y auditoría | Propios de macOS. El informe aún no revisa integridad de programas, cortafuegos ni actualizaciones. |
 | 9 | 🟡 | Señuelos | Con usuario propio sin privilegios; falta la prueba real. |
 | 10 | 🟡 | Actualizaciones | Usan el instalador de Mac; hace falta publicar una versión que lo incluya. |
 | 11 | ⬜ | Endurecimiento guiado | Las medidas actuales son de Linux; en Mac se indica que no está disponible. |
-| 12 | ⬜ | Ventana grande de alerta y PIN sin terminal | Hoy usan `zenity`, que no existe en macOS. |
+| 12 | 🟡 | Ventana grande de alerta y PIN sin terminal | Con ventanas del sistema; falta verlas en un Mac con pantalla. |
 | 13 | ⬜ | API y app de iOS | La app solo acompaña: alertas, estado de los equipos y bloquear o liberar IPs. iOS no permite que una app vigile el sistema. |
 
 ## Cómo se prueba
