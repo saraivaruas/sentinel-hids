@@ -56,6 +56,11 @@ class Red:
         raise AssertionError(f"comando inesperado: {c}")
 
 
+def setUpModule():
+    p = mock.patch.object(identidad, "GANCHO", "/no/existe/gancho")      # que no mire el equipo donde corren las pruebas
+    p.start(); unittest.addModuleCleanup(p.stop)
+
+
 class EstadoTests(unittest.TestCase):
     def setUp(self):
         self.env = helpers.Env(); self.addCleanup(self.env.close)
@@ -148,6 +153,23 @@ class RotarTests(unittest.TestCase):
         r = identidad.restaurar(self.env.cfg, self.env.alerter, run)
         self.assertFalse(r["ok"]); self.assertIn("no en la de fábrica", r["mensaje"])
         self.assertTrue(identidad.restaurar(self.env.cfg, self.env.alerter, self.red)["ok"])   # lo guardado no se perdió
+
+    def test_con_el_gancho_de_macchanger_no_corta_la_red(self):
+        d = self.env.dir
+        gancho, ajuste = os.path.join(d, "gancho"), os.path.join(d, "macchanger")
+        open(gancho, "w").close()
+        for texto, activo in (("ENABLE_ON_POST_UP_DOWN=true\n", True), ('ENABLE_ON_POST_UP_DOWN="true"\n', True), ("ENABLE_ON_POST_UP_DOWN=false\n", False), ("# ENABLE_ON_POST_UP_DOWN=true\n", False)):
+            with open(ajuste, "w") as f:
+                f.write(texto)
+            with mock.patch.object(identidad, "GANCHO", gancho), mock.patch.object(identidad, "AJUSTE_GANCHO", ajuste):
+                self.assertEqual(identidad.gancho_activo(), activo, texto)
+                self.red.calls.clear()
+                r = identidad.rotar(self.env.cfg, self.env.alerter, self.red)
+                self.assertEqual(r["ok"], not activo, texto)
+                if activo:
+                    self.assertIn("identidad retirar", r["mensaje"])
+                    self.assertFalse([c for c in self.red.calls if "modify" in c or "up" in c])
+                    self.assertIn(identidad.AVISO_GANCHO, identidad.estado(self.env.cfg, self.red)["otros"])
 
     def test_una_puerta_que_nunca_contesta_no_impide_rotar(self):
         self.red.contesta = False

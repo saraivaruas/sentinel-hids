@@ -24,10 +24,12 @@ class RetiroTests(unittest.TestCase):
         self.registro = self.escribir(self.log, "change-ip.log", "")
         self.cron = self.escribir(self.crond, "propio", "MAILTO=root\n@reboot root /usr/bin/macchanger -r eth0\n0 3 * * * root /usr/bin/otra\n")
         self.escribir(self.spool, "root", "")
+        self.gancho = self.escribir(d, "gancho", "#!/bin/sh\n", 0o755)
+        self.ajuste = self.escribir(d, "macchanger.default", '# comentario\nENABLE_ON_POST_UP_DOWN=true\nINTERFACE="wlo1"\n')
         self.crontab = CRONTAB
         self.habilitado, self.falla_crontab = True, False
         for k, v in (("UNIDAD_ANTIGUA", self.unidad), ("CARPETAS_SCRIPTS", (self.bin,)), ("REGISTROS", self.log), ("CRON_USUARIOS", self.spool),
-                     ("CRON_SISTEMA", (os.path.join(self.crond, "*"),))):
+                     ("CRON_SISTEMA", (os.path.join(self.crond, "*"),)), ("GANCHO", self.gancho), ("AJUSTE_GANCHO", self.ajuste)):
             p = mock.patch.object(identidad, k, v); p.start(); self.addCleanup(p.stop)
 
     def escribir(self, base, nombre, texto, modo=0o644):
@@ -71,11 +73,13 @@ class RetiroTests(unittest.TestCase):
         self.assertEqual(self.crontab, "# m h dom mon dow orden\n30 2 * * * /usr/bin/respaldo\n")
         self.assertEqual(self.leer(self.cron), "MAILTO=root\n0 3 * * * root /usr/bin/otra\n")
         self.assertFalse(self.habilitado)
+        self.assertEqual(self.leer(self.ajuste), '# comentario\nENABLE_ON_POST_UP_DOWN=false\nINTERFACE="wlo1"\n')
+        self.assertTrue(os.path.exists(self.gancho))                                       # el archivo del paquete no se toca
         self.assertEqual(os.stat(r["carpeta"]).st_mode & 0o777, 0o700)
         self.assertIn("No queda nada", identidad.retirar(self.env.cfg, self.env.alerter, self.run_)["mensaje"])
 
     def test_devolver_deja_todo_como_estaba(self):
-        antes = {r: (self.leer(r), os.stat(r).st_mode) for r in (self.unidad, self.script_mac, self.script_ip, self.registro, self.cron)}
+        antes = {r: (self.leer(r), os.stat(r).st_mode) for r in (self.unidad, self.script_mac, self.script_ip, self.registro, self.cron, self.ajuste)}
         identidad.retirar(self.env.cfg, self.env.alerter, self.run_)
         r = identidad.devolver(self.env.cfg, self.env.alerter, self.run_)
         self.assertTrue(r["ok"], r)

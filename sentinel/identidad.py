@@ -23,6 +23,11 @@ UNIDAD_ANTIGUA = "/etc/systemd/system/macchanger.service"
 CARPETAS_SCRIPTS = ("/usr/local/bin", "/usr/local/sbin")
 SCRIPT_ANTIGUO = re.compile(r"change[-_]?(mac|ip)(\.sh)?", re.I)         # el nombre completo del archivo
 REGISTROS = "/var/log"
+# el paquete «macchanger» puede traer un gancho que reescribe la MAC cada vez que la red se desconecta
+GANCHO = "/etc/network/if-post-down.d/macchanger"
+AJUSTE_GANCHO = "/etc/default/macchanger"
+GANCHO_ENCENDIDO = re.compile(r"""^([ \t]*ENABLE_ON_POST_UP_DOWN[ \t]*=[ \t]*)(["']?)true\2""", re.M)
+AVISO_GANCHO = "gancho de macchanger (reescribe la MAC cada vez que la red se reconecta)"
 TEMPORIZADOR = "sentinel-identidad.timer"
 ENLACE = "/etc/systemd/system/timers.target.wants/" + TEMPORIZADOR
 HORAS = (1, 168)                                           # entre una hora y una semana
@@ -65,11 +70,23 @@ def leer(uuid: str, campos: list[str], run=core.run) -> dict | None:
     return {c: (lineas[i].strip() if i < len(lineas) else "") for i, c in enumerate(campos)}
 
 
+def gancho_activo() -> bool:
+    if not os.path.exists(GANCHO):
+        return False
+    try:
+        with open(AJUSTE_GANCHO, encoding="utf-8", errors="replace") as f:
+            return bool(GANCHO_ENCENDIDO.search(f.read()))
+    except OSError:
+        return False
+
+
 def otros_rotadores(run=core.run, patrones=CRON) -> tuple[list[str], bool]:
     """Programas ajenos a Sentinel que ya cambian la MAC o la IP. El segundo valor dice si se pudo revisar todo el cron."""
     hallados, completo = [], True
     if run(["systemctl", "is-enabled", "macchanger.service"], 5)[1].strip() == "enabled":
         hallados.append("macchanger.service (cambia la MAC al arrancar)")
+    if gancho_activo():
+        hallados.append(AVISO_GANCHO)
     for patron in patrones:
         carpeta = os.path.dirname(patron)
         if os.path.isdir(carpeta) and not os.access(carpeta, os.R_OK):
@@ -177,6 +194,10 @@ def rotar(cfg, alerter, run=core.run) -> dict:
     if e["error"]:
         return {"ok": False, "mensaje": e["error"]}
     uuid, dev, prop = e["conexion"], e["interfaz"], e["tipo"] + ".cloned-mac-address"
+    if gancho_activo():                                       # pisaría la MAC nueva: ni siquiera se corta la red
+        msg = f"No se cambió nada: el {AVISO_GANCHO}. Retíralo (con copia) con: sudo sentinel identidad retirar"
+        alerter.emit("medium", "identidad", "gancho_macchanger", msg, key="identidad:gancho")
+        return {"ok": False, "mensaje": msg}
     previo = leer(uuid, [prop, "ipv4.dhcp-client-id", "ipv4.dhcp-send-hostname", "ipv6.dhcp-send-hostname"], run)
     if previo is None:
         return {"ok": False, "mensaje": "No pude leer la conexión actual; no se cambió nada."}
@@ -311,7 +332,11 @@ def _es_script(ruta: str) -> bool:
 
 def plan_retiro(run=core.run) -> dict:
     """Qué se quitaría. «completo» es falso si faltan permisos para verlo todo."""
-    plan = {"servicio": UNIDAD_ANTIGUA if os.path.isfile(UNIDAD_ANTIGUA) else "", "crontabs": {}, "cron": {}, "scripts": [], "registros": [], "completo": True}
+    plan = {"servicio": UNIDAD_ANTIGUA if os.path.isfile(UNIDAD_ANTIGUA) else "", "crontabs": {}, "cron": {}, "ganchos": {}, "scripts": [], "registros": [], "completo": True}
+    if gancho_activo():                                       # no se borra nada del paquete: se usa su propio interruptor
+        with open(AJUSTE_GANCHO, encoding="utf-8") as f:
+            texto = f.read()
+        plan["ganchos"][AJUSTE_GANCHO] = {"despues": GANCHO_ENCENDIDO.sub(r"\g<1>\g<2>false\g<2>", texto)}
     try:
         usuarios = sorted(os.listdir(CRON_USUARIOS)) if os.path.isdir(CRON_USUARIOS) else []
     except PermissionError:
@@ -346,7 +371,7 @@ def plan_retiro(run=core.run) -> dict:
 
 
 def hay_algo(plan: dict) -> bool:
-    return any(plan[k] for k in ("servicio", "crontabs", "cron", "scripts", "registros"))
+    return any(plan[k] for k in ("servicio", "crontabs", "cron", "ganchos", "scripts", "registros"))
 
 
 def describir(plan: dict) -> list[str]:
@@ -354,6 +379,7 @@ def describir(plan: dict) -> list[str]:
     out += [f"Línea de {r}: {x}" for r, v in plan["cron"].items() for x in v["quitar"]]
     if plan["servicio"]:
         out.append(f"Servicio: {plan['servicio']}")
+    out += [f"En {r}: ENABLE_ON_POST_UP_DOWN pasa a «false» (apaga el {AVISO_GANCHO})" for r in plan["ganchos"]]
     return out + [f"Archivo: {r}" for r in plan["scripts"] + plan["registros"]]
 
 
@@ -374,7 +400,7 @@ def retirar(cfg, alerter, run=core.run) -> dict:
         n += 1
         carpeta = f"{base}-{n}"
     core.ensure_dir(carpeta, 0o700)
-    archivos = [r for r in [*plan["cron"], plan["servicio"], *plan["scripts"], *plan["registros"]] if r]
+    archivos = [r for r in [*plan["cron"], *plan["ganchos"], plan["servicio"], *plan["scripts"], *plan["registros"]] if r]
     manifiesto = {"archivos": [], "crontabs": [], "servicio": False, "devuelto": False}
     for i, ruta in enumerate(archivos):
         copia = os.path.join(carpeta, f"{i:02d}-{os.path.basename(ruta)}")
@@ -400,7 +426,7 @@ def retirar(cfg, alerter, run=core.run) -> dict:
         rc, out = run(["crontab", "-u", u, nuevo], 15)
         if rc != 0:
             return fallo(f"cambiar las tareas de {u}", out)
-    for ruta, v in plan["cron"].items():
+    for ruta, v in {**plan["cron"], **plan["ganchos"]}.items():
         with open(ruta, "w", encoding="utf-8") as f:                                  # conserva dueño y permisos
             f.write(v["despues"])
     if plan["servicio"]:

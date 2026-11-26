@@ -95,7 +95,7 @@ class ModoDiscretoTests(unittest.TestCase):
         self.calls, self.fallan, self.avahi = [], set(), "active"
         self.perfil = {"ipv4.dhcp-send-hostname": "yes", "ipv6.dhcp-send-hostname": "yes"}
         for p in (mock.patch.object(plataforma, "ES_MAC", False), mock.patch.object(discrecion, "PROC", self.proc), mock.patch.object(discrecion, "ARCHIVO_PING", self.ping),
-                  mock.patch.object(discrecion, "ARCHIVO_ANUNCIOS", self.res), mock.patch.object(identidad, "estado", lambda cfg, run=None: {"error": "", "conexion": "uuid-1"})):
+                  mock.patch.object(discrecion, "ARCHIVO_ANUNCIOS", self.res), mock.patch.object(identidad, "GANCHO", "/no/existe/gancho"), mock.patch.object(identidad, "estado", lambda cfg, run=None: {"error": "", "conexion": "uuid-1"})):
             p.start(); self.addCleanup(p.stop)
 
     def run_(self, c, t=20):
