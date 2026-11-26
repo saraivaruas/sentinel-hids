@@ -9,6 +9,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- **Primera prueba real de MAC e IP en un equipo:** `retirar`, `restaurar` y `rotar` funcionaron en un adaptador USB `r8152`; la hoja de ruta lo recoge.
 - La hoja de ruta marca como probados en Mac real los señuelos, la vigilancia de USB y la protección con PIN.
 - La hoja de ruta marca como escritos, pendientes de prueba real, el cortafuegos de puertos, el informe completo y el endurecimiento en macOS.
 - La prueba del instalador en macOS aplica y revierte el endurecimiento de verdad, genera el informe completo y pide el plan del cortafuegos.
