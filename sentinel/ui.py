@@ -193,6 +193,13 @@ class Data:
         from . import identidad
         return identidad.estado(core.load_config())
 
+    def discrecion(self) -> dict:
+        """Apartado «Modo discreto» de Ajustes: qué delata al equipo y qué medidas hay puestas (solo lectura)."""
+        from . import discrecion
+        r = discrecion.revisar(core.load_config())
+        puestas = discrecion.aplicadas()
+        return {**r, "medidas": [{"id": k, "titulo": v, "aplicada": k in puestas} for k, v in discrecion.MEDIDAS.items()]}
+
     def endurecer(self, perfil: str) -> dict:
         """Lo que muestra la página «Endurecimiento»: cada medida con su estado (solo lectura; no cambia nada)."""
         perfil = perfil if perfil in endurecer.PERFILES else "recomendado"
@@ -368,6 +375,14 @@ def build_action(body: dict) -> list[str]:
         return ["equipo", "--horario", ",".join(horas)]
     if name == "senuelos":
         return ["senuelos", "activar" if body.get("on") is True else "desactivar"]
+    if name == "discrecion_aplicar":
+        from . import discrecion
+        ids = body.get("ids")
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, str) and i in discrecion.MEDIDAS for i in ids):
+            raise ValueError("elige al menos una medida válida")
+        return ["discrecion", "aplicar", "--solo", ",".join(ids), "--si"]            # el panel ya pidió la confirmación
+    if name == "discrecion_revertir":
+        return ["discrecion", "revertir"]
     if name == "identidad_activar":
         horas = str(body.get("horas", ""))
         if not (horas.isdecimal() and 1 <= int(horas) <= 168):
@@ -565,6 +580,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json({"servers": remote.poll_all(), "max": remote.MAX_SERVERS})
         if u.path == "/api/settings":
             return self._json(d.settings())
+        if u.path == "/api/discrecion":
+            return self._json(d.discrecion())
         if u.path == "/api/identidad":
             return self._json(d.identidad())
         if u.path == "/api/firewall":

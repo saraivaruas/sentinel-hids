@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from helpers import Env
-from sentinel import cli, identidad, ui
+from sentinel import cli, discrecion, identidad, ui
 
 UI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sentinel", "ui")
 
@@ -44,6 +44,31 @@ class PrivacidadDeRedTests(unittest.TestCase):
         for accion in ("identidad_activar", "identidad_desactivar", "identidad_rotar", "identidad_restaurar"):
             self.assertIn(f'"{accion}"', pin)
         self.assertTrue(callable(cli.cmd_identidad))
+
+
+class ModoDiscretoTests(unittest.TestCase):
+    def test_acciones(self):
+        self.assertEqual(ui.build_action({"name": "discrecion_aplicar", "ids": ["nombre", "ping"]}), ["discrecion", "aplicar", "--solo", "nombre,ping", "--si"])
+        self.assertEqual(ui.build_action({"name": "discrecion_revertir"}), ["discrecion", "revertir"])
+        for malo in (None, [], "ping", ["otra"], ["ping; reboot"], [1], [["ping"]]):
+            with self.assertRaises(ValueError, msg=malo):
+                ui.build_action({"name": "discrecion_aplicar", "ids": malo})
+
+    def test_datos_de_la_pagina(self):
+        e = Env()
+        try:
+            with mock.patch.object(discrecion, "revisar", return_value={"error": "", "hallazgos": []}), mock.patch.object(discrecion, "aplicadas", return_value=["ping"]):
+                d = ui.Data(e.cfg).discrecion()
+            self.assertEqual({m["id"]: m["aplicada"] for m in d["medidas"]}, {"nombre": False, "anuncios": False, "ping": True})
+        finally:
+            e.close()
+
+    def test_la_pagina_tiene_lo_que_usa_el_programa(self):
+        html, js = leer("index.html"), leer("app.js")
+        for ident in set(re.findall(r'\$\("#(dc-[a-z]+)"\)', js)):
+            self.assertIn(f'id="{ident}"', html, ident)
+        pin = js.split("const NEEDS_PIN")[1].split(";")[0]
+        self.assertIn('"discrecion_aplicar"', pin); self.assertIn('"discrecion_revertir"', pin)
 
 
 if __name__ == "__main__":

@@ -170,3 +170,6 @@ select,input{height:38px;border-radius:10px}.form input,.form select{height:40px
 .ia-out{margin-top:.6rem;padding:.6rem .8rem;border-left:3px solid var(--accent,#4c8bf5);background:rgba(127,127,127,.08);border-radius:6px}
 .ia-t{white-space:pre-wrap;margin:.2rem 0}
 .ia-out small{display:block;margin-top:.25rem}
+/* casilla y texto en la misma línea */
+label.chk{display:flex;align-items:center;gap:9px;margin:6px 0}
+label.chk input{width:auto;margin:0;flex:none}

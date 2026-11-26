@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar", "endurecer_aplicar", "endurecer_revertir", "identidad_activar", "identidad_desactivar", "identidad_rotar", "identidad_restaurar"]);
+  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar", "endurecer_aplicar", "endurecer_revertir", "identidad_activar", "identidad_desactivar", "identidad_rotar", "identidad_restaurar", "discrecion_aplicar", "discrecion_revertir"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -107,7 +107,7 @@
     if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
     if (narrow()) setSidebar(false);
     if (v.startsWith("fw-")) loadFirewall();
-    if (v === "ajustes") { loadSettings(); loadIdentidad(); }
+    if (v === "ajustes") { loadSettings(); loadIdentidad(); loadDiscrecion(); }
     if (v === "correo") loadCorreo();
     if (v === "ia") loadIA();
     if (v === "inicio") loadInicio();
@@ -561,6 +561,28 @@
     if (!(await confirmDlg("Volver a la MAC de fábrica", "Se recuperan los ajustes originales de la conexión. " + CORTE, "Restaurar"))) return;
     await runAction("identidad_restaurar", {}, btn); loadIdentidad();
   });
+
+  // ---------- Modo discreto: qué delata al equipo y las medidas que elija el usuario
+  async function loadDiscrecion() {
+    const d = await api("/api/discrecion"), hall = $("#dc-hall"), med = $("#dc-med"); clear(hall); clear(med);
+    const puestas = d.medidas.filter((m) => m.aplicada).length;
+    const badge = $("#dc-st"); badge.textContent = puestas ? puestas + " de " + d.medidas.length + " activas" : "apagado"; badge.className = "badge sev-" + (puestas ? "low" : "info");
+    if (d.error) hall.appendChild(el("p", "hint", d.error));
+    (d.hallazgos || []).forEach((h) => hall.appendChild(el("p", "hint", (h.estado === "expuesto" ? "✖ " : h.estado === "discreto" ? "✔ " : "? ") + h.titulo + ": " + h.detalle)));
+    d.medidas.forEach((m) => {
+      const l = el("label", "hint chk"), c = el("input"); c.type = "checkbox"; c.value = m.id; c.checked = true; c.disabled = m.aplicada || !!d.error;
+      l.appendChild(c); l.appendChild(document.createTextNode(m.titulo + (m.aplicada ? " (activa)" : ""))); med.appendChild(l);
+    });
+    $("#dc-on").disabled = !!d.error || puestas === d.medidas.length; $("#dc-off").hidden = !puestas;
+  }
+  $("#dc-on").addEventListener("click", async (e) => {
+    const btn = e.currentTarget, ids = [...document.querySelectorAll("#dc-med input:checked:not(:disabled)")].map((c) => c.value);
+    if (!ids.length) { toast("Elige al menos una medida", true); return; }
+    const aviso = (ids.includes("ping") ? "Sin respuesta a ping, tampoco responderá a tus otros equipos ni por la VPN. " : "") + (ids.includes("anuncios") ? "Puede dejar de encontrarse solo a impresoras y equipos «.local». " : "");
+    if (!(await confirmDlg("Activar el modo discreto", aviso + "Se guarda lo que había y puedes deshacerlo.", "Activar"))) return;
+    await runAction("discrecion_aplicar", { ids }, btn); loadDiscrecion();
+  });
+  $("#dc-off").addEventListener("click", async (e) => { await runAction("discrecion_revertir", {}, e.currentTarget); loadDiscrecion(); });
 
   // ---------- Postura
   async function loadAudit() {
