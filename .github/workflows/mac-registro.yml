@@ -30,6 +30,7 @@ jobs:
           sudo dseditgroup -o edit -a sentinelprueba -t user com.apple.access_ssh || true
           sudo dscl . -passwd /Users/sentinelprueba 'Clave-Buena-123'
           dscl . -authonly sentinelprueba 'Clave-Buena-123' && echo "clave de prueba correcta"
+          sudo dseditgroup -o edit -a sentinelprueba -t user admin  # para que sudo le pida la clave y la rechace
           sleep 3
           nc -z 127.0.0.1 22 && echo "SSH escuchando" || echo "SSH NO escucha"
       - name: Provocar accesos y capturar el registro
@@ -49,7 +50,8 @@ jobs:
           intento sentinelprueba Clave-Buena-123
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes sentinelprueba@127.0.0.1 true; echo "ssh sin clave -> $?"
           printf 'a\nb\nc\n' | sudo -u sentinelprueba sudo -k -S true; echo "sudo malo -> $?"
-          echo mala | sudo -u sentinelprueba su root -c true; echo "su malo -> $?"
+          # su solo pide la clave si hay terminal: expect le da una
+          expect -c 'spawn sudo -u sentinelprueba su root -c true; expect "assword:"; send "mala\r"; expect eof'; echo "su malo (con terminal)"
           sleep 8
           sudo pkill -f "log stream" || true
           sudo log show --last 3m --info --style ndjson --predicate "$filtro" > "$RUNNER_TEMP/guardado.ndjson"
@@ -70,7 +72,8 @@ jobs:
               if claves is None:
                   claves = sorted(r); print("CAMPOS:", claves)
               msg = r["eventMessage"]
-              if r.get("processImagePath", "").endswith("sudo") or any(p in msg.lower() for p in ("fail", "invalid", "accept", "password", "preauth", "auth", "incorrect")):
+              propio = r.get("processImagePath", "").endswith(("/sudo", "/su")) and r.get("senderImagePath") == r.get("processImagePath")
+              if (propio and msg != "Reading config") or any(p in msg.lower() for p in ("fail", "invalid", "accept", "password", "preauth", "auth", "incorrect")):
                   print(json.dumps([r.get("processImagePath"), r.get("senderImagePath"), r.get("subsystem"), r.get("category"), r.get("messageType"), msg[:300]], ensure_ascii=False))
           EOF
           done
