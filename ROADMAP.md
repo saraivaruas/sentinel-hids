@@ -67,7 +67,7 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 1 | ✅ | Vigilancia de archivos | En vivo por sondeo cada 10 s, con las rutas críticas de macOS. |
 | 2 | ✅ | Fuerza bruta | Lee el registro unificado: SSH, `sudo` y `su` (`mac-registro`). |
 | 3 | ✅ | Bloqueo de IP | Con `pf`, repuesto tras reiniciar (`mac-bloqueo`). |
-| 3b | 🟡 | Administrar puertos del cortafuegos | Con `pf`: plan, aplicar a prueba, confirmar y restaurar. Falta su prueba real. |
+| 3b | ✅ | Administrar puertos del cortafuegos | Con `pf`: plan, aplicar a prueba, confirmar y restaurar; probado con conexiones reales (`mac-bloqueo`). |
 | 4a | ✅ | Servicio e instalador | `install-mac.sh` y `launchd`: instalar, detener, iniciar, desinstalar y protección con PIN (`mac-instalar`). |
 | 4b | 🟡 | Instalador `.pkg` | Se genera, instala y desinstala en equipos reales (`mac-instalar`). Sin firmar: firmarlo y notarizarlo requiere la cuenta de Apple Developer. |
 | 4c | ✅ | Icono en la barra de menú | Se compila, lee el estado y queda corriendo (`mac-instalar`). Falta verlo en un Mac con pantalla. |
