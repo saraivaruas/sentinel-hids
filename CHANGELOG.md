@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- Las pruebas del horario del informe y de `status` simulan `systemd`; en la CI de Mac fallaban desde que existe el manejo con `launchd`.
 - La prueba de «no reponer lo liberado» dependía de que el equipo tuviera `pfctl` y fallaba en Debian 12; ahora lo simula.
 - **Panel, Ajustes → «Privacidad de red»:** muestra la MAC, la IP y si se envía el nombre; permite activar o apagar el cambio programado, elegir el intervalo, cambiar ahora y volver a la MAC de fábrica, con confirmación, PIN y clave de administrador. Si otro programa ya cambia la MAC, no deja activarlo y dice cuál. 4 pruebas nuevas.
 - **Cambio programado de MAC e IP (Linux), apagado por defecto:** `sudo sentinel identidad activar --cada 2` y `desactivar`, con un temporizador de systemd. El primer cambio llega al cumplirse el intervalo y no se activa si otro programa ya cambia la MAC o la IP. Piden el PIN. 7 pruebas nuevas.
