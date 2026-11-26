@@ -9,6 +9,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- La hoja de ruta recoge que el endurecimiento y el informe del equipo pasan sus pruebas reales en los cuatro tipos de Mac.
 - La prueba real del endurecimiento compara también, tras revertir, los ajustes de actualización automática y los archivos de configuración de SSH.
 - **`endurecer revertir` ya no dice «todo quedó como estaba» sin mirarlo:** si el sistema no deja deshacer un cambio (macOS reciente no permite apagar Gatekeeper por comando), lo dice y sale con error. 1 prueba nueva.
 - La hoja de ruta recoge que el cortafuegos de puertos de macOS pasa su prueba real.
