@@ -80,6 +80,7 @@ class HorarioTests(unittest.TestCase):
         self.e = Env()
         self.dir = tempfile.mkdtemp()
         self.env = mock.patch.dict(os.environ, {"SENTINEL_SYSTEMD_DIR": self.dir}); self.env.start()
+        linux = mock.patch.object(equipo.plataforma, "ES_MAC", False); linux.start(); self.addCleanup(linux.stop)   # estas pruebas son de systemd
         self.llamadas = []
 
     def tearDown(self):

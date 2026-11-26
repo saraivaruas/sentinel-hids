@@ -10,6 +10,9 @@ from sentinel import cli
 
 
 class StatusTests(unittest.TestCase):
+    def setUp(self):
+        linux = mock.patch.object(cli.plataforma, "ES_MAC", False); linux.start(); self.addCleanup(linux.stop)   # simulan las respuestas de systemd
+
     def status(self):
         out = io.StringIO()
         with redirect_stdout(out), mock.patch.object(core, "run", return_value=(0, "active")):
