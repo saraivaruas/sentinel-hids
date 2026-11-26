@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- La prueba del instalador en macOS comprueba que el icono se compila, lee el estado y queda corriendo.
 - **Icono en la barra de menú de macOS:** un escudo del color del estado, con «Abrir panel». El instalador lo compila y lo arranca; el desinstalador lo quita. 1 prueba nueva.
 - **PIN sin terminal en macOS:** se pide con una ventana del sistema (antes dependía de `zenity`, que no existe en Mac). 2 pruebas nuevas.
 - **Ventana grande de alerta en macOS** (si activas `popup_min`), con el botón «Abrir panel»; el texto de la alerta viaja como dato. 2 pruebas nuevas.
