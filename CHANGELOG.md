@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Prueba del monitor completo en macOS (`mac-monitor`):** lo arranca como administrador con las rutas reales, crea un programa de arranque, provoca accesos fallidos, ejecuta los comandos principales y exige que no haya errores.
 - En macOS los registros y el estado quedan legibles para el grupo `admin` (allí no existe `adm`), para que el panel pueda leerlos. 1 prueba nueva.
 - **Valores por defecto de macOS:** se vigilan sus rutas críticas (`/private/etc`, `LaunchDaemons`, `LaunchAgents`, tareas programadas, `/Users/*/.ssh`…), sus carpetas y registros web (Apache y Homebrew), y el señuelo ya no usa el 5900 («Compartir pantalla»). Lo que escribas en `sentinel.conf` sigue mandando. 1 prueba nueva.
 - En macOS la página del cortafuegos explica que todavía no se administra (y que el bloqueo con `pf` sí funciona) en vez de pedir `ufw` o `iptables`. 1 prueba nueva.
