@@ -49,6 +49,21 @@ comprobar "el informe programado se genera" sh -c 'ls /var/lib/sentinel/informes
 echo "== reinstalar encima"; "$AQUI/install-mac.sh" >/dev/null; comprobar "reinstalar funciona" test $? = 0
 comprobar "sigue corriendo tras reinstalar" esperar 60 corriendo
 
+echo "== señuelos"
+comprobar "los señuelos se activan" /usr/local/bin/sentinel senuelos activar
+comprobar "quedan escuchando" esperar 30 nc -z 127.0.0.1 2222
+comprobar "corren con el usuario sin privilegios" test "$(ps -o user= -p "$(pgrep -f '/opt/sentinel honeypot' | head -1)" | tr -d ' ')" = _sentinel
+echo hola | nc -w 3 127.0.0.1 2222 >/dev/null
+comprobar "avisa de quien toca un señuelo" esperar 60 evento toque
+comprobar "activarlos no se reporta como ataque" sh -c '! grep -q "sentinel.honeypot.plist" /var/log/sentinel/events.jsonl'
+comprobar "ese usuario no puede leer los registros" sh -c '! sudo -u _sentinel cat /var/log/sentinel/events.jsonl'
+comprobar "los señuelos se apagan" /usr/local/bin/sentinel senuelos desactivar
+comprobar "el puerto queda cerrado" sh -c '! nc -z 127.0.0.1 2222'
+
+echo "== USB y extensiones"
+/usr/bin/python3 -I -c 'import sys; sys.path.insert(0, "/opt/sentinel"); from sentinel import hostcheck; print("usb:", hostcheck.usb_devices()); print("extensiones:", hostcheck.kernel_modules())'
+ioreg -p IOUSB -l -w0 | grep -E '\+-o |idVendor|idProduct|USB Product Name' | head -30; kmutil showloaded --list-only 2>/dev/null | grep -v com.apple | head; systemextensionsctl list
+
 echo "== con PIN"
 printf '\nsecreto-123\n' | /usr/local/bin/sentinel --pin-stdin pin establecer; comprobar "se puede poner un PIN" test $? = 0
 comprobar "sin escribir el PIN no se reinstala" sh -c "! '$AQUI/install-mac.sh' </dev/null"
@@ -69,6 +84,7 @@ comprobar "ningún programa se cayó" sh -c '! grep -q Traceback /var/log/sentin
 echo "== desinstalar"; "$AQUI/uninstall-mac.sh" --todo; comprobar "el desinstalador termina bien" test $? = 0
 comprobar "no queda el servicio" sh -c "! launchctl print $SVC.monitor"
 comprobar "no quedan procesos" sh -c "! pgrep -f '/opt/sentinel monitor'"
+comprobar "no queda el usuario de los señuelos" sh -c '! dscl . -read /Users/_sentinel'
 for r in /opt/sentinel /etc/sentinel /var/lib/sentinel /var/log/sentinel /usr/local/bin/sentinel; do comprobar "no queda $r" test ! -e "$r"; done
 rm -f /Library/LaunchDaemons/com.ejemplo.intruso.plist
 if [ "$FALLOS" = 0 ]; then echo "Todas las comprobaciones pasaron."; else echo "$FALLOS comprobaciones fallidas"; exit 1; fi
