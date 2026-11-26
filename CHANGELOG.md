@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- En macOS los registros y el estado quedan legibles para el grupo `admin` (allí no existe `adm`), para que el panel pueda leerlos. 1 prueba nueva.
 - **Valores por defecto de macOS:** se vigilan sus rutas críticas (`/private/etc`, `LaunchDaemons`, `LaunchAgents`, tareas programadas, `/Users/*/.ssh`…), sus carpetas y registros web (Apache y Homebrew), y el señuelo ya no usa el 5900 («Compartir pantalla»). Lo que escribas en `sentinel.conf` sigue mandando. 1 prueba nueva.
 - En macOS la página del cortafuegos explica que todavía no se administra (y que el bloqueo con `pf` sí funciona) en vez de pedir `ufw` o `iptables`. 1 prueba nueva.
 - **Prueba real del bloqueo en macOS (`mac-bloqueo`):** conexiones IPv4 e IPv6 de verdad que deben cortarse al bloquear, seguir para las demás direcciones y volver al liberar o caducar.
