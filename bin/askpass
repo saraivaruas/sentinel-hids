@@ -1,0 +1,3 @@
+#!/bin/sh
+# macOS: ventana de contraseña para «sudo -A» (la usa el panel). Lo que se escribe va directo a sudo.
+exec /usr/bin/osascript -e 'display dialog "Sentinel necesita tu contraseña de administrador." with title "Sentinel" default answer "" with hidden answer with icon caution' -e 'text returned of result'

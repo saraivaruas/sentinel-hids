@@ -464,7 +464,7 @@ def run_action(body: dict) -> dict:
         return {"ok": False, "out": f"Acción rechazada: {e}"}
     binp = sentinel_bin()
     if not binp:
-        return {"ok": False, "out": "Sentinel no está instalado en el sistema: ejecuta «sudo ./install.sh»."}
+        return {"ok": False, "out": "Sentinel no está instalado en el sistema: ejecuta «sudo ./" + ("install-mac.sh" if plataforma.ES_MAC else "install.sh") + "»."}
     pin_in = str(body.get("pin", ""))[:200]
     smtp_clave = (body.get("name") == "smtp_guardar" and "--password-stdin" in args) or (body.get("name") == "ia_guardar" and "--key-stdin" in args)
     pre = ["--pin-stdin"] if ("pin" in body or smtp_clave) else []         # el PIN y la contraseña SMTP viajan por la entrada estándar, nunca en la lista de procesos
@@ -473,16 +473,26 @@ def run_action(body: dict) -> dict:
     elif smtp_clave:
         pin_in = (pin_in + "\n" if "pin" in body else "") + str(body.get("clave", ""))[:200]
     real = os.path.realpath(binp)                    # la política de polkit (org.sentinel.policy) recuerda la clave unos minutos para esta ruta
-    cmd = [real, *pre, *args] if core.is_root() else ["pkexec", real, *pre, *args]
-    if not core.is_root() and not shutil.which("pkexec"):
+    env = None
+    if core.is_root():
+        cmd = [real, *pre, *args]
+    elif plataforma.ES_MAC:                          # en macOS no hay pkexec: sudo pide la clave con una ventana del sistema
+        ventana = os.path.join(os.path.dirname(real), "askpass")
+        if not os.path.exists(ventana):
+            return {"ok": False, "out": "Falta la ventana de contraseña: vuelve a instalar con «sudo ./install-mac.sh»."}
+        cmd, env = ["sudo", "-A", real, *pre, *args], dict(os.environ, SUDO_ASKPASS=ventana)
+    elif not shutil.which("pkexec"):
         return {"ok": False, "out": "Falta pkexec para pedir permisos de administrador."}
+    else:
+        cmd = ["pkexec", real, *pre, *args]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False, input=(pin_in + "\n") if pre else None)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False, input=(pin_in + "\n") if pre else None, env=env)
     except (OSError, subprocess.SubprocessError) as e:
         return {"ok": False, "out": str(e)}
     out = ((r.stdout or "") + (r.stderr or "")).strip()
-    if r.returncode == 126:
-        out = "No se autorizó la acción (clave cancelada o incorrecta)."
+    sin_clave = env is not None and r.returncode == 1 and any(x in out for x in ("no password was provided", "a password is required", "incorrect password"))
+    if r.returncode == 126 or sin_clave:
+        return {"ok": False, "out": "No se autorizó la acción (clave cancelada o incorrecta).", "code": r.returncode}
     return {"ok": r.returncode in (0, 1, 2) if args[0] == "scan" else r.returncode == 0, "out": out[-3000:], "code": r.returncode}
 
 

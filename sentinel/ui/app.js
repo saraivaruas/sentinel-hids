@@ -70,7 +70,7 @@
     } else if (st.pinSet && (name === "pin_establecer" || name === "pin_quitar")) {
       if (!extra || extra.pin == null) return null;
     } else if (name === "pin_establecer") { extra = Object.assign({ pin: "" }, extra); }
-    if (!st.installed) { toast("Sentinel aún no está instalado en el sistema. Ejecuta «sudo ./install.sh».", true); return null; }
+    if (!st.installed) { toast("Sentinel aún no está instalado en el sistema. Ejecuta el instalador: «sudo ./install.sh» (en Mac, «sudo ./install-mac.sh»).", true); return null; }
     if (btn) { btn.disabled = true; btn.dataset.l = btn.textContent; btn.textContent = "Trabajando…"; }
     try {
       const r = await api("/api/action", Object.assign({ name }, extra || {}));
