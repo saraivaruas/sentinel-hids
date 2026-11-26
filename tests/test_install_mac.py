@@ -1,4 +1,5 @@
 import os
+import plistlib
 import subprocess
 import unittest
 
@@ -20,6 +21,14 @@ class InstalarMacTests(unittest.TestCase):
         # las tareas se escriben antes de la referencia: así Sentinel no se reporta a sí mismo como programa de arranque nuevo
         self.assertLess(s.index("servicio.instalar"), s.index("baseline init")); self.assertLess(s.index("baseline init"), s.index("servicio.iniciar"))
         self.assertTrue(all("[simulación]" in ln for ln in s.splitlines() if "rm -rf" in ln))
+
+    def test_deja_el_panel_en_aplicaciones(self):
+        r = self.correr("Darwin", "--dry-run")
+        self.assertIn("/Applications/Sentinel.app/Contents/MacOS/Sentinel", r.stdout)
+        with open(os.path.join(ROOT, "packaging", "macos", "Info.plist"), "rb") as f:
+            d = plistlib.load(f)
+        self.assertEqual(d["CFBundleExecutable"], "Sentinel")
+        self.assertTrue(os.access(os.path.join(ROOT, "packaging", "macos", "abrir-panel"), os.X_OK))
 
 
 if __name__ == "__main__":

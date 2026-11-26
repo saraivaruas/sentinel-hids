@@ -57,6 +57,13 @@ do_ install -d -m 750 -o root -g admin /var/lib/sentinel /var/log/sentinel
 do_ mkdir -p /etc/newsyslog.d
 do_ cp "$AQUI/packaging/macos/newsyslog.conf" /etc/newsyslog.d/sentinel.conf
 
+# El panel como aplicación, para abrirlo desde el Launchpad o Aplicaciones
+APP="/Applications/Sentinel.app/Contents"
+do_ mkdir -p "$APP/MacOS"
+do_ cp "$AQUI/packaging/macos/Info.plist" "$APP/Info.plist"
+do_ cp "$AQUI/packaging/macos/abrir-panel" "$APP/MacOS/Sentinel"
+do_ chmod 755 "$APP/MacOS/Sentinel"
+
 paso "3/5 Tareas de launchd"
 modulo "servicio.instalar(sys.argv[1])" "$PY"
 

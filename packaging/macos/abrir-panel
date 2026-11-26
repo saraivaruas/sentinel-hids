@@ -1,0 +1,3 @@
+#!/bin/sh
+# Abre el panel de Sentinel (en el navegador). Corre con tu usuario; lo que cambia algo pide la contraseña.
+exec /usr/local/bin/sentinel ui

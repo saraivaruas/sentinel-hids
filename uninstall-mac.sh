@@ -10,6 +10,6 @@ if [ -x "$DEST/bin/sentinel" ]; then
   "$DEST/bin/sentinel" detener >/dev/null || true
 fi
 rm -f /Library/LaunchDaemons/io.github.saraivaruas.sentinel.*.plist /usr/local/bin/sentinel /etc/newsyslog.d/sentinel.conf
-rm -rf "$DEST"
+rm -rf "$DEST" /Applications/Sentinel.app
 pfctl -a com.apple/sentinel -F all >/dev/null 2>&1 || true      # quita los bloqueos
 if [ "${1:-}" = "--todo" ]; then rm -rf /var/lib/sentinel /var/log/sentinel /etc/sentinel; echo "Todo eliminado."; else echo "Programa eliminado. Se conservan /var/lib/sentinel, /var/log/sentinel y /etc/sentinel (usa --todo para borrarlos)."; fi
