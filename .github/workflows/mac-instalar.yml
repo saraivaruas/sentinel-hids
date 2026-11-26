@@ -1,0 +1,28 @@
+# Prueba real en macOS del instalador: instalar, vigilar como servicio, detener, iniciar y desinstalar.
+# Solo en equipos desechables de GitHub.
+name: mac-instalar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/mac-instalar.yml", "sentinel/**", "bin/**", "install-mac.sh", "uninstall-mac.sh", "packaging/macos/**", "tools/prueba-mac-instalar.sh"]
+
+permissions:
+  contents: read
+
+jobs:
+  instalar:
+    name: Instalar en ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-26-intel, macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Instalar, usar y desinstalar
+        run: |
+          sudo systemsetup -setremotelogin on || true
+          sudo GITHUB_ACTIONS=true ./tools/prueba-mac-instalar.sh
