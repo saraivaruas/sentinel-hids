@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Bloqueo de IP en macOS con `pf`:** Sentinel bloquea y libera atacantes en un ancla propia (`com.apple/sentinel`) sin tocar `/etc/pf.conf`, y corta las conexiones que la IP ya tenía abiertas. Si las reglas del equipo no incluyen esa ancla, avisa en lugar de fingir que bloqueó. 4 pruebas nuevas.
 - La hoja de ruta marca como hecha la detección de fuerza bruta en macOS, probada en equipos reales de GitHub.
 - **Prueba real de la fuerza bruta en macOS:** `mac-registro` deja de solo capturar muestras: en macOS 26 y 15 (Apple Silicon e Intel) provoca accesos fallidos de SSH, `sudo` y `su` mientras el detector de Sentinel escucha, y falla si no salen las alertas.
 - **Fuerza bruta en macOS:** el detector de accesos lee el registro unificado (`log stream`) en lugar del journal: SSH (fuerza bruta, acceso tras intentos fallidos, root remoto), `sudo` y `su`. Solo acepta mensajes escritos por los programas del sistema (por su ruta completa), para que otro programa no pueda inventar ataques y provocar bloqueos. En Linux no cambia nada. 2 pruebas nuevas.
