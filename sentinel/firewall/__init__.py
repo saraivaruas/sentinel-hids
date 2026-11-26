@@ -9,7 +9,7 @@ import re
 import shutil
 import time
 
-from .. import core
+from .. import core, plataforma
 from . import exposure, iptables, ufw
 
 BACKENDS = {"ufw": ufw, "iptables": iptables}
@@ -124,6 +124,8 @@ def describe(p: dict, backend: str = "") -> list[str]:
 def state(cfg=None) -> dict:
     """Foto completa (la toma root; el panel la lee): backend, reglas, plan y puertos escuchando."""
     conf = settings(cfg)
+    if plataforma.ES_MAC:
+        return {"ok": False, "error": "En macOS Sentinel todavía no administra el cortafuegos. El bloqueo de atacantes sí funciona (con pf).", "conf": conf, "time": core.iso()}
     be = pick(conf["backend"])
     if be is None:
         return {"ok": False, "error": "No hay ufw ni iptables instalado", "conf": conf, "time": core.iso()}

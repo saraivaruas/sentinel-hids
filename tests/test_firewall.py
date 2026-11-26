@@ -142,6 +142,11 @@ udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
         r = {i["port"]: i for i in exposure.analyze(ss, set(), [])}
         self.assertEqual(r[41641]["status"], "privada"); self.assertIn("Tailscale", r[41641]["advice"]); self.assertEqual(r[5353]["status"], "bloqueado")
 
+    def test_en_macos_dice_que_aun_no_administra_el_cortafuegos(self):
+        with mock.patch.object(firewall.plataforma, "ES_MAC", True), mock.patch.object(firewall, "pick") as pick:
+            s = firewall.state(core.load_config())
+        self.assertFalse(s["ok"]); self.assertIn("macOS", s["error"]); self.assertIn("pf", s["error"]); pick.assert_not_called()
+
     def test_docker_publicado(self):
         d = exposure.parse_docker(self.DOCKER)
         self.assertEqual([(x["name"], x["port"], x["all"]) for x in d], [("web", 8080, True), ("web", 8080, True), ("db", 3307, False), ("api", 9000, True)])
