@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Corregido
+- **La MAC nueva se perdía en equipos con el paquete `macchanger`:** su gancho (`ENABLE_ON_POST_UP_DOWN`) ejecuta `macchanger -e` cada vez que la red se desconecta y reescribía la MAC recién puesta. Ahora Sentinel lo detecta, `rotar` avisa sin cortar la red y `retirar` lo apaga con su propio interruptor (con copia; `devolver` lo repone). Causa confirmada en un equipo real. 1 prueba nueva.
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
