@@ -29,10 +29,10 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | N.º | Estado | Pieza | Detalle |
 |---|---|---|---|
 | 2.1 | 🟡 | Revisión de lo que delata al equipo | Solo lee: nombre por DHCP, LLMNR, mDNS, NetBIOS, SSDP, puertos abiertos, respuesta a ping y anuncios de programas (Syncthing, por ejemplo). Comando `sentinel discrecion`, probado en un equipo real sin permisos de administrador; falta con ellos y que pase por la CI. |
-| 2.2 | ⬜ | No anunciarse | Apagar LLMNR y mDNS y no enviar el nombre. |
-| 2.3 | ⬜ | No contestar a ping | Solo la petición de eco en IPv4 e IPv6; lo que la red necesita para funcionar (ARP, descubrimiento de vecinos) se mantiene. |
+| 2.2 | 🟡 | No anunciarse | Apagar LLMNR, mDNS y Avahi y no enviar el nombre. Hecho y probado con un sistema simulado; falta un equipo real y la CI. Chrome y Syncthing siguen anunciándose: son ajustes de cada programa. |
+| 2.3 | 🟡 | No contestar a ping | Solo la petición de eco en IPv4 e IPv6; ARP y el descubrimiento de vecinos se mantienen. Afecta también al ping desde la VPN y el propio equipo. Hecho y probado con un sistema simulado; falta un equipo real y la CI. |
 | 2.4 | ⬜ | Entrada cerrada | Con el módulo cortafuegos: nada abierto desde fuera, sin respuesta a lo no pedido. |
-| 2.5 | ⬜ | Modo discreto | Un interruptor que aplica 2.2 a 2.4, comprueba que la red siga funcionando y se puede deshacer. |
+| 2.5 | 🟡 | Modo discreto | `sentinel discrecion aplicar` y `revertir`: aplica 2.2 y 2.3 y se puede deshacer. Falta sumar 2.4 y comprobarlo en un equipo real. |
 | 2.6 | ⬜ | Página en el panel | |
 
 ### Fase 3: más adelante

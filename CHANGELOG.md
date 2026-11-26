@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Modo discreto (Linux), `sudo sentinel discrecion aplicar` y `revertir`:** no envía el nombre del equipo al router, apaga mDNS, LLMNR y Avahi y no contesta ping (IPv4 e IPv6). Cada medida se puede elegir con `--solo`, guarda lo que había y se deshace; no corta la red. Piden el PIN. `identidad restaurar` respeta el nombre oculto. 8 pruebas nuevas (con un sistema simulado).
 - **`sudo sentinel identidad retirar` y `devolver` (Linux):** quitan el método antiguo de rotar MAC e IP (tareas de cron, `macchanger.service`, scripts `change-mac`/`change-ip` y sus registros). Muestra la lista, pide confirmación y PIN, guarda una copia antes de tocar nada y respeta las demás tareas. 7 pruebas nuevas.
 - La hoja de ruta marca los requisitos de macOS como pendientes de su prueba real.
 - La hoja de ruta muestra pieza por pieza qué tiene macOS igual que Linux, qué espera su prueba real y qué falta.
