@@ -34,7 +34,24 @@ sudo -u "$SUDO_USER" -H /usr/bin/python3 -I "$AQUI/tools/prueba-mac-panel.py"; c
 /usr/local/bin/sentinel test; comprobar "la prueba de alertas funciona" test $? = 0
 /usr/local/bin/sentinel audit | tee /tmp/audit.txt
 comprobar "la auditoría reconoce las protecciones de macOS" sh -c 'grep -q "SIP" /tmp/audit.txt && ! grep -Eq "no se pudo revisar|ufw|auditd" /tmp/audit.txt'
-/usr/local/bin/sentinel endurecer plan
+echo "== endurecimiento"
+FW=/usr/libexec/ApplicationFirewall/socketfilterfw
+foto() { "$FW" --getglobalstate; "$FW" --getstealthmode; defaults read /Library/Preferences/com.apple.loginwindow GuestEnabled 2>/dev/null || echo "sin invitado"; }
+foto > /tmp/antes.txt; spctl --status
+/usr/local/bin/sentinel endurecer plan --perfil recomendado
+/usr/local/bin/sentinel endurecer aplicar --perfil recomendado --si | tee /tmp/aplicar.txt
+comprobar "ninguna medida tuvo que deshacerse sola" sh -c '! grep -q "se deshizo sola" /tmp/aplicar.txt'
+comprobar "el cortafuegos de macOS queda encendido" sh -c "$FW --getglobalstate | grep -q 'is enabled'"
+/usr/local/bin/sentinel endurecer plan --perfil recomendado
+comprobar "revertir funciona" /usr/local/bin/sentinel endurecer revertir
+foto > /tmp/despues.txt; spctl --status
+comprobar "todo vuelve a como estaba" diff /tmp/antes.txt /tmp/despues.txt
+
+echo "== informe y cortafuegos de puertos"
+/usr/local/bin/sentinel equipo | tee /tmp/informe.txt >/dev/null
+comprobar "el informe no tiene secciones caídas" sh -c '! grep -q "(falló)" /tmp/informe.txt'
+sed -n '/Firma de los programas/,/Persistencia/p;/Protecciones de macOS/,$p' /tmp/informe.txt | head -40
+comprobar "el plan del cortafuegos responde" /usr/local/bin/sentinel firewall plan
 
 ANTES="$(pid)"; kill -9 "$ANTES"
 comprobar "si matan el monitor, launchd lo vuelve a levantar" esperar 60 sh -c "p=\$(pgrep -f '/opt/sentinel monitor' | head -1); [ -n \"\$p\" ] && [ \"\$p\" != '$ANTES' ]"
