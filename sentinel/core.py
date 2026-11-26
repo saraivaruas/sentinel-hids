@@ -19,6 +19,8 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 
+from . import pf, plataforma
+
 VERSION = "2.11.2"
 SEV = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEV_ES = {"info": "info", "low": "baja", "medium": "media", "high": "alta", "critical": "CRÍTICA"}
@@ -657,10 +659,12 @@ class Banner:
         self.bans: dict = read_json(self.path, {}) or {}
 
     def backend(self) -> str:
-        """Motor de bloqueo: CrowdSec si está activo; si no firewalld, ufw o iptables (en ese orden)."""
+        """Motor de bloqueo: en macOS, pf. En Linux, CrowdSec si está activo; si no firewalld, ufw o iptables (en ese orden)."""
         b = self.cfg.get("ban", "backend", fallback="auto")
         if b != "auto":
             return b
+        if plataforma.ES_MAC:
+            return "pf" if shutil.which("pfctl") else "none"
         active = lambda u: run(["systemctl", "is-active", u], 5)[1].strip().split("\n")[-1] == "active"
         if shutil.which("cscli") and active("crowdsec"):
             return "crowdsec"
@@ -678,6 +682,8 @@ class Banner:
     def _cmds(be: str, ip: str, ttl: int) -> tuple[list[str], list[str] | None]:
         """(comando para bloquear, comando para desbloquear) de cada motor."""
         v6 = ":" in ip
+        if be == "pf":
+            return pf.tabla("add", ip), pf.tabla("delete", ip)
         if be == "crowdsec":
             return ["cscli", "decisions", "add", "--ip", ip, "--duration", f"{ttl}s", "--type", "ban"], ["cscli", "decisions", "delete", "--ip", ip]
         if be == "firewalld":
@@ -703,10 +709,13 @@ class Banner:
         cmd, _ = self._cmds(be, ip, ttl)
         if be == "crowdsec":
             cmd += ["--reason", f"sentinel: {reason}"[:180]]
-        rc, out = run(cmd, 20)
+        error = pf.preparar(run, state_dir()) if be == "pf" else ""
+        rc, out = (1, error) if error else run(cmd, 20)
         if rc != 0:
             self.alerter.emit("high", "ban", "fallo", f"No se pudo bloquear {ip}: {out.strip()[:160]}", key=f"banfail:{ip}")
             return False
+        if be == "pf":
+            run(["pfctl", "-k", ip], 20)  # corta también las conexiones que ya tenía abiertas
         self.bans[ip] = {"until": now() + ttl, "reason": reason, "backend": be, "since": iso()}
         atomic_write_json(self.path, self.bans, share=True)
         where = self.intel.geo_text(ip) if self.intel else ""
@@ -740,7 +749,7 @@ class Banner:
         if self.intel:
             self.intel.ban_released(ip, by)
         if is_root():
-            for be in ("crowdsec", "firewalld", "ufw", "iptables"):
+            for be in ("pf", "crowdsec", "firewalld", "ufw", "iptables"):
                 if be == "crowdsec" and not shutil.which("cscli"):
                     continue
                 _, undo = self._cmds(be, ip, 0)
