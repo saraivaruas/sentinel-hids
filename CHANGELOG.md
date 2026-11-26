@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- El comando `sentinel` usa el Python que el instalador de macOS anota (uno que un usuario corriente no pueda cambiar), en vez del primero del PATH. En Linux no cambia nada. 1 prueba nueva.
 - **Parada con PIN en macOS:** `launchd` no deja distinguir un apagado de una orden de detener ni negarse a ella, así que Sentinel avisa (gravedad alta) y sale, en vez de insistir y registrar un «intento de detener» crítico en cada reinicio. Es una protección más débil que en Linux. 1 prueba nueva.
 - **`status`, `detener`, `iniciar`, el panel y el horario del informe funcionan en macOS** con `launchd`; antes mostraban errores de `systemctl`. Los señuelos figuran como no disponibles. En Linux no cambia nada. 2 pruebas nuevas.
 - **Servicios en macOS (`launchd`):** definición de las cuatro tareas (monitor siempre encendido, revisión cada 30 minutos, informe semanal e informe del equipo) y cómo cargarlas, consultarlas y detenerlas. Python corre aislado y sin carpetas modificables por usuarios en el PATH. 5 pruebas nuevas.
