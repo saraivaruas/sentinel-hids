@@ -6,7 +6,7 @@
 ![Linux](https://img.shields.io/badge/plataforma-Linux-lightgrey)
 ![Sin dependencias](https://img.shields.io/badge/dependencias%20de%20Python-0-brightgreen)
 
-**Sentinel** es un **sistema de detección de intrusiones para el equipo (HIDS)** de código abierto para Linux: vigila la **integridad de archivos**, detecta **puertas traseras web (webshells)**, **fuerza bruta**, **escaneo de puertos** y **procesos sospechosos**, tiene **señuelos (honeypots)**, bloquea atacantes de forma temporal y te avisa con **ventanas de alerta** y un **panel gráfico**. Escrito en Python, sin librerías externas. 🇬🇧 [English version](README.en.md).
+**Sentinel** es un **sistema de detección de intrusiones para el equipo (HIDS)** de código abierto para Linux: vigila la **integridad de archivos**, detecta **puertas traseras web (webshells)**, **fuerza bruta**, **escaneo de puertos** y **procesos sospechosos**, tiene **señuelos (honeypots)**, bloquea atacantes de forma temporal y te avisa con **ventanas de alerta** y un **panel gráfico**. Escrito en Python, sin librerías externas. 🇬🇧 [English version](README.en.md). 🍎 ¿Tienes un Mac? Hay una [versión para macOS en pruebas](#instalar-en-macos-nuevo-en-pruebas).
 
 ![Panel de Sentinel](docs/panel-resumen-oscuro.png)
 
@@ -193,6 +193,30 @@ Motor de bloqueo (`[ban] backend = auto`): CrowdSec → firewalld → ufw (activ
 Opciones del instalador: `--sin-dependencias`, `--sin-limpiar` (no toca la v1).
 Desinstalar: `sudo apt purge sentinel` o `sudo ./uninstall.sh` (`--todo` borra también registros y referencias).
 Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` → `dist/`.
+
+## Instalar en macOS (nuevo, en pruebas)
+
+La versión para Mac pasa pruebas automáticas en macOS 26 (Tahoe) y 15 (Sequoia), Apple Silicon e Intel, **pero todavía no se ha usado en un Mac con pantalla**. Pruébala primero en un equipo que no sea crítico.
+
+Todavía no está en las publicaciones (*Releases*): se instala desde la rama `main`, con una cuenta de administrador.
+
+```bash
+xcode-select --install                     # una sola vez: Python 3, git y el compilador del icono
+cd ~
+git clone https://github.com/saraivaruas/sentinel-hids.git
+cd sentinel-hids
+./install-mac.sh --dry-run                 # muestra qué haría, sin cambiar nada
+sudo ./install-mac.sh                      # instala y arranca
+```
+
+Comprueba con `sentinel status` y `sudo sentinel test`. El panel se abre con `sentinel ui` o con la aplicación **Sentinel** (carpeta Aplicaciones); en la barra de menú queda un escudo con el estado. Para que pueda leer todas las carpetas, dale «Acceso total al disco» al programa que indica el instalador (Ajustes del Sistema > Privacidad y seguridad).
+
+- **Actualizar:** `cd ~/sentinel-hids && git pull && sudo ./install-mac.sh`
+- **Desinstalar:** `sudo /opt/sentinel/uninstall-mac.sh` (con `--todo` borra también configuración y registros)
+- **Qué cambia respecto de Linux:** usa `launchd`, `pf` para bloquear y para el cortafuegos de puertos (pruébalo primero con `sudo sentinel firewall aplicar --probar 120`: puede cortar compartir pantalla o archivos si no los permites), y medidas de endurecimiento propias de Mac. El PIN avisa si alguien detiene Sentinel, pero macOS no permite impedirlo.
+- **Instalador `.pkg`:** se genera en un Mac con `./packaging/macos/build-pkg.sh` y trae su propio Python. Aún no está firmado ni publicado, así que macOS advertirá al abrirlo.
+
+El estado de cada función está en la [hoja de ruta](ROADMAP.md).
 
 ## Uso diario
 
