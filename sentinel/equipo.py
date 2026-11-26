@@ -170,6 +170,13 @@ class Revision:
                 self.inf.linea(f"La comprobación falló: {type(e).__name__}: {str(e)[:150]}")
         return self.inf
 
+    # ---- de dónde salen los datos (en macOS se reemplazan: ver equipo_mac)
+    def _ss_escucha(self) -> str:
+        return core.run(["ss", "-tulnpH"], 10)[1]
+
+    def _ss_establecidas(self) -> str:
+        return core.run(["ss", "-tnpH", "state", "established"], 10)[1]
+
     # ------------------------------------------------------------------ comprobaciones
     def contexto(self) -> None:
         i = self.inf
@@ -251,7 +258,7 @@ class Revision:
         i = self.inf
         i.sec("Puertos en escucha")
         filas = set()
-        for e in exposure.parse_ss(core.run(["ss", "-tulnpH"], 10)[1]):
+        for e in exposure.parse_ss(self._ss_escucha()):
             ambito = "local" if e["addr"].startswith(exposure.LOOP) else "TODAS LAS INTERFACES" if e["addr"] in ("0.0.0.0", "*", "[::]", "::") else e["addr"]
             filas.add((e["proto"], ambito, "efímero" if e["port"] >= 32768 and e["proto"] == "udp" else str(e["port"]), e["proc"] or "?"))
         for f in sorted(filas):
@@ -264,7 +271,7 @@ class Revision:
         permitidos = set(core.csv(self.cfg.get("equipo", "conexiones_permitidas", fallback=""))) | self.allow.procs
         c2 = {int(p) for p in core.csv(self.cfg.get("equipo", "puertos_c2", fallback="")) if p.isdigit()}
         por_proc: dict = collections.defaultdict(set)
-        for ln in core.run(["ss", "-tnpH", "state", "established"], 10)[1].splitlines():
+        for ln in self._ss_establecidas().splitlines():
             f = ln.split()
             if len(f) < 4:
                 continue
@@ -571,7 +578,10 @@ class Revision:
 
 # ---------------------------------------------------------------------- informe
 def revisar(cfg=None, aceptar: bool = False, rapido: bool = False) -> Informe:
-    return Revision(cfg or core.load_config(), aceptar, rapido).run()
+    clase = Revision
+    if plataforma.ES_MAC:
+        from .equipo_mac import RevisionMac as clase          # importa este módulo: por eso va aquí
+    return clase(cfg or core.load_config(), aceptar, rapido).run()
 
 
 def a_texto(inf: Informe) -> str:
