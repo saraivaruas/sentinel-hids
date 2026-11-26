@@ -105,9 +105,13 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
+      # El entorno de Flatpak viene dentro de la imagen y, cuando Flathub publica uno más nuevo, hay que actualizarlo. En las capas de la imagen
+      # no se puede mover una carpeta («Invalid cross-device link»); en un volumen (Docker lo rellena con lo que trae la imagen) sí.
+      volumes:
+        - /var/lib/flatpak
     steps:
       - uses: actions/checkout@v7
-      # El contenedor de Flathub falla a veces al actualizar el SDK («Invalid cross-device link»): un solo reintento, sin ocultar un fallo real
+      # Un solo reintento, por si Flathub falla al descargar; no oculta un fallo real
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         id: intento1
         continue-on-error: true
