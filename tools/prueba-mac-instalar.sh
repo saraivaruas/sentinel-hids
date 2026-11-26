@@ -110,7 +110,8 @@ for l in open("/var/log/sentinel/events.jsonl"):
 comprobar "ningún módulo informó un error" sh -c '! grep -q "\"source\": \"monitor\", \"kind\": \"error\"" /var/log/sentinel/events.jsonl'
 comprobar "ningún programa se cayó" sh -c '! grep -q Traceback /var/log/sentinel/*.salida.log'
 
-echo "== desinstalar"; "$AQUI/uninstall-mac.sh" --todo; comprobar "el desinstalador termina bien" test $? = 0
+comprobar "el desinstalador queda junto al programa" test -x /opt/sentinel/uninstall-mac.sh
+echo "== desinstalar (con el que dejó la instalación)"; /opt/sentinel/uninstall-mac.sh --todo; comprobar "el desinstalador termina bien" test $? = 0
 comprobar "no queda el servicio" sh -c "! launchctl print $SVC.monitor"
 comprobar "no quedan procesos" sh -c "! pgrep -f '/opt/sentinel monitor'"
 comprobar "no queda el icono" sh -c '! pgrep -f /opt/sentinel/bin/sentinel-barra'
