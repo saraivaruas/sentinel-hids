@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Valores por defecto de macOS:** se vigilan sus rutas críticas (`/private/etc`, `LaunchDaemons`, `LaunchAgents`, tareas programadas, `/Users/*/.ssh`…), sus carpetas y registros web (Apache y Homebrew), y el señuelo ya no usa el 5900 («Compartir pantalla»). Lo que escribas en `sentinel.conf` sigue mandando. 1 prueba nueva.
 - En macOS la página del cortafuegos explica que todavía no se administra (y que el bloqueo con `pf` sí funciona) en vez de pedir `ufw` o `iptables`. 1 prueba nueva.
 - **Prueba real del bloqueo en macOS (`mac-bloqueo`):** conexiones IPv4 e IPv6 de verdad que deben cortarse al bloquear, seguir para las demás direcciones y volver al liberar o caducar.
 - **Los bloqueos sobreviven a un reinicio en macOS:** el sistema olvida las reglas de `pf` al apagarse, así que el monitor repone los bloqueos vigentes (respetando los que liberaste desde la terminal). 2 pruebas nuevas.
