@@ -9,6 +9,10 @@ from helpers import Env, core
 from sentinel import cli, requisitos as rq
 
 
+def setUpModule():
+    p = mock.patch.object(rq.plataforma, "ES_MAC", False); p.start(); unittest.addModuleCleanup(p.stop)    # las listas de Linux, también en la CI de Mac
+
+
 class RequisitosTests(unittest.TestCase):
     def estado_con_faltas(self, *ids):
         # Hermético: todo «instalado» salvo lo que se pide que falte, sin depender de lo que tenga el equipo que corre las pruebas (CI incluido).
@@ -47,6 +51,12 @@ class RequisitosTests(unittest.TestCase):
         for ident, like, esperado in (("ubuntu", "debian", "apt"), ("debian", "", "apt"), ("linuxmint", "ubuntu debian", "apt"), ("fedora", "", "dnf"), ("rocky", "rhel centos fedora", "dnf"),
                                       ("arch", "", "pacman"), ("manjaro", "arch", "pacman"), ("opensuse-leap", "suse opensuse", "zypper"), ("gentoo", "", "")):
             self.assertEqual(rq.gestor(id_falso=ident, like_falso=like), esperado, ident)
+
+    def test_en_macos_pide_las_herramientas_de_apple_y_no_las_de_linux(self):
+        with mock.patch.object(rq.plataforma, "ES_MAC", True), mock.patch.dict("os.environ", {"SENTINEL_FAKE_MISSING": "firewall"}):
+            ids = {r.id: ok for r, ok in rq.estado()}
+        self.assertFalse(ids["firewall"]); self.assertIn("launchd", ids); self.assertFalse({"systemd", "iproute2", "inotify", "logrotate", "polkit"} & set(ids))
+        self.assertFalse([r for r in rq.REQUISITOS_MAC if r.paquetes])                      # nada que instalar con apt y compañía
 
     def test_resumen_para_el_panel(self):
         d = rq.como_dict(self.estado_con_faltas("polkit"), "apt")

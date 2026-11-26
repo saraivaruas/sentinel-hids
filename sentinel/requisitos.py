@@ -12,6 +12,8 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 
+from . import plataforma
+
 OBLIGATORIO, RECOMENDADO, OPCIONAL = "obligatorio", "recomendado", "opcional"
 GESTORES = ("apt", "dnf", "pacman", "zypper")
 
@@ -67,6 +69,17 @@ REQUISITOS = [
 ]
 
 
+# macOS trae casi todo: no hay nada que instalar con un gestor de paquetes.
+REQUISITOS_MAC = [
+    Requisito("python3", "Python 3.8 o superior", "Sentinel está escrito en Python.", OBLIGATORIO, _py, manual="Instálalo con las herramientas de Apple:  xcode-select --install"),
+    Requisito("launchd", "launchd (launchctl)", "Arranca Sentinel y programa las revisiones y los informes.", OBLIGATORIO, _bin("launchctl")),
+    Requisito("registro", "Registro del sistema (log)", "Detecta los ataques por SSH, sudo y su.", OBLIGATORIO, _bin("log")),
+    Requisito("lsof", "lsof y ps", "Ve los procesos, los puertos que escuchan y las conexiones abiertas.", OBLIGATORIO, lambda: bool(shutil.which("lsof") and shutil.which("ps"))),
+    Requisito("firewall", "pf (pfctl)", "Bloquea a quien ataca.", RECOMENDADO, _bin("pfctl")),
+    Requisito("ssh-keygen", "ssh-keygen", "Revisa las llaves SSH autorizadas en el informe del equipo.", RECOMENDADO, _bin("ssh-keygen")),
+]
+
+
 def gestor(os_release: str = "/etc/os-release", id_falso: str = "", like_falso: str = "") -> str:
     """Familia de la distribución: apt (Debian/Ubuntu), dnf (Fedora/RHEL), pacman (Arch), zypper (openSUSE) o «» si no se reconoce."""
     ident, like = id_falso, like_falso
@@ -86,7 +99,7 @@ def gestor(os_release: str = "/etc/os-release", id_falso: str = "", like_falso: 
 def estado() -> list[tuple[Requisito, bool]]:
     """Qué tiene el equipo. SENTINEL_FAKE_MISSING=id,id fuerza que falten esos requisitos (para pruebas y para ver cómo se ve la lista)."""
     falsos = {x.strip() for x in os.environ.get("SENTINEL_FAKE_MISSING", "").split(",") if x.strip()}
-    return [(r, bool(r.esta()) and r.id not in falsos) for r in REQUISITOS]
+    return [(r, bool(r.esta()) and r.id not in falsos) for r in (REQUISITOS_MAC if plataforma.ES_MAC else REQUISITOS)]
 
 
 def faltan(niveles=(OBLIGATORIO, RECOMENDADO), lista=None) -> list[Requisito]:
