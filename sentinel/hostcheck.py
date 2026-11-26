@@ -84,7 +84,29 @@ def listeners() -> dict[str, dict]:
     return parse_listeners(out) if rc == 0 else {}
 
 
+def usb_de_ioreg(texto: str) -> list[str]:
+    """Salida de `ioreg -p IOUSB -l -w0` (macOS) -> «idVendor:idProduct nombre», como en Linux."""
+    res, actual = set(), {}
+
+    def vaciar():
+        if "idVendor" in actual and "idProduct" in actual:
+            res.add(f"{int(actual['idVendor']):04x}:{int(actual['idProduct']):04x} {actual.get('USB Product Name', '')}".strip())
+        actual.clear()
+
+    for ln in texto.splitlines():
+        if "+-o " in ln:
+            vaciar(); continue
+        m = re.search(r'"(idVendor|idProduct|USB Product Name)" = (?:"(.*)"|(\d+))\s*$', ln)
+        if m:
+            actual[m.group(1)] = m.group(2) if m.group(2) is not None else m.group(3)
+    vaciar()
+    return sorted(res)
+
+
 def usb_devices() -> list[str]:
+    if plataforma.ES_MAC:
+        rc, out = core.run(["ioreg", "-p", "IOUSB", "-l", "-w0"], 20)
+        return usb_de_ioreg(out) if rc == 0 else []
     res = []
     for d in glob.glob("/sys/bus/usb/devices/*"):
         try:
@@ -96,7 +118,27 @@ def usb_devices() -> list[str]:
     return sorted(set(res))
 
 
+def extensiones_de_terceros(kexts: str, sistema: str) -> list[str]:
+    """Extensiones de macOS que no son de Apple: las del núcleo (`kmutil showloaded`) y las de sistema
+    (`systemextensionsctl list`: cortafuegos, antivirus, VPN… o programas espía). Las de Apple se cargan y
+    descargan solas, así que avisar de ellas solo haría ruido."""
+    res = set()
+    for ln in kexts.splitlines():
+        m = re.search(r"\s([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+) \([^)]*\)", ln)
+        if m and not m.group(1).startswith("com.apple."):
+            res.add("kext:" + m.group(1))
+    for ln in sistema.splitlines():
+        m = re.search(r"\t([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+) \([^)]*\)\t", ln)
+        if m and not m.group(1).startswith("com.apple.") and "[activated" in ln:
+            res.add("sysext:" + m.group(1))
+    return sorted(res)
+
+
 def kernel_modules() -> list[str]:
+    if plataforma.ES_MAC:
+        rc, kexts = core.run(["kmutil", "showloaded", "--list-only"], 30)
+        rc2, sistema = core.run(["systemextensionsctl", "list"], 30)
+        return extensiones_de_terceros(kexts if rc == 0 else "", sistema if rc2 == 0 else "")
     try:
         return sorted({ln.split()[0] for ln in open("/proc/modules", encoding="utf-8") if ln.strip()})
     except OSError:
