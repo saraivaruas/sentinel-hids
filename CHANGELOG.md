@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- Las pruebas del panel de endurecimiento simulan Linux, que es lo que comprueban, también en la CI de Mac.
 - **Endurecimiento en macOS:** las medidas son de Linux, así que ya no se evalúan ni se aplican en un Mac; la línea de comandos y el panel lo dicen y remiten a la auditoría. 1 prueba nueva.
 - **Actualizar en macOS** descarga y verifica el paquete y ejecuta `install-mac.sh` (antes habría ejecutado el instalador de Linux). Las publicaciones anteriores no lo traen: en ese caso lo dice y no instala nada. 2 pruebas nuevas.
 - La prueba en simulación del instalador de macOS ya no depende de si el equipo que la corre tiene Sentinel instalado.
