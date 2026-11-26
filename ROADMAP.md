@@ -72,7 +72,7 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 4b | ⬜ | Instalador `.pkg` firmado | Firmarlo y notarizarlo requiere la cuenta de Apple Developer. |
 | 4c | ⬜ | Icono en la barra de menú | |
 | 5 | 🟡 | Captura de paquetes | Con BPF; la prueba real (`mac-captura`) está pendiente. |
-| 6 | ✅ | Configuración, `status` y requisitos propios de macOS | |
+| 6 | 🟡 | Configuración, `status` y requisitos propios de macOS | Configuración y `status` probados; falta la prueba real de los requisitos. |
 | 7 | 🟡 | Panel | Avisos, permisos de administrador y aplicación en Aplicaciones; falta la prueba real y probar la ventana de contraseña en un Mac con pantalla. |
 | 8 | 🟡 | Informe del equipo y auditoría | Propios de macOS. El informe aún no revisa integridad de programas, cortafuegos ni actualizaciones. |
 | 9 | 🟡 | Señuelos | Con usuario propio sin privilegios; falta la prueba real. |
