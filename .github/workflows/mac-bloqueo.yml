@@ -1,0 +1,26 @@
+# Prueba real en macOS del bloqueo de IP con pf: conexiones de verdad que deben cortarse y volver.
+# Solo en equipos desechables de GitHub: enciende el cortafuegos y añade direcciones de prueba.
+name: mac-bloqueo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/mac-bloqueo.yml", "sentinel/pf.py", "sentinel/core.py", "tools/prueba-mac-bloqueo.py"]
+
+permissions:
+  contents: read
+
+jobs:
+  bloqueo:
+    name: Bloqueo con pf en ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-26-intel, macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Bloquear, reponer y liberar de verdad
+        run: sudo GITHUB_ACTIONS=true python3 tools/prueba-mac-bloqueo.py
