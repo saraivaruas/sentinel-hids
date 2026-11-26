@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Hoja de ruta de privacidad de red:** rotación de MAC e IP dentro de Sentinel (fase 1) y modo discreto para anunciarse lo menos posible (fase 2), con sus límites.
 - **Prueba real del instalador (`mac-instalar`):** en los cuatro equipos instala, comprueba que el servicio vigila y alerta, que revive si lo matan, que `detener`/`iniciar` y las tareas programadas funcionan, reinstala encima y desinstala sin dejar restos.
 - **Instalador para macOS (`sudo ./install-mac.sh`) y desinstalador (`uninstall-mac.sh`):** instala en `/opt/sentinel`, escribe una configuración propia de Mac, programa las tareas, crea la referencia de integridad y arranca; respeta el PIN y rota los registros. 2 pruebas nuevas.
 - El comando `sentinel` usa el Python que el instalador de macOS anota (uno que un usuario corriente no pueda cambiar), en vez del primero del PATH. En Linux no cambia nada. 1 prueba nueva.
