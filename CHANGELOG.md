@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Avisos en pantalla en macOS:** las alertas salen como notificaciones del sistema en la sesión de quien usa el equipo (antes no aparecía nada). El texto de la alerta viaja como dato, nunca dentro del guion, para que un atacante no pueda ejecutar nada. 2 pruebas nuevas.
 - Las pruebas del horario del informe y de `status` simulan `systemd`; en la CI de Mac fallaban desde que existe el manejo con `launchd`.
 - La prueba de «no reponer lo liberado» dependía de que el equipo tuviera `pfctl` y fallaba en Debian 12; ahora lo simula.
 - **Panel, Ajustes → «Privacidad de red»:** muestra la MAC, la IP y si se envía el nombre; permite activar o apagar el cambio programado, elegir el intervalo, cambiar ahora y volver a la MAC de fábrica, con confirmación, PIN y clave de administrador. Si otro programa ya cambia la MAC, no deja activarlo y dice cuál. 4 pruebas nuevas.
