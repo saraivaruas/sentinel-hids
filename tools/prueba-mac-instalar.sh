@@ -94,4 +94,13 @@ comprobar "no queda el icono" sh -c '! pgrep -f /opt/sentinel/bin/sentinel-barra
 comprobar "no queda el usuario de los señuelos" sh -c '! dscl . -read /Users/_sentinel'
 for r in /opt/sentinel /etc/sentinel /var/lib/sentinel /var/log/sentinel /usr/local/bin/sentinel; do comprobar "no queda $r" test ! -e "$r"; done
 rm -f /Library/LaunchDaemons/com.ejemplo.intruso.plist
+
+echo "== instalador .pkg"
+comprobar "el .pkg se genera" "$AQUI/packaging/macos/build-pkg.sh"
+PKG="$(ls "$AQUI"/dist/sentinel-*-macos.pkg)"
+installer -pkg "$PKG" -target /; comprobar "macOS instala el .pkg" test $? = 0
+comprobar "instalado con el .pkg, el monitor corre" esperar 90 corriendo
+comprobar "sentinel responde" /usr/local/bin/sentinel status
+"$AQUI/uninstall-mac.sh" --todo; comprobar "se desinstala después del .pkg" test $? = 0
+comprobar "no queda /opt/sentinel tras el .pkg" test ! -e /opt/sentinel
 if [ "$FALLOS" = 0 ]; then echo "Todas las comprobaciones pasaron."; else echo "$FALLOS comprobaciones fallidas"; exit 1; fi
