@@ -1,0 +1,25 @@
+# Prueba real en macOS de la captura de paquetes (BPF). Solo en equipos desechables de GitHub.
+name: mac-captura
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/mac-captura.yml", "sentinel/bpf.py", "sentinel/packets.py", "tools/prueba-mac-captura.py"]
+
+permissions:
+  contents: read
+
+jobs:
+  captura:
+    name: Captura de paquetes en ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-26-intel, macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Escanear y capturar de verdad
+        run: sudo GITHUB_ACTIONS=true python3 tools/prueba-mac-captura.py
