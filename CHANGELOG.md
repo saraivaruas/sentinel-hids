@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Prueba real de la captura (`mac-captura`):** un escaneo de puertos de verdad que debe detectarse, y tráfico normal que no debe confundirse con un ataque.
 - **Captura de paquetes en macOS (BPF):** detecta escaneos de puertos, sigilosos e inundaciones en la interfaz por la que el equipo sale a la red, y la sigue si cambia. Antes salía «no disponible». 6 pruebas nuevas.
 - La prueba del instalador en macOS ejecuta la auditoría real del equipo.
 - **Auditoría en macOS:** revisa cortafuegos, SIP, FileVault, Gatekeeper, actualizaciones automáticas, SSH, credenciales y Sentinel; antes puntuaba el Mac con comprobaciones de Linux. Lo que no se puede determinar no se da por bueno. 3 pruebas nuevas.
