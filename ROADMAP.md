@@ -25,7 +25,7 @@ En orden de importancia.
 | N.º | Estado | Pieza | Detalle |
 |---|---|---|---|
 | 1 | 🟡 | Vigilancia de archivos | Funciona en vivo por sondeo cada 10 s. Faltan las rutas críticas de macOS (ver punto 6). |
-| 2 | ⬜ | Fuerza bruta (`authwatch`) | Leer el registro unificado de macOS en lugar del journal. |
+| 2 | ✅ | Fuerza bruta (`authwatch`) | Lee el registro unificado de macOS. La prueba real (`mac-registro`) detecta ataques por SSH, `sudo` y `su`. El bloqueo de la IP depende del punto 3. |
 | 3 | ⬜ | Bloqueo de IP y firewall | Con `pf` en lugar de `ufw`/`iptables`. |
 | 4 | ⬜ | Servicio e instalación | `launchd`, instalador `.pkg` e icono en la barra de menú. |
 | 5 | ⬜ | Captura de paquetes | Con BPF. |
