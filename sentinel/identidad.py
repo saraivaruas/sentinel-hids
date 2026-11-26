@@ -114,7 +114,7 @@ def estado(cfg, run=core.run) -> dict:
     return {**plan, "error": "", "interfaz": dev, "conexion": uuid, "tipo": tipo, "mac": actual, "mac_fabrica": fabrica,
             "aleatoria": actual != fabrica, "ip": direccion(dev, run), "puerta": puerta(dev, run),
             "metodo": v.get("ipv4.method", ""), "envia_nombre": v.get("ipv4.dhcp-send-hostname", "") != "no",
-            "otros": otros, "cron_revisado": completo}
+            "otros": otros, "cron_revisado": completo, "restaurable": uuid in _guardado()["originales"]}
 
 
 def mac_aleatoria() -> str:

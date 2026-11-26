@@ -51,7 +51,7 @@
       d.showModal();
     });
   }
-  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar", "endurecer_aplicar", "endurecer_revertir"]);
+  const NEEDS_PIN = new Set(["resolver", "normal", "aprender", "ajustes", "allow", "unban", "update", "baseline_accept", "fw_aplicar", "fw_config", "fw_config_varios", "pin_establecer", "pin_quitar", "smtp_guardar", "smtp_quitar", "equipo_horario", "ia_guardar", "ia_quitar", "endurecer_aplicar", "endurecer_revertir", "identidad_activar", "identidad_desactivar", "identidad_rotar", "identidad_restaurar"]);
   let pinCache = { v: "", until: 0 };
   function askPin() {
     return new Promise((res) => {
@@ -97,7 +97,7 @@
   const TITLES = { inicio: ["Primeros pasos", "Deja Sentinel a tu medida en pocos minutos"], resumen: ["Resumen", "Estado de la protección de este equipo"], eventos: ["Eventos", "Todo lo que Sentinel ha detectado"], bloqueos: ["Bloqueos", "Atacantes bloqueados y lista blanca"], postura: ["Postura de seguridad", "Qué tan bien configurado está el equipo"],
     atacantes: ["Atacantes", "Quién intentó entrar, de dónde viene y qué hizo"], paquetes: ["Paquetes", "Qué son y cuáles son peligrosos, explicado fácil"],
     requisitos: ["Requisitos", "Qué necesita Sentinel y qué tiene tu equipo"], correo: ["Correo e informes", "Cómo te llegan los avisos y el informe del equipo"], endurecer: ["Endurecimiento", "Cierra puertas de ataque comunes, con copia y reversión"], ia: ["Asistente de IA", "Explica cada detección en lenguaje sencillo (solo explica, no actúa)"],
-    ajustes: ["Ajustes", "Señuelos, avisos y notificaciones"], servidores: ["Servidores", "El estado de Sentinel en tus otros servidores"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
+    ajustes: ["Ajustes", "Señuelos, privacidad de red, avisos y notificaciones"], servidores: ["Servidores", "El estado de Sentinel en tus otros servidores"], "fw-puertos": ["Firewall · Puertos", "Qué está abierto desde afuera y qué se cerraría"], "fw-reglas": ["Firewall · Reglas y ajustes", "Reglas actuales y puertos que quieres mantener abiertos"] };
   function go(v) {
     if (!TITLES[v]) v = "resumen";
     st.view = v;
@@ -107,7 +107,7 @@
     if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
     if (narrow()) setSidebar(false);
     if (v.startsWith("fw-")) loadFirewall();
-    if (v === "ajustes") loadSettings();
+    if (v === "ajustes") { loadSettings(); loadIdentidad(); }
     if (v === "correo") loadCorreo();
     if (v === "ia") loadIA();
     if (v === "inicio") loadInicio();
@@ -528,6 +528,38 @@
     $("#st-hp-ports").textContent = s.honeypot.ports.join(", "); $("#st-hp-btn").textContent = on ? "Apagar señuelos" : "Activar señuelos"; $("#st-hp-btn").dataset.on = on ? "1" : "";
     $("#st-note").textContent = s.toast_available ? "" : "Falta GTK para el aviso de esquina (paquete python3-gi): se usará la notificación del sistema.";
   }
+
+  // ---------- Privacidad de red: cambio de MAC e IP (apagado hasta que el usuario lo active)
+  async function loadIdentidad() {
+    const d = await api("/api/identidad");
+    const badge = $("#id-st"); badge.textContent = d.activo ? "activado · cada " + d.cada_horas + " h" : "apagado"; badge.className = "badge sev-" + (d.activo ? "low" : "info");
+    const sel = $("#id-horas"), h = String(d.cada_horas);
+    if (![...sel.options].some((o) => o.value === h)) { const o = el("option", "", h + " horas"); o.value = h; sel.appendChild(o); }
+    sel.value = h;
+    $("#id-info").textContent = d.error ? d.error : "Ahora en " + d.interfaz + ": MAC " + d.mac + (d.aleatoria ? " (cambiada)" : " (la de fábrica)") + " · IP " + (d.ip || "sin dirección") + (d.metodo === "auto" ? "" : " (fija: no cambia)") + " · el nombre del equipo " + (d.envia_nombre ? "se envía a la red" : "no se envía") + ".";
+    const otros = d.otros || [], warn = $("#id-warn");
+    warn.hidden = !otros.length && d.cron_revisado !== false;
+    warn.textContent = otros.length ? "⚠ Otros programas ya cambian la MAC o la IP; quítalos para poder activar: " + otros.join(" · ") : "Al activar se revisan también las tareas programadas del administrador.";
+    $("#id-btn").textContent = d.activo ? "Apagar" : "Activar"; $("#id-btn").dataset.on = d.activo ? "1" : "";
+    $("#id-btn").disabled = !d.activo && (!!d.error || otros.length > 0);
+    sel.disabled = !!d.activo; $("#id-now").disabled = !!d.error; $("#id-rest").hidden = !d.restaurable;
+  }
+  const CORTE = "La red se cortará unos segundos y se cerrarán las conexiones abiertas.";
+  $("#id-btn").addEventListener("click", async (e) => {
+    const btn = e.currentTarget, on = !!btn.dataset.on, horas = $("#id-horas").value;
+    if (!on && !(await confirmDlg("Activar el cambio de MAC e IP", "Cada " + horas + " h tu equipo cambiará de MAC e IP. " + CORTE, "Activar"))) return;
+    await runAction(on ? "identidad_desactivar" : "identidad_activar", on ? {} : { horas }, btn); loadIdentidad();
+  });
+  $("#id-now").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (!(await confirmDlg("Cambiar MAC e IP ahora", CORTE, "Cambiar"))) return;
+    await runAction("identidad_rotar", {}, btn); loadIdentidad();
+  });
+  $("#id-rest").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (!(await confirmDlg("Volver a la MAC de fábrica", "Se recuperan los ajustes originales de la conexión. " + CORTE, "Restaurar"))) return;
+    await runAction("identidad_restaurar", {}, btn); loadIdentidad();
+  });
 
   // ---------- Postura
   async function loadAudit() {

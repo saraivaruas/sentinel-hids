@@ -288,6 +288,16 @@
           <div class="fix-row"><button class="btn" id="st-learn-btn">Aprender por 3 días</button></div>
         </article>
         <article class="card">
+          <div class="card-h"><h3>Privacidad de red: cambiar MAC e IP</h3><span class="badge" id="id-st">—</span></div>
+          <p class="hint">Cada cierto tiempo, tu equipo se presenta en la red con una dirección distinta y sin decir su nombre. <b>Tú decides</b>: está apagado hasta que lo actives. En cada cambio la red se corta unos segundos y se cierran las conexiones abiertas; si la red deja de responder, vuelve a lo anterior. No te hace invisible: el router sigue viendo tu tráfico.</p>
+          <p class="hint" id="id-info"></p>
+          <p class="hint" id="id-warn" hidden></p>
+          <div class="form">
+            <label>Cambiar cada<select id="id-horas"><option value="1">1 hora</option><option value="2">2 horas</option><option value="4">4 horas</option><option value="6">6 horas</option><option value="12">12 horas</option><option value="24">24 horas</option></select></label>
+          </div>
+          <div class="fix-row"><button class="btn primary" type="button" id="id-btn">Activar</button><button class="btn" type="button" id="id-now">Cambiar ahora</button><button class="btn" type="button" id="id-rest" hidden>Volver a la MAC de fábrica</button></div>
+        </article>
+        <article class="card">
           <div class="card-h"><h3>PIN de protección</h3><span class="badge" id="pin-st">—</span></div>
           <p class="hint">Con un PIN, nadie puede detener Sentinel, desinstalarlo, cambiar sus ajustes, ampliar la lista blanca ni aplicar cambios al firewall sin escribirlo. Cada intento sin PIN deja una alerta. No protege contra alguien con control total del equipo que lo apague a la fuerza, pero cierra las vías normales y deja rastro.</p>
           <form id="pin-form" class="form">

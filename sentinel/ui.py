@@ -188,6 +188,11 @@ class Data:
                 "equipo": {"enviar": cfg.getboolean("equipo", "enviar_correo", fallback=True), "horas": equipo.horas_validas(cfg.get("equipo", "horas", fallback=equipo.HORAS_POR_DEFECTO)) or equipo.HORAS_POR_DEFECTO.split(","),
                            "siguiente": sig if sig and sig != "n/a" else "", "temporizador_activo": activo, "ultimo_informe": ultimo}}
 
+    def identidad(self) -> dict:
+        """Apartado «Privacidad de red» de Ajustes: MAC, IP y si el cambio programado está encendido (solo lectura)."""
+        from . import identidad
+        return identidad.estado(core.load_config())
+
     def endurecer(self, perfil: str) -> dict:
         """Lo que muestra la página «Endurecimiento»: cada medida con su estado (solo lectura; no cambia nada)."""
         perfil = perfil if perfil in endurecer.PERFILES else "recomendado"
@@ -361,6 +366,15 @@ def build_action(body: dict) -> list[str]:
         return ["equipo", "--horario", ",".join(horas)]
     if name == "senuelos":
         return ["senuelos", "activar" if body.get("on") is True else "desactivar"]
+    if name == "identidad_activar":
+        horas = str(body.get("horas", ""))
+        if not (horas.isdecimal() and 1 <= int(horas) <= 168):
+            raise ValueError("el intervalo va de 1 a 168 horas")
+        return ["identidad", "activar", "--cada", str(int(horas))]
+    if name == "identidad_desactivar":
+        return ["identidad", "desactivar"]
+    if name in ("identidad_rotar", "identidad_restaurar"):
+        return ["identidad", name.split("_")[1], "--si"]            # el panel ya pidió la confirmación
     if name == "normal":
         from . import normal
         e = normal.find_event(float(body.get("epoch", 0)), str(body.get("key", "")))
@@ -539,6 +553,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json({"servers": remote.poll_all(), "max": remote.MAX_SERVERS})
         if u.path == "/api/settings":
             return self._json(d.settings())
+        if u.path == "/api/identidad":
+            return self._json(d.identidad())
         if u.path == "/api/firewall":
             return self._json(core.read_json(os.path.join(core.state_dir(), "firewall.json"), {}) or {"ok": False})
         if u.path == "/api/audit":
