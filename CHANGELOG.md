@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **El informe del equipo en macOS completa sus secciones:** firma de los programas que arrancan solos, SIP y Gatekeeper, y actualizaciones pendientes. 3 pruebas nuevas.
 - La hoja de ruta marca como probados en Mac real la captura, el panel y los requisitos, y como escritos el `.pkg`, el icono de la barra y las ventanas.
 - La prueba del instalador en macOS genera el `.pkg`, lo instala con la herramienta del sistema y comprueba que Sentinel queda funcionando.
 - **Instalador `.pkg` para macOS** (`packaging/macos/build-pkg.sh`), que ejecuta el mismo instalador de siempre. Sale sin firmar: macOS avisará al abrirlo hasta firmarlo y notarizarlo con una cuenta de Apple Developer. 2 pruebas nuevas.
