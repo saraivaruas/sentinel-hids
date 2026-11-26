@@ -27,12 +27,15 @@ buscar_python() {
   return 1
 }
 # El instalador .pkg trae su propio Python (uno por tipo de procesador): así no hacen falta las herramientas de Apple.
+# Una actualización desde el código conserva el Python y el icono que dejó el .pkg.
 INCLUIDO="$AQUI/runtime/$(uname -m).tar.gz"; TMPPY=""
-if [ -f "$INCLUIDO" ]; then
+GUARDADO="$(mktemp -d)"; trap 'rm -rf "$GUARDADO"' EXIT
+[ -x "$DEST/bin/sentinel-barra" ] && cp "$DEST/bin/sentinel-barra" "$GUARDADO/sentinel-barra"
+if [ -f "$INCLUIDO" ] || [ -x "$DEST/runtime/bin/python3" ]; then
   if [ "$DRY" = 1 ]; then PY="$DEST/runtime/bin/python3"; echo "  [simulación] usar el Python incluido en el paquete"
   else
-    TMPPY="$(mktemp -d)"; trap 'rm -rf "$TMPPY"' EXIT
-    tar -xzf "$INCLUIDO" -C "$TMPPY"
+    TMPPY="$GUARDADO"
+    if [ -f "$INCLUIDO" ]; then tar -xzf "$INCLUIDO" -C "$TMPPY"; else cp -R "$DEST/runtime" "$TMPPY/python"; fi
     PY="$TMPPY/python/bin/python3"
     "$PY" -I -c 'import ssl, sqlite3, plistlib' || { echo "El Python incluido no funciona en este equipo."; exit 1; }
   fi
@@ -54,13 +57,13 @@ if [ "$DRY" = 0 ] && [ -x "$DEST/bin/sentinel" ]; then
 fi
 
 paso "1/5 Programa en $DEST (solo el administrador puede modificarlo)"
-echo "  Python: $PY"
+if [ -n "$TMPPY" ]; then echo "  Python: $DEST/runtime/bin/python3 (propio de Sentinel)"; else echo "  Python: $PY"; fi
 do_ rm -rf "$DEST"; do_ mkdir -p "$DEST" /usr/local/bin
 do_ cp -R "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$DEST/"
 do_ find "$DEST" -name __pycache__ -prune -exec rm -rf {} +
-if [ -f "$INCLUIDO" ]; then
-  if [ "$DRY" = 1 ]; then echo "  [simulación] instalar el Python incluido en $DEST/runtime"
-  else mv "$TMPPY/python" "$DEST/runtime"; PY="$DEST/runtime/bin/python3"; fi
+if [ "$DRY" = 1 ]; then
+  [ "$PY" = "$DEST/runtime/bin/python3" ] && echo "  [simulación] instalar el Python incluido en $DEST/runtime"
+elif [ -n "$TMPPY" ]; then mv "$TMPPY/python" "$DEST/runtime"; PY="$DEST/runtime/bin/python3"
 fi
 # se compila todo ahora: si Python lo hiciera después, Sentinel vería aparecer archivos nuevos en su propia carpeta
 if [ "$DRY" = 1 ]; then echo "  [simulación] precompilar $DEST"
@@ -111,7 +114,8 @@ BARRA=/Library/LaunchAgents/io.github.saraivaruas.sentinel.barra.plist
 HECHO="$AQUI/prebuilt/sentinel-barra"
 preparar_barra() {
   if [ -f "$HECHO" ]; then cp "$HECHO" "$DEST/bin/sentinel-barra"
-  else xcrun -f swiftc >/dev/null 2>&1 && xcrun swiftc -O -o "$DEST/bin/sentinel-barra" "$AQUI/packaging/macos/barra.swift"; fi
+  elif xcrun -f swiftc >/dev/null 2>&1; then xcrun swiftc -O -o "$DEST/bin/sentinel-barra" "$AQUI/packaging/macos/barra.swift"
+  else [ -f "$GUARDADO/sentinel-barra" ] && cp "$GUARDADO/sentinel-barra" "$DEST/bin/sentinel-barra"; fi
 }
 if [ "$DRY" = 1 ]; then
   if [ -f "$HECHO" ]; then echo "  [simulación] copiar el icono ya compilado (sentinel-barra) e instalar $BARRA"; else echo "  [simulación] compilar sentinel-barra e instalar $BARRA"; fi
