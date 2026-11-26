@@ -16,17 +16,6 @@ def setUpModule():
     p = mock.patch.object(en.plataforma, "ES_MAC", False); p.start(); unittest.addModuleCleanup(p.stop)      # las medidas son de Linux, también en la CI de Mac
 
 
-class EnMacTests(unittest.TestCase):
-    def test_en_macos_no_ofrece_ni_aplica_medidas_de_linux(self):
-        e = Env(); self.addCleanup(e.close)
-        out = io.StringIO()
-        with mock.patch.object(en.plataforma, "ES_MAC", True), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(pin, "required", return_value=False), mock.patch.object(en, "aplicar") as ap, redirect_stdout(out):
-            self.assertEqual(en.plan("estricto"), [])
-            self.assertEqual(cli.main(["endurecer", "plan"]), 0)
-            self.assertEqual(cli.main(["endurecer", "aplicar", "--si"]), 1)
-        self.assertIn("todavía no está disponible en macOS", out.getvalue()); self.assertNotIn("No hay nada pendiente", out.getvalue()); ap.assert_not_called()
-
-
 class Base(unittest.TestCase):
     def setUp(self):
         self.e = Env()

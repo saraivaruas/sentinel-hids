@@ -341,9 +341,6 @@ def cmd_requisitos(a) -> int:
 def cmd_endurecer(a) -> int:
     """Endurecimiento guiado: `plan` (solo lectura), `aplicar` (con copia y comprobación), `revertir` y `estado`."""
     solo = core.csv(a.solo) if a.solo else None
-    if not endurecer.disponible():
-        print("[]" if a.json else endurecer.AVISO_MAC)
-        return 0 if a.accion in ("plan", "estado") else 1
     items = endurecer.plan(a.perfil, solo)
     cuenta = {c: sum(1 for i in items if i.codigo == c) for c in (endurecer.APLICADA, endurecer.PENDIENTE, endurecer.BLOQUEADA, endurecer.NO_APLICA)}
     if a.accion == "revertir":

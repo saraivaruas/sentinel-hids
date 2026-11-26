@@ -77,6 +77,7 @@ class Medida:
     comprobar: object = None      # (ctx) -> (ok, mensaje)    se ejecuta tras aplicar; si falla se revierte
     nota: str = ""                # aviso de impacto en el uso diario
     revertir_despues: object = None
+    deshacer: object = None       # (ctx) -> list[list[str]]  para medidas que son comandos: se calcula ANTES de aplicar y devuelve el sistema a como estaba
 
 
 # ---------------------------------------------------------------------------- sysctl
@@ -160,7 +161,7 @@ def _sshd_hay(ctx: Contexto) -> bool:
 
 def _ssh_llaves(ctx: Contexto) -> bool:
     """¿Hay al menos una llave autorizada para entrar por SSH? Sin ella, desactivar las contraseñas dejaría a todos fuera."""
-    for home in glob.glob(ctx.ruta("/home/*")) + [ctx.ruta("/root")]:
+    for home in glob.glob(ctx.ruta("/home/*")) + [ctx.ruta("/root")] + glob.glob(ctx.ruta("/Users/*")) + [ctx.ruta("/var/root")]:      # las dos últimas, macOS
         try:
             if os.path.getsize(os.path.join(home, ".ssh", "authorized_keys")) > 20:
                 return True
@@ -279,21 +280,20 @@ def indice_perfil(p: str) -> int:
     return PERFILES.index(p)
 
 
-AVISO_MAC = "El endurecimiento guiado todavía no está disponible en macOS: sus medidas son de Linux. La auditoría («sentinel audit») dice qué conviene activar en tu Mac."
-
-
-def disponible() -> bool:
-    return not plataforma.ES_MAC
+def medidas() -> list:
+    """Las medidas de este sistema (en macOS son otras; el motor es el mismo)."""
+    if plataforma.ES_MAC:
+        from . import endurecer_mac          # importa este módulo: por eso va aquí
+        return endurecer_mac.MEDIDAS
+    return MEDIDAS
 
 
 def plan(perfil: str = "recomendado", solo: list[str] | None = None, ctx: Contexto | None = None) -> list[Item]:
     if perfil not in PERFILES:
         raise ValueError(f"perfil desconocido: {perfil}")
-    if ctx is None and not disponible():          # sobre el equipo real: las medidas de Linux no se evalúan ni se aplican en un Mac
-        return []
     ctx = ctx or Contexto()
     out = []
-    for m in MEDIDAS:
+    for m in medidas():
         if solo and m.id not in solo:
             continue
         if not solo and indice_perfil(m.perfil) > indice_perfil(perfil):
@@ -339,7 +339,10 @@ def aplicar(items: list[Item], ctx: Contexto | None = None, alerter=None) -> dic
                 copia = os.path.join(carpeta, "copias", re.sub(r"[^\w.-]", "_", c.ruta))
                 shutil.copy2(destino, copia)
             previo.append({"ruta": c.ruta, "existia": existia, "copia": copia})
-        manifiesto["medidas"].append({"id": m.id, "archivos": previo})
+        entrada = {"id": m.id, "archivos": previo}
+        if m.deshacer:
+            entrada["deshacer"] = m.deshacer(ctx)        # antes de cambiar nada: depende de cómo está ahora
+        manifiesto["medidas"].append(entrada)
         _guardar_json(os.path.join(carpeta, "manifiesto.json"), manifiesto)          # el manifiesto se guarda ANTES de tocar nada
         for c in it.cambios:
             destino = ctx.ruta(c.ruta)
@@ -354,9 +357,11 @@ def aplicar(items: list[Item], ctx: Contexto | None = None, alerter=None) -> dic
         for cmd in (m.despues(ctx) if m.despues else []):
             ctx.run(cmd, 60)
         ok, msg = (m.comprobar(ctx) if m.comprobar else (True, ""))
+        if ok and m.deshacer and m.estado(ctx)[0] != APLICADA:
+            ok, msg = False, "el sistema no aceptó el cambio"
         if not ok:
             _restaurar_medida(manifiesto["medidas"][-1], ctx)
-            for cmd in (m.despues(ctx) if m.despues else []):
+            for cmd in (entrada["deshacer"] if m.deshacer else (m.despues(ctx) if m.despues else [])):
                 ctx.run(cmd, 60)
             res["revertidas"].append((m.id, msg))
             manifiesto["medidas"].pop()
@@ -401,10 +406,14 @@ def revertir(carpeta: str | None = None, ctx: Contexto | None = None, alerter=No
         _restaurar_medida(ent, ctx)
         ids.append(ent["id"]); rutas += [a["ruta"] for a in ent["archivos"]]
     _marcar_cambio_propio(rutas)
-    por_id = {m.id: m for m in MEDIDAS}
+    por_id = {m.id: m for m in medidas()}
     visto = set()
+    for ent in reversed(man["medidas"]):                 # las que son comandos: lo guardado al aplicar
+        for cmd in ent.get("deshacer", []):
+            ctx.run(cmd, 60)
     for i in ids:
-        for cmd in (por_id[i].despues(ctx) if i in por_id and por_id[i].despues else []):
+        m = por_id.get(i)
+        for cmd in (m.despues(ctx) if m and m.despues and not m.deshacer else []):
             if tuple(cmd) not in visto:
                 visto.add(tuple(cmd)); ctx.run(cmd, 60)
     os.rename(os.path.join(base_dir(), nombre, "manifiesto.json"), os.path.join(base_dir(), nombre, "manifiesto.revertido.json"))
