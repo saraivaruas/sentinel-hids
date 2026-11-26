@@ -6,6 +6,11 @@ from helpers import Env, core
 from sentinel import endurecer, ia, ui
 
 
+def setUpModule():
+    from sentinel import endurecer
+    p = mock.patch.object(endurecer.plataforma, "ES_MAC", False); p.start(); unittest.addModuleCleanup(p.stop)      # las medidas son de Linux, también en la CI de Mac
+
+
 class AccionesTests(unittest.TestCase):
     def test_aplicar_valida_perfil_y_medidas(self):
         ids = [endurecer.MEDIDAS[0].id]
