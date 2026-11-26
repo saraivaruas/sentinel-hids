@@ -4,4 +4,6 @@
 # un paquete falso llamado «sentinel» que alguien deje en esa carpeta. La opción -I (aislado) ignora el directorio actual,
 # PYTHONPATH y los paquetes del usuario.
 D="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-exec python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); sys.argv[0] = "sentinel"; from sentinel.cli import main; sys.exit(main(sys.argv[2:]))' "$D" "$@"
+# En macOS el instalador anota aquí qué Python usar (uno que solo el administrador pueda cambiar).
+PY=python3; [ -r "$D/python" ] && PY="$(cat "$D/python")"
+exec "$PY" -I -c 'import sys; sys.path.insert(0, sys.argv[1]); sys.argv[0] = "sentinel"; from sentinel.cli import main; sys.exit(main(sys.argv[2:]))' "$D" "$@"
