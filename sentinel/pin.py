@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import sys
 
-from . import core
+from . import core, plataforma
 
 ITERS = 300_000
 MIN_LEN = 6
@@ -183,6 +183,21 @@ def next_stdin_line() -> str:
     return lines.pop(0).rstrip("\r") if lines else ""
 
 
+def _ventana_mac(prompt: str) -> str | None:
+    """Sin terminal, en macOS: una ventana con el campo oculto en la pantalla del usuario."""
+    from .core import Alerter
+    tgt = Alerter().desktop_target()
+    if not tgt or not shutil.which("osascript"):
+        return None
+    user, uid = tgt
+    cmd = ["osascript", "-e", "on run argv", "-e", 'text returned of (display dialog (item 1 of argv) with title "Sentinel" default answer "" with hidden answer)', "-e", "end run", "--", prompt.strip()]
+    try:
+        r = subprocess.run(Alerter.en_sesion_mac(cmd, user, uid, core.is_root()), capture_output=True, text=True, timeout=120, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.rstrip("\n") if r.returncode == 0 else None
+
+
 def ask(prompt: str = "PIN de Sentinel: ") -> str | None:
     """Pregunta el PIN en la terminal; si no hay terminal, con una ventana (zenity). None = no se pudo preguntar."""
     if sys.stdin.isatty():
@@ -195,6 +210,8 @@ def ask(prompt: str = "PIN de Sentinel: ") -> str | None:
             return getpass.getpass(prompt, stream=tty)
     except (OSError, EOFError, KeyboardInterrupt):
         pass
+    if plataforma.ES_MAC:
+        return _ventana_mac(prompt)
     if shutil.which("zenity"):
         from .core import Alerter
         tgt = Alerter().desktop_target()

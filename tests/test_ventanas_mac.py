@@ -2,7 +2,7 @@ import unittest
 from unittest import mock
 
 from helpers import Env, core
-from sentinel import plataforma
+from sentinel import pin, plataforma
 
 
 class VentanasMacTests(unittest.TestCase):
@@ -29,6 +29,20 @@ class VentanasMacTests(unittest.TestCase):
             self.assertEqual(abrir.call_count, veces, salida)
             if veces:
                 self.assertEqual(abrir.call_args[0][0][-3:], ["open", "-a", "Sentinel"])
+
+    def preguntar(self, rc, salida):
+        with mock.patch("sys.stdin.isatty", return_value=False), mock.patch("builtins.open", side_effect=OSError), \
+             mock.patch.object(pin.subprocess, "run", return_value=mock.Mock(returncode=rc, stdout=salida)) as run:
+            return pin.ask("PIN de Sentinel: "), run
+
+    def test_pide_el_pin_con_una_ventana_si_no_hay_terminal(self):
+        r, run = self.preguntar(0, "secreto-1\n")
+        self.assertEqual(r, "secreto-1")
+        c = run.call_args[0][0]
+        self.assertTrue(any("hidden answer" in x for x in c)); self.assertNotIn("zenity", c)
+
+    def test_cancelar_la_ventana_del_pin_no_devuelve_nada(self):
+        self.assertIsNone(self.preguntar(1, "")[0])
 
 
 if __name__ == "__main__":
