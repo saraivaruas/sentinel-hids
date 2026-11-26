@@ -1,44 +1,48 @@
-# Muestras reales del registro de macOS al fallar accesos (SSH, sudo, su), para escribir y revisar
-# el detector de fuerza bruta. Solo en equipos desechables de GitHub: crea un usuario y enciende SSH.
+# Prueba real en macOS del detector de fuerza bruta: provoca accesos (SSH, sudo, su) y comprueba que
+# Sentinel avise leyendo el registro del sistema. Solo en equipos desechables de GitHub: crea un
+# usuario, le cambia las reglas de sudo y enciende SSH.
 name: mac-registro
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [".github/workflows/mac-registro.yml"]
+    paths: [".github/workflows/mac-registro.yml", "sentinel/authwatch.py", "tools/prueba-mac-accesos.py"]
 
 permissions:
   contents: read
 
 jobs:
-  muestras:
-    name: Registro en ${{ matrix.os }}
+  accesos:
+    name: Accesos fallidos en ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26, macos-15]
+        os: [macos-26, macos-26-intel, macos-15, macos-15-intel]
     steps:
+      - uses: actions/checkout@v7
       - name: Encender SSH y crear un usuario de prueba
         run: |
           sw_vers; ssh -V
           sudo sysadminctl -addUser sentinelprueba -password 'Clave-Buena-123'
+          sudo dscl . -passwd /Users/sentinelprueba 'Clave-Buena-123'
+          dscl . -authonly sentinelprueba 'Clave-Buena-123' && echo "clave de prueba correcta"
           sudo systemsetup -setremotelogin on || true
           sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist || true
           sudo dseditgroup -o edit -a sentinelprueba -t user com.apple.access_ssh || true
-          sudo dscl . -passwd /Users/sentinelprueba 'Clave-Buena-123'
-          dscl . -authonly sentinelprueba 'Clave-Buena-123' && echo "clave de prueba correcta"
-          sudo dseditgroup -o edit -a sentinelprueba -t user admin  # para que sudo le pida la clave y la rechace
+          # Los administradores de estos equipos usan sudo sin clave: a este usuario se le exige.
+          echo 'sentinelprueba ALL=(ALL) PASSWD: ALL' | sudo tee /etc/sudoers.d/zz_sentinelprueba >/dev/null
+          sudo chmod 440 /etc/sudoers.d/zz_sentinelprueba
           sleep 3
-          nc -z 127.0.0.1 22 && echo "SSH escuchando" || echo "SSH NO escucha"
-      - name: Provocar accesos y capturar el registro
+          nc -z 127.0.0.1 22 && echo "SSH escuchando"
+      - name: Provocar accesos mientras Sentinel escucha
         run: |
           set +e  # los accesos fallidos son lo que se quiere provocar
-          filtro='process BEGINSWITH "sshd" OR process == "sudo" OR process == "su"'
-          sudo log stream --style ndjson --level info --predicate "$filtro" > "$RUNNER_TEMP/vivo.ndjson" &
-          sleep 5
+          sudo python3 tools/prueba-mac-accesos.py "$RUNNER_TEMP/fin" > "$RUNNER_TEMP/sentinel.txt" 2>&1 &
+          escucha=$!
+          sleep 8
           intento() { # usuario clave
             printf '#!/bin/sh\necho "%s"\n' "$2" > "$RUNNER_TEMP/clave.sh"; chmod +x "$RUNNER_TEMP/clave.sh"
             SSH_ASKPASS="$RUNNER_TEMP/clave.sh" SSH_ASKPASS_REQUIRE=force ssh -o StrictHostKeyChecking=no \
@@ -48,32 +52,11 @@ jobs:
           intento noexiste mala
           intento sentinelprueba mala
           intento sentinelprueba Clave-Buena-123
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes sentinelprueba@127.0.0.1 true; echo "ssh sin clave -> $?"
           printf 'a\nb\nc\n' | sudo -u sentinelprueba sudo -k -S true; echo "sudo malo -> $?"
           # su solo pide la clave si hay terminal: expect le da una
-          expect -c 'spawn sudo -u sentinelprueba su root -c true; expect "assword:"; send "mala\r"; expect eof'; echo "su malo (con terminal)"
-          sleep 8
-          sudo pkill -f "log stream" || true
-          sudo log show --last 3m --info --style ndjson --predicate "$filtro" > "$RUNNER_TEMP/guardado.ndjson"
-      - name: Mostrar las muestras
-        run: |
-          for f in vivo guardado; do
-            echo "===== $f ($(wc -l < "$RUNNER_TEMP/$f.ndjson") líneas)"
-            python3 - "$RUNNER_TEMP/$f.ndjson" <<'EOF'
-          import json, sys
-          claves = None
-          for linea in open(sys.argv[1], encoding="utf-8", errors="replace"):
-              try:
-                  r = json.loads(linea)
-              except ValueError:
-                  print("NO-JSON:", linea.rstrip()[:200]); continue
-              if not isinstance(r, dict) or "eventMessage" not in r:
-                  print("OTRO:", linea.rstrip()[:200]); continue
-              if claves is None:
-                  claves = sorted(r); print("CAMPOS:", claves)
-              msg = r["eventMessage"]
-              propio = r.get("processImagePath", "").endswith(("/sudo", "/su")) and r.get("senderImagePath") == r.get("processImagePath")
-              if (propio and msg != "Reading config") or any(p in msg.lower() for p in ("fail", "invalid", "accept", "password", "preauth", "auth", "incorrect")):
-                  print(json.dumps([r.get("processImagePath"), r.get("senderImagePath"), r.get("subsystem"), r.get("category"), r.get("messageType"), msg[:300]], ensure_ascii=False))
-          EOF
-          done
+          expect -c 'spawn sudo -u sentinelprueba su root -c true; expect "assword:"; send "mala\r"; expect eof'
+          sleep 10
+          touch "$RUNNER_TEMP/fin"
+          wait $escucha; resultado=$?
+          cat "$RUNNER_TEMP/sentinel.txt"
+          exit $resultado
