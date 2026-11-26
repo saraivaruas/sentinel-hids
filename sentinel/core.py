@@ -215,9 +215,27 @@ def log_dir() -> str:
     return os.environ.get("SENTINEL_LOG", "/var/log/sentinel")
 
 
+# Valores por defecto que cambian en macOS (/etc, /var y /tmp son enlaces a /private). El resto vale igual.
+DEFAULTS_MAC = """
+[fim]
+paths = /private/etc/passwd,/private/etc/master.passwd,/private/etc/group,/private/etc/sudoers,/private/etc/sudoers.d,/private/etc/ssh,/private/etc/pam.d,/private/etc/hosts,/private/etc/profile,/private/etc/bashrc,/private/etc/zshrc,/private/etc/zprofile,/private/etc/pf.conf,/private/etc/pf.anchors,/private/etc/periodic,/private/etc/crontab,/private/var/at/tabs,/private/etc/sentinel,/Library/LaunchDaemons,/Library/LaunchAgents,/Library/StartupItems,/usr/local/bin,/usr/local/sbin,/opt/sentinel,/private/var/root/.ssh,/Users/*/.ssh,/Users/*/.zshrc,/Users/*/.zprofile,/Users/*/.bashrc,/Users/*/.bash_profile,/Users/*/.profile,/Users/*/Library/LaunchAgents
+www = /Library/WebServer/Documents,/opt/homebrew/var/www,/usr/local/var/www
+excludes = */node_modules/*,*/.git/*,*/cache/*,*/storage/logs/*,*/storage/framework/*,*.log,*/uploads/*,*/vendor/*,*/.DS_Store
+
+[weblog]
+paths = /private/var/log/apache2/*access*log,/opt/homebrew/var/log/nginx/*access*.log,/usr/local/var/log/nginx/*access*.log
+
+[honeypot]
+; el 5900 no: en macOS es «Compartir pantalla»
+ports = 2222,2323,3390,60009
+"""
+
+
 def load_config(path: str | None = None) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=None)
     cfg.read_string(DEFAULTS)
+    if plataforma.ES_MAC:
+        cfg.read_string(DEFAULTS_MAC)
     p = path or conf_path()
     if os.path.exists(p):
         cfg.read(p, encoding="utf-8")
