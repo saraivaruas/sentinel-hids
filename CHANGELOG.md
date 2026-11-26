@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Fuerza bruta en macOS:** el detector de accesos lee el registro unificado (`log stream`) en lugar del journal: SSH (fuerza bruta, acceso tras intentos fallidos, root remoto), `sudo` y `su`. Solo acepta mensajes escritos por los programas del sistema (por su ruta completa), para que otro programa no pueda inventar ataques y provocar bloqueos. En Linux no cambia nada. 2 pruebas nuevas.
 - **`su` fallido en macOS:** se reconoce el aviso «BAD SU» y se alerta igual que en Linux. 1 prueba nueva.
 - La tarea `mac-registro` falla la clave de `sudo` con un usuario administrador y la de `su` con terminal, para ver lo que anota cada uno.
 - La tarea `mac-registro` ya no se corta en el primer acceso fallido (era justo lo que debía provocar) y comprueba la clave del usuario de prueba.
