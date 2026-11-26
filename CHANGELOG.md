@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **`su` fallido en macOS:** se reconoce el aviso «BAD SU» y se alerta igual que en Linux. 1 prueba nueva.
 - La tarea `mac-registro` falla la clave de `sudo` con un usuario administrador y la de `su` con terminal, para ver lo que anota cada uno.
 - La tarea `mac-registro` ya no se corta en el primer acceso fallido (era justo lo que debía provocar) y comprueba la clave del usuario de prueba.
 - **Muestras reales del registro de macOS:** una tarea aparte de la CI (`mac-registro`) provoca accesos fallidos de SSH, sudo y su en macOS 26 y 15 y muestra lo que anota el sistema, para escribir el detector de fuerza bruta sobre datos reales.
