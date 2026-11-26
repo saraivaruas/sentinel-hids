@@ -25,6 +25,13 @@ class InstalarMacTests(unittest.TestCase):
         self.assertLess(s.index("servicio.instalar"), ref); self.assertLess(ref, s.index("servicio.iniciar"))
         self.assertTrue(all("[simulación]" in ln for ln in s.splitlines() if "rm -rf" in ln))
 
+    def test_deja_el_desinstalador_junto_al_programa(self):
+        s = self.correr("Darwin", "--dry-run").stdout
+        copia = next(ln for ln in s.splitlines() if "cp -R" in ln)
+        self.assertIn("uninstall-mac.sh", copia); self.assertTrue(copia.endswith("/opt/sentinel/"))
+        self.assertIn("sudo /opt/sentinel/uninstall-mac.sh", s)                      # y dice cómo usarlo
+        self.assertTrue(os.access(os.path.join(ROOT, "uninstall-mac.sh"), os.X_OK))
+
     def test_deja_el_panel_en_aplicaciones(self):
         r = self.correr("Darwin", "--dry-run")
         self.assertIn("/Applications/Sentinel.app/Contents/MacOS/Sentinel", r.stdout)

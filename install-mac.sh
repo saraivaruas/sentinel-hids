@@ -59,7 +59,7 @@ fi
 paso "1/5 Programa en $DEST (solo el administrador puede modificarlo)"
 if [ -n "$TMPPY" ]; then echo "  Python: $DEST/runtime/bin/python3 (propio de Sentinel)"; else echo "  Python: $PY"; fi
 do_ rm -rf "$DEST"; do_ mkdir -p "$DEST" /usr/local/bin
-do_ cp -R "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$DEST/"
+do_ cp -R "$AQUI/sentinel" "$AQUI/bin" "$AQUI/yara" "$AQUI/README.md" "$AQUI/uninstall-mac.sh" "$DEST/"
 do_ find "$DEST" -name __pycache__ -prune -exec rm -rf {} +
 if [ "$DRY" = 1 ]; then
   [ "$PY" = "$DEST/runtime/bin/python3" ] && echo "  [simulación] instalar el Python incluido en $DEST/runtime"
@@ -141,4 +141,5 @@ fi
 modulo "e = servicio.iniciar(); print(chr(10).join(e)); sys.exit(1 if e else 0)"
 
 echo; echo "Listo. Comprueba con:  sentinel status"
+echo "Para desinstalar:  sudo $DEST/uninstall-mac.sh   (con --todo borra también configuración y registros)"
 echo "Para ver todos los archivos del sistema, da «Acceso total al disco» a $PY en Ajustes > Privacidad y seguridad."
