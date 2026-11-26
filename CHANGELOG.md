@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **`sudo sentinel identidad rotar` y `restaurar` (Linux):** MAC aleatoria a través de NetworkManager e IP nueva por DHCP, sin enviar el nombre del equipo. Si no llega una IP o la puerta de salida deja de responder, vuelve sola a lo anterior; `restaurar` regresa a la MAC de fábrica y a los ajustes originales. Piden el PIN. 7 pruebas nuevas (con una red simulada).
 - **`sentinel identidad estado` (Linux):** muestra la MAC en uso y la de fábrica, la IP, si se envía el nombre del equipo a la red y si otros programas ya cambian la MAC o la IP. Solo lee. 5 pruebas nuevas.
 - **Hoja de ruta de privacidad de red:** rotación de MAC e IP dentro de Sentinel (fase 1) y modo discreto para anunciarse lo menos posible (fase 2), con sus límites.
 - **Prueba real del instalador (`mac-instalar`):** en los cuatro equipos instala, comprueba que el servicio vigila y alerta, que revive si lo matan, que `detener`/`iniciar` y las tareas programadas funcionan, reinstala encima y desinstala sin dejar restos.
