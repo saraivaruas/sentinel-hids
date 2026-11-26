@@ -1,4 +1,6 @@
+import json
 import unittest
+from unittest import mock
 
 from helpers import Env
 from sentinel import authwatch
@@ -61,6 +63,27 @@ class AuthTests(unittest.TestCase):
         ev = [x for x in self.e.events() if x["kind"] == "su_fallido"]
         self.assertEqual(len(ev), 1)
         self.assertIn("hacia root por ana", ev[0]["msg"])
+
+    def linea_mac(self, msg, ruta="/usr/libexec/sshd-session", origen=None):
+        return json.dumps({"processImagePath": ruta, "senderImagePath": origen or ruta, "eventMessage": msg}) + "\n"
+
+    def test_registro_de_macos(self):
+        fallo = "Failed password for invalid user noexiste from 203.0.113.9 port 49162 ssh2"
+        self.assertEqual(authwatch.mensaje_mac(self.linea_mac(fallo)), ("sshd", fallo))
+        self.assertIsNone(authwatch.mensaje_mac('Filtering the log data using "..."\n'))
+        self.assertIsNone(authwatch.mensaje_mac('{"count":759,"finished":1}\n'))
+        self.assertIsNone(authwatch.mensaje_mac("[1, 2]\n"))
+        self.assertIsNone(authwatch.mensaje_mac(self.linea_mac(fallo, ruta="/tmp/sshd-session")))               # impostor
+        self.assertIsNone(authwatch.mensaje_mac(self.linea_mac(fallo, origen="/usr/lib/pam/libpam.2.dylib")))    # biblioteca
+
+    def test_follow_en_macos_lee_el_registro_unificado(self):
+        lineas = [self.linea_mac(f"Failed password for root from 203.0.113.9 port {4000 + i} ssh2") for i in range(5)]
+        with mock.patch.object(authwatch.plataforma, "ES_MAC", True), mock.patch.object(authwatch.subprocess, "Popen") as popen:
+            popen.return_value.stdout = iter(lineas)
+            self.a.follow()
+        self.assertEqual(popen.call_args[0][0][:2], ["log", "stream"])
+        popen.return_value.terminate.assert_called_once()
+        self.assertIn("fuerza_bruta", self.kinds())
 
     def test_sudo_fallido(self):
         self.a.handle("sudo", "ana : 3 incorrect password attempts ; TTY=pts/0 ; PWD=/home/ana ; USER=root ; COMMAND=/bin/ls", 1)

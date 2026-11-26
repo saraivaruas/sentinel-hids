@@ -1,4 +1,4 @@
-"""Detección de ataques en vivo desde el journal: fuerza bruta (SSH, sudo), accesos sospechosos y escaneo de puertos (bloqueos del cortafuegos)."""
+"""Detección de ataques en vivo desde el journal (en macOS, el registro unificado): fuerza bruta (SSH, sudo), accesos sospechosos y escaneo de puertos (bloqueos del cortafuegos)."""
 from __future__ import annotations
 
 import collections
@@ -6,7 +6,7 @@ import json
 import re
 import subprocess
 
-from . import core
+from . import core, plataforma
 
 RE_FAIL = re.compile(r"Failed (?:password|publickey|keyboard-interactive/pam) for (?:invalid user )?(\S+) from (\S+)")
 RE_INVALID = re.compile(r"Invalid user (\S*) from (\S+)")
@@ -17,6 +17,25 @@ RE_SUDO_ROOT = re.compile(r"(\S+)\s*: .*USER=root ; COMMAND=(.*)")
 RE_UFW = re.compile(r"\[UFW BLOCK\].*?SRC=(\S+).*?PROTO=(\S+)(?:.*?DPT=(\d+))?")
 RE_SU_FAIL = re.compile(r"FAILED SU \(to (\S+)\) (\S+) on")
 RE_SU_FAIL_MAC = re.compile(r"BAD SU (\S+) to (\S+) on")
+
+# Programas de macOS cuyos mensajes se leen. Van por ruta completa (protegida por el sistema) para que
+# otro programa que se llame «sshd» no pueda inventar ataques y provocar bloqueos.
+PROGRAMAS_MAC = {"/usr/libexec/sshd-session": "sshd", "/usr/sbin/sshd": "sshd", "/usr/bin/sudo": "sudo", "/usr/bin/su": "su"}
+FILTRO_MAC = "processImagePath IN {" + ", ".join(f'"{p}"' for p in PROGRAMAS_MAC) + "}"
+
+
+def mensaje_mac(linea: str) -> tuple[str, str] | None:
+    """(programa, mensaje) de una línea de «log stream --style ndjson», o None si no interesa."""
+    try:
+        r = json.loads(linea)
+        ruta, msg = r["processImagePath"], r["eventMessage"]
+        ident = PROGRAMAS_MAC[ruta]
+    except (ValueError, KeyError, TypeError):
+        return None
+    # Solo lo que escribe el propio programa, no las bibliotecas que carga (PAM, XPC…).
+    if r.get("senderImagePath") != ruta or not isinstance(msg, str):
+        return None
+    return ident, msg
 
 
 class AuthWatch:
@@ -101,6 +120,9 @@ class AuthWatch:
 
     def follow(self, stop=lambda: False) -> None:
         """Lee el journal en vivo. Termina cuando `stop()` es verdadero o se cierra journalctl."""
+        if plataforma.ES_MAC:
+            self._follow_mac(stop)
+            return
         cmd = ["journalctl", "-f", "-n", "0", "-o", "json", "--output-fields=MESSAGE,SYSLOG_IDENTIFIER,_TRANSPORT"]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         try:
@@ -114,5 +136,19 @@ class AuthWatch:
                 msg = r.get("MESSAGE")
                 if isinstance(msg, str):
                     self.handle(r.get("SYSLOG_IDENTIFIER", ""), msg, kernel=r.get("_TRANSPORT") == "kernel")
+        finally:
+            p.terminate()
+
+    def _follow_mac(self, stop) -> None:
+        """Lo mismo en macOS, desde el registro unificado. SSH anota los accesos con nivel «info»."""
+        cmd = ["log", "stream", "--style", "ndjson", "--level", "info", "--predicate", FILTRO_MAC]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, errors="replace")
+        try:
+            for ln in p.stdout:  # type: ignore[union-attr]
+                if stop():
+                    break
+                m = mensaje_mac(ln)
+                if m:
+                    self.handle(*m)
         finally:
             p.terminate()
