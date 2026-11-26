@@ -124,6 +124,29 @@ PKG="$(ls "$AQUI"/dist/sentinel-*-macos.pkg)"
 installer -pkg "$PKG" -target /; comprobar "macOS instala el .pkg" test $? = 0
 comprobar "instalado con el .pkg, el monitor corre" esperar 90 corriendo
 comprobar "sentinel responde" /usr/local/bin/sentinel status
+PROPIO=/opt/sentinel/runtime/bin/python3
+comprobar "usa su propio Python, no el de Apple" test "$(cat /opt/sentinel/python)" = "$PROPIO"
+comprobar "el monitor corre con ese Python" sh -c "launchctl print $SVC.monitor | grep -q '$PROPIO'"
+comprobar "es Python 3.12" sh -c "$PROPIO --version | grep -q ' 3\.12'"
+comprobar "ese Python se conecta por https" "$PROPIO" -I -c 'import urllib.error, urllib.request
+try: urllib.request.urlopen("https://api.github.com", timeout=30)
+except urllib.error.HTTPError: pass'
+comprobar "el icono viene compilado para los dos procesadores" sh -c 'a="$(lipo -archs /opt/sentinel/bin/sentinel-barra)"; echo "$a" | grep -q arm64 && echo "$a" | grep -q x86_64'
+comprobar "el icono queda en la barra" esperar 30 pgrep -u "$SUDO_USER" -f /opt/sentinel/bin/sentinel-barra
+sudo -u "$SUDO_USER" /opt/sentinel/bin/sentinel-barra --una-vez
+sudo -u "$SUDO_USER" -H "$PROPIO" -I "$AQUI/tools/prueba-mac-panel.py"; comprobar "el panel funciona con ese Python" test $? = 0
+comprobar "los señuelos se activan con ese Python" /usr/local/bin/sentinel senuelos activar
+comprobar "y quedan escuchando" esperar 30 nc -z 127.0.0.1 2222
+/usr/local/bin/sentinel senuelos desactivar
+touch /Library/LaunchDaemons/com.ejemplo.intruso.plist
+comprobar "detecta cambios" esperar 60 evento com.ejemplo.intruso
+rm -f /Library/LaunchDaemons/com.ejemplo.intruso.plist
+sleep 30
+/usr/local/bin/sentinel scan >/dev/null
+comprobar "Python no genera avisos por sus propios archivos" sh -c '! grep -q "/opt/sentinel/" /var/log/sentinel/events.jsonl'
+"$AQUI/install-mac.sh" </dev/null >/dev/null; comprobar "actualizar desde el código funciona tras el .pkg" test $? = 0
+comprobar "y conserva el Python propio" test "$(cat /opt/sentinel/python)" = "$PROPIO"
+comprobar "sigue corriendo tras actualizar el .pkg" esperar 60 corriendo
 "$AQUI/uninstall-mac.sh" --todo; comprobar "se desinstala después del .pkg" test $? = 0
 comprobar "no queda /opt/sentinel tras el .pkg" test ! -e /opt/sentinel
 if [ "$FALLOS" = 0 ]; then echo "Todas las comprobaciones pasaron."; else echo "$FALLOS comprobaciones fallidas"; exit 1; fi
