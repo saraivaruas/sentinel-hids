@@ -215,6 +215,7 @@ Generar la versión (paquete + tarball + huellas): `packaging/make-release.sh` �
 | `sentinel identidad estado` | MAC e IP en uso, si se envía el nombre del equipo y otros programas que las cambian |
 | `sudo sentinel identidad activar --cada 2\|desactivar` | cambia MAC e IP cada tantas horas (apagado por defecto) |
 | `sudo sentinel discrecion` | qué delata a este equipo en la red: nombre, anuncios, puertos y ping (solo lee) |
+| `sudo sentinel identidad retirar\|devolver` | quita scripts, tareas y `macchanger.service` del método antiguo, con copia · lo repone |
 | `sudo sentinel identidad rotar\|restaurar` | MAC e IP nuevas sin enviar el nombre (vuelve atrás si falla) · volver a la MAC de fábrica |
 
 Configuración: `/etc/sentinel/sentinel.conf` (parte de `etc/sentinel.conf.example`). Registros: `/var/log/sentinel/`.

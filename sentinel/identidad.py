@@ -8,13 +8,21 @@ import glob
 import os
 import re
 import secrets
+import shutil
 import time
 
 from . import core, plataforma
 
 TIPOS = ("802-3-ethernet", "802-11-wireless")
-ROTADORES = re.compile(r"change[-_]?(mac|ip)|macchanger", re.I)
+ROTADORES = re.compile(r"(?<![a-z])(change[-_]?(mac|ip)(?![a-z])|macchanger)", re.I)   # «exchange-ip» no cuenta
 CRON = ("/etc/crontab", "/etc/cron.d/*", "/var/spool/cron/crontabs/*")
+# lo que «retirar» sabe quitar del método antiguo
+CRON_SISTEMA = ("/etc/crontab", "/etc/cron.d/*")
+CRON_USUARIOS = "/var/spool/cron/crontabs"
+UNIDAD_ANTIGUA = "/etc/systemd/system/macchanger.service"
+CARPETAS_SCRIPTS = ("/usr/local/bin", "/usr/local/sbin")
+SCRIPT_ANTIGUO = re.compile(r"change[-_]?(mac|ip)(\.sh)?", re.I)         # el nombre completo del archivo
+REGISTROS = "/var/log"
 TEMPORIZADOR = "sentinel-identidad.timer"
 ENLACE = "/etc/systemd/system/timers.target.wants/" + TEMPORIZADOR
 HORAS = (1, 168)                                           # entre una hora y una semana
@@ -223,12 +231,12 @@ def programada(cfg, alerter, run=core.run) -> dict | None:
     return rotar(cfg, alerter, run)
 
 
-def _aceptar_cambios(cfg, alerter) -> None:
+def _aceptar_cambios(cfg, alerter, rutas: list[str] | None = None) -> None:
     """Lo que Sentinel cambia por orden del usuario no se reporta como ataque."""
     from . import fim
     vigia = fim.Fim(cfg, alerter, core.Allow(cfg))
     if vigia.load() is not None:
-        vigia.accept([core.conf_path(), ENLACE])
+        vigia.accept(rutas or [core.conf_path(), ENLACE])
 
 
 def activar(cfg, horas: int, alerter, run=core.run) -> dict:
@@ -239,7 +247,7 @@ def activar(cfg, horas: int, alerter, run=core.run) -> dict:
     if not HORAS[0] <= horas <= HORAS[1]:
         return {"ok": False, "mensaje": f"El intervalo va de {HORAS[0]} a {HORAS[1]} horas."}
     if e["otros"]:
-        return {"ok": False, "mensaje": "No se activó: otros programas ya cambian la MAC o la IP y se pisarían. Quítalos primero:\n- " + "\n- ".join(e["otros"])}
+        return {"ok": False, "mensaje": "No se activó: otros programas ya cambian la MAC o la IP y se pisarían. Para retirarlos (con copia): sudo sentinel identidad retirar\n- " + "\n- ".join(e["otros"])}
     core.set_setting("identidad", "cada_horas", str(horas))
     core.set_setting("identidad", "activo", "yes")
     d = _guardado()
@@ -264,4 +272,168 @@ def desactivar(cfg, alerter, run=core.run) -> dict:
     if rc != 0:
         msg += f" (aviso: no pude apagar el temporizador: {out.strip() or 'sin detalle'}; aunque siga, no cambiará nada)"
     alerter.emit("info", "identidad", "desactivada", msg, key=f"identidad:off:{int(core.now())}")
+    return {"ok": True, "mensaje": msg}
+
+
+# ---------- retirar el método antiguo (scripts sueltos, cron y macchanger.service), con copia y vuelta atrás
+def _separar(texto: str) -> tuple[list[str], str]:
+    """(líneas activas que rotan, el resto del archivo tal cual)."""
+    fuera, resto = [], []
+    for linea in texto.splitlines(keepends=True):
+        if not linea.lstrip().startswith("#") and ROTADORES.search(linea):
+            fuera.append(linea.strip())
+        else:
+            resto.append(linea)
+    return fuera, "".join(resto)
+
+
+def _es_script(ruta: str) -> bool:
+    try:
+        with open(ruta, "rb") as f:
+            return os.path.isfile(ruta) and f.read(2) == b"#!"
+    except OSError:
+        return False
+
+
+def plan_retiro(run=core.run) -> dict:
+    """Qué se quitaría. «completo» es falso si faltan permisos para verlo todo."""
+    plan = {"servicio": UNIDAD_ANTIGUA if os.path.isfile(UNIDAD_ANTIGUA) else "", "crontabs": {}, "cron": {}, "scripts": [], "registros": [], "completo": True}
+    try:
+        usuarios = sorted(os.listdir(CRON_USUARIOS)) if os.path.isdir(CRON_USUARIOS) else []
+    except PermissionError:
+        usuarios, plan["completo"] = [], False
+    for u in usuarios:
+        rc, texto = run(["crontab", "-u", u, "-l"], 10)
+        if rc != 0:
+            plan["completo"] = False
+            continue
+        fuera, resto = _separar(texto)
+        if fuera:
+            plan["crontabs"][u] = {"quitar": fuera, "antes": texto, "despues": resto}
+    for patron in CRON_SISTEMA:
+        for ruta in sorted(glob.glob(patron)):
+            try:
+                with open(ruta, encoding="utf-8") as f:
+                    fuera, resto = _separar(f.read())
+            except (OSError, UnicodeDecodeError):
+                plan["completo"] = False
+                continue
+            if fuera:
+                plan["cron"][ruta] = {"quitar": fuera, "despues": resto}
+    for carpeta in CARPETAS_SCRIPTS:
+        for ruta in sorted(glob.glob(os.path.join(carpeta, "*"))):
+            nombre = os.path.basename(ruta)
+            if SCRIPT_ANTIGUO.fullmatch(nombre) and _es_script(ruta):
+                plan["scripts"].append(ruta)
+                registro = os.path.join(REGISTROS, os.path.splitext(nombre)[0] + ".log")
+                if os.path.isfile(registro):
+                    plan["registros"].append(registro)
+    return plan
+
+
+def hay_algo(plan: dict) -> bool:
+    return any(plan[k] for k in ("servicio", "crontabs", "cron", "scripts", "registros"))
+
+
+def describir(plan: dict) -> list[str]:
+    out = [f"Tarea de {u}: {x}" for u, v in plan["crontabs"].items() for x in v["quitar"]]
+    out += [f"Línea de {r}: {x}" for r, v in plan["cron"].items() for x in v["quitar"]]
+    if plan["servicio"]:
+        out.append(f"Servicio: {plan['servicio']}")
+    return out + [f"Archivo: {r}" for r in plan["scripts"] + plan["registros"]]
+
+
+def _respaldos() -> str:
+    return os.path.join(core.state_dir(), "retirados")
+
+
+def retirar(cfg, alerter, run=core.run) -> dict:
+    """Quita el método antiguo. Primero copia todo; con `devolver` queda como estaba."""
+    plan = plan_retiro(run)
+    if not plan["completo"]:
+        return {"ok": False, "mensaje": "No pude revisar todas las tareas programadas (hace falta administrador). No se cambió nada."}
+    if not hay_algo(plan):
+        return {"ok": True, "mensaje": "No queda nada del método antiguo."}
+    base = carpeta = os.path.join(_respaldos(), time.strftime("%Y%m%d-%H%M%S"))
+    n = 1
+    while os.path.exists(carpeta):
+        n += 1
+        carpeta = f"{base}-{n}"
+    core.ensure_dir(carpeta, 0o700)
+    archivos = [r for r in [*plan["cron"], plan["servicio"], *plan["scripts"], *plan["registros"]] if r]
+    manifiesto = {"archivos": [], "crontabs": [], "servicio": False, "devuelto": False}
+    for i, ruta in enumerate(archivos):
+        copia = os.path.join(carpeta, f"{i:02d}-{os.path.basename(ruta)}")
+        shutil.copy2(ruta, copia)
+        st = os.stat(ruta)
+        manifiesto["archivos"].append({"ruta": ruta, "copia": copia, "uid": st.st_uid, "gid": st.st_gid})
+    for u, v in plan["crontabs"].items():
+        copia = os.path.join(carpeta, f"crontab-{u}")
+        with open(copia, "w", encoding="utf-8") as f:
+            f.write(v["antes"])
+        manifiesto["crontabs"].append({"usuario": u, "copia": copia})
+    if plan["servicio"]:
+        manifiesto["servicio"] = run(["systemctl", "is-enabled", "macchanger.service"], 5)[1].strip() == "enabled"
+    core.atomic_write_json(os.path.join(carpeta, "manifiesto.json"), manifiesto)      # antes de tocar nada
+
+    def fallo(que: str, salida: str) -> dict:
+        return {"ok": False, "mensaje": f"No pude {que}: {salida.strip() or 'sin detalle'}. Para dejarlo como estaba: sudo sentinel identidad devolver", "carpeta": carpeta}
+
+    for u, v in plan["crontabs"].items():
+        nuevo = os.path.join(carpeta, f"crontab-{u}.nuevo")
+        with open(nuevo, "w", encoding="utf-8") as f:
+            f.write(v["despues"])
+        rc, out = run(["crontab", "-u", u, nuevo], 15)
+        if rc != 0:
+            return fallo(f"cambiar las tareas de {u}", out)
+    for ruta, v in plan["cron"].items():
+        with open(ruta, "w", encoding="utf-8") as f:                                  # conserva dueño y permisos
+            f.write(v["despues"])
+    if plan["servicio"]:
+        rc, out = run(["systemctl", "disable", "macchanger.service"], 30)
+        if rc != 0:
+            return fallo("desactivar macchanger.service", out)
+        os.remove(plan["servicio"])
+        run(["systemctl", "daemon-reload"], 30)
+    for ruta in plan["scripts"] + plan["registros"]:
+        os.remove(ruta)
+    _aceptar_cambios(cfg, alerter, archivos + [os.path.join(os.path.dirname(UNIDAD_ANTIGUA), "multi-user.target.wants", "macchanger.service")])
+    msg = f"Método antiguo retirado ({len(describir(plan))} elementos). Copia en {carpeta}. Para deshacerlo: sudo sentinel identidad devolver"
+    alerter.emit("info", "identidad", "retirado", msg, key=f"identidad:retirado:{int(core.now())}")
+    return {"ok": True, "mensaje": msg, "carpeta": carpeta}
+
+
+def devolver(cfg, alerter, run=core.run) -> dict:
+    """Repone lo último que quitó `retirar`."""
+    if activa(cfg):
+        return {"ok": False, "mensaje": "El cambio programado de Sentinel está activado y se pisarían. Apágalo antes: sudo sentinel identidad desactivar"}
+    for ruta in sorted(glob.glob(os.path.join(_respaldos(), "*", "manifiesto.json")), reverse=True):
+        m = core.read_json(ruta)
+        if m and not m.get("devuelto"):
+            break
+    else:
+        return {"ok": False, "mensaje": "No hay nada que devolver."}
+    for a in m["archivos"]:
+        shutil.copy2(a["copia"], a["ruta"])
+        try:
+            os.chown(a["ruta"], a["uid"], a["gid"])
+        except OSError:
+            pass
+    errores = []
+    for c in m["crontabs"]:
+        rc, out = run(["crontab", "-u", c["usuario"], c["copia"]], 15)
+        if rc != 0:
+            errores.append(f"tareas de {c['usuario']}: {out.strip()}")
+    if m["servicio"]:
+        run(["systemctl", "daemon-reload"], 30)
+        rc, out = run(["systemctl", "enable", "macchanger.service"], 30)
+        if rc != 0:
+            errores.append(f"macchanger.service: {out.strip()}")
+    _aceptar_cambios(cfg, alerter, [a["ruta"] for a in m["archivos"]] + [os.path.join(os.path.dirname(UNIDAD_ANTIGUA), "multi-user.target.wants", "macchanger.service")])
+    if errores:
+        return {"ok": False, "mensaje": "Se repusieron los archivos, pero falló: " + "; ".join(errores)}
+    m["devuelto"] = True
+    core.atomic_write_json(ruta, m)
+    msg = "Se repuso el método antiguo tal como estaba."
+    alerter.emit("info", "identidad", "devuelto", msg, key=f"identidad:devuelto:{int(core.now())}")
     return {"ok": True, "mensaje": msg}

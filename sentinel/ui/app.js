@@ -540,7 +540,7 @@
     $("#id-info").textContent = d.error ? d.error : "Ahora en " + d.interfaz + ": MAC " + d.mac + (d.aleatoria ? " (cambiada)" : " (la de fábrica)") + " · IP " + (d.ip || "sin dirección") + (d.metodo === "auto" ? "" : " (fija: no cambia)") + " · el nombre del equipo " + (d.envia_nombre ? "se envía a la red" : "no se envía") + ".";
     const otros = d.otros || [], warn = $("#id-warn");
     warn.hidden = !otros.length && d.cron_revisado !== false;
-    warn.textContent = otros.length ? "⚠ Otros programas ya cambian la MAC o la IP; quítalos para poder activar: " + otros.join(" · ") : "Al activar se revisan también las tareas programadas del administrador.";
+    warn.textContent = otros.length ? "⚠ Otros programas ya cambian la MAC o la IP. Para activar, retíralos desde la terminal con «sudo sentinel identidad retirar» (guarda una copia): " + otros.join(" · ") : "Al activar se revisan también las tareas programadas del administrador.";
     $("#id-btn").textContent = d.activo ? "Apagar" : "Activar"; $("#id-btn").dataset.on = d.activo ? "1" : "";
     $("#id-btn").disabled = !d.activo && (!!d.error || otros.length > 0);
     sel.disabled = !!d.activo; $("#id-now").disabled = !!d.error; $("#id-rest").hidden = !d.restaurable;
