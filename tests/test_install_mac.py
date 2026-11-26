@@ -19,7 +19,8 @@ class InstalarMacTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         s = r.stdout
         # las tareas se escriben antes de la referencia: así Sentinel no se reporta a sí mismo como programa de arranque nuevo
-        self.assertLess(s.index("servicio.instalar"), s.index("baseline init")); self.assertLess(s.index("baseline init"), s.index("servicio.iniciar"))
+        ref = s.index("bin/sentinel baseline ")                                  # «init» o «accept», según haya ya una referencia en este equipo
+        self.assertLess(s.index("servicio.instalar"), ref); self.assertLess(ref, s.index("servicio.iniciar"))
         self.assertTrue(all("[simulación]" in ln for ln in s.splitlines() if "rm -rf" in ln))
 
     def test_deja_el_panel_en_aplicaciones(self):
