@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **PIN sin terminal en macOS:** se pide con una ventana del sistema (antes dependía de `zenity`, que no existe en Mac). 2 pruebas nuevas.
 - **Ventana grande de alerta en macOS** (si activas `popup_min`), con el botón «Abrir panel»; el texto de la alerta viaja como dato. 2 pruebas nuevas.
 - **Panel, Ajustes → «Modo discreto en la red»:** muestra qué delata al equipo y deja elegir qué activar (nombre, anuncios, ping) o deshacerlo, con confirmación, PIN y clave de administrador. 3 pruebas nuevas.
 - **Modo discreto (Linux), `sudo sentinel discrecion aplicar` y `revertir`:** no envía el nombre del equipo al router, apaga mDNS, LLMNR y Avahi y no contesta ping (IPv4 e IPv6). Cada medida se puede elegir con `--solo`, guarda lo que había y se deshace; no corta la red. Piden el PIN. `identidad restaurar` respeta el nombre oculto. 8 pruebas nuevas (con un sistema simulado).
