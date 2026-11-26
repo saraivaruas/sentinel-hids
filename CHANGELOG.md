@@ -8,6 +8,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- **Prueba real del cortafuegos de puertos en macOS:** conexiones de verdad comprueban que lo elegido sigue abierto, lo demás se rechaza, lo ya conectado continúa, una prueba sin confirmar se revierte sola y el bloqueo de IPs sigue mandando.
 - **Cortafuegos de puertos en macOS:** `sentinel firewall` y la página del panel muestran el plan, aplican a prueba con reversión automática, confirman y restauran. Solo rechaza conexiones nuevas desde fuera (lo ya iniciado y lo que sale siguen; loopback, ping, DHCP, mDNS y Tailscale pasan) y el monitor lo repone tras reiniciar. Por defecto un Mac no abre ningún puerto salvo SSH si está encendido. 7 pruebas nuevas.
 - La preparación de `pf` en macOS sirve ahora para cualquier ancla de Sentinel, no solo la del bloqueo de IPs.
 - **El informe del equipo en macOS completa sus secciones:** firma de los programas que arrancan solos, SIP y Gatekeeper, y actualizaciones pendientes. 3 pruebas nuevas.
