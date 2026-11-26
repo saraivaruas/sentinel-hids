@@ -81,6 +81,20 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 12 | 🟡 | Ventana grande de alerta y PIN sin terminal | Con ventanas del sistema; falta verlas en un Mac con pantalla. |
 | 13 | ⬜ | API y app de iOS | La app solo acompaña: alertas, estado de los equipos y bloquear o liberar IPs. iOS no permite que una app vigile el sistema. |
 
+## Qué falta para publicar la versión de Mac
+
+En este orden.
+
+| N.º | Estado | Paso | Depende de |
+|---|---|---|---|
+| M.1 | ⬜ | Primera instalación en un Mac con pantalla: ventanas de contraseña, PIN y alerta, icono, «Acceso total al disco» y un Mac sin las herramientas de Apple (con el `.pkg`) | Un Mac real |
+| M.2 | ⬜ | Corregir lo que aparezca en M.1 | M.1 |
+| M.3 | 🟡 | Membresía de Apple Developer | Pagada; espera la aprobación de Apple |
+| M.4 | ⬜ | Certificados «Developer ID Application» y «Developer ID Installer» | M.3 |
+| M.5 | ⬜ | Firmar (también los programas del Python incluido) y notarizar el `.pkg` desde GitHub, con los certificados guardados como secretos | M.4 |
+| M.6 | ⬜ | Publicar la versión con el `.pkg` firmado; con eso funciona la actualización desde Sentinel | M.2 y M.5 |
+| M.7 | ⬜ | API y app de iOS (punto 13) | Proyecto aparte; publicarla requiere M.3 |
+
 ## Cómo se prueba
 
 - **GitHub Actions con macOS:** pruebas automáticas en cada subida. No tiene pantalla interactiva.
