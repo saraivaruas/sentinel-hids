@@ -9,6 +9,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- **`endurecer revertir` ya no dice «todo quedó como estaba» sin mirarlo:** si el sistema no deja deshacer un cambio (macOS reciente no permite apagar Gatekeeper por comando), lo dice y sale con error. 1 prueba nueva.
 - La hoja de ruta recoge que el cortafuegos de puertos de macOS pasa su prueba real.
 - La prueba real de los señuelos en macOS exige que ni su tarea ni su copia de configuración generen alertas por encima de «info».
 - **Activar los señuelos ya no dispara una alerta contra Sentinel:** el monitor podía ver sus archivos antes de que se anotaran, y la copia de configuración se anotaba con una ruta distinta de la vigilada. Encontrado en la prueba real. 1 prueba nueva.
