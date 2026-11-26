@@ -32,6 +32,9 @@ echo "== panel (como $SUDO_USER)"
 sudo -u "$SUDO_USER" -H /usr/bin/python3 -I "$AQUI/tools/prueba-mac-panel.py"; comprobar "el panel funciona" test $? = 0
 /usr/local/bin/sentinel requisitos > /tmp/req.txt; comprobar "no falta ningún requisito" grep -q "Todo lo necesario ya está instalado" /tmp/req.txt
 /usr/local/bin/sentinel test; comprobar "la prueba de alertas funciona" test $? = 0
+/usr/local/bin/sentinel audit | tee /tmp/audit.txt
+comprobar "la auditoría reconoce las protecciones de macOS" sh -c 'grep -q "SIP" /tmp/audit.txt && ! grep -Eq "no se pudo revisar|ufw|auditd" /tmp/audit.txt'
+/usr/local/bin/sentinel endurecer plan
 
 ANTES="$(pid)"; kill -9 "$ANTES"
 comprobar "si matan el monitor, launchd lo vuelve a levantar" esperar 60 sh -c "p=\$(pgrep -f '/opt/sentinel monitor' | head -1); [ -n \"\$p\" ] && [ \"\$p\" != '$ANTES' ]"
