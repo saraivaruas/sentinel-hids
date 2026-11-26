@@ -200,6 +200,10 @@ enviar_correo = yes
 horas = 08:00,16:00,23:00
 ; el informe se guarda en /var/lib/sentinel/informes; cuántos se conservan
 informes_max = 30
+
+[identidad]
+; interfaz cuya MAC e IP se cambian (vacío = la de la salida a internet). Ver: sentinel identidad estado
+interfaz =
 """
 
 

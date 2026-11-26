@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, incidents, mailer, pin, plataforma, report, requisitos, servicio, update
+from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, identidad, incidents, mailer, pin, plataforma, report, requisitos, servicio, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -382,6 +382,28 @@ def cmd_endurecer(a) -> int:
     if r["carpeta"]:
         print(f"\nCopia de seguridad: {r['carpeta']}\nPara deshacerlo todo:  sudo sentinel endurecer revertir")
     return 0 if not r["revertidas"] else 1
+
+
+def cmd_identidad(a) -> int:
+    """MAC e IP del equipo en la red: `estado` (solo lectura)."""
+    e = identidad.estado(core.load_config())
+    if a.json:
+        print(json.dumps(e, ensure_ascii=False, indent=1)); return 1 if e["error"] else 0
+    if e["error"]:
+        print(e["error"], file=sys.stderr); return 1
+    print(f"IDENTIDAD EN LA RED · {e['interfaz']}\n")
+    print(f" MAC en uso:      {e['mac']}  ({'cambiada' if e['aleatoria'] else 'la de fábrica'})")
+    print(f" MAC de fábrica:  {e['mac_fabrica']}")
+    print(f" IP:              {e['ip'] or 'sin dirección'}  ({'automática por DHCP' if e['metodo'] == 'auto' else 'fija: no cambia al rotar'})")
+    print(f" Puerta de salida: {e['puerta'] or 'ninguna'}")
+    print(f" Nombre del equipo: {col('se envía a la red', 'aviso') if e['envia_nombre'] else col('no se envía', 'ok')}")
+    if e["otros"]:
+        print(col("\n Otros programas que también cambian la MAC o la IP:", "aviso"))
+        for x in e["otros"]:
+            print(f"   - {x}")
+    if not e["cron_revisado"]:
+        print("\n No pude revisar las tareas programadas de root: ejecuta  sudo sentinel identidad estado")
+    return 0
 
 
 def _hay_servicios() -> bool:
@@ -808,6 +830,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("endurecer", help="endurecimiento guiado del equipo: plan (solo lectura), aplicar (con copia y comprobación), revertir"); s.add_argument("accion", nargs="?", default="plan", choices=["plan", "estado", "aplicar", "revertir"])
     s.add_argument("--perfil", default="recomendado", choices=list(endurecer.PERFILES), help="basico (sin efectos visibles), recomendado (CIS nivel 1) o estricto (servidores)"); s.add_argument("--solo", help="solo estas medidas, separadas por coma")
     s.add_argument("--si", action="store_true", help="no preguntar antes de aplicar"); s.add_argument("--tanda", help="revertir: carpeta de la tanda (por defecto la última)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_endurecer)
+    s = sub.add_parser("identidad", help="MAC e IP del equipo en la red: estado"); s.add_argument("accion", nargs="?", default="estado", choices=["estado"]); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_identidad)
     s = sub.add_parser("requisitos", help="qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta"); s.add_argument("--instalar", action="store_true", help="instala lo que falta (pregunta antes y pide tu contraseña de administrador)")
     s.add_argument("--si", action="store_true", help="instala sin preguntar (lo usa el panel)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_requisitos)
     s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])

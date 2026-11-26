@@ -77,3 +77,7 @@ enviar_correo = yes
 ; Procesos que pueden tener conexiones externas sin generar hallazgo (se suman a [allow] procs)
 conexiones_permitidas = chrome,firefox,claude,claude-desktop,cloudflared,syncthing,tailscaled,crowdsec,crowdsec-firewa,apt,apt-get,http,curl,wget,snapd,packagekitd,fwupd,gnome-software,unattended-upgr,node,python3,msmtp,git,ssh,code,dotnet
 informes_max = 30
+
+[identidad]
+; Interfaz cuya MAC e IP se cambian (vacío = la de la salida a internet). Ver:  sentinel identidad estado
+interfaz =
