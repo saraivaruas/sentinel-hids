@@ -1,3 +1,4 @@
+import argparse
 import os
 import plistlib
 import tempfile
@@ -124,6 +125,18 @@ class ServicioTests(unittest.TestCase):
             servicio.iniciar(self.launchctl); self.assertIn("honeypot", self.cargadas)       # sigue activado tras detener e iniciar
             self.assertEqual(servicio.desactivar_senuelos(self.launchctl), [])
             self.assertFalse(os.path.exists(servicio.ruta("honeypot"))); self.assertEqual(servicio.estado("sentinel-honeypot", self.launchctl), "not-found")
+
+    def test_los_archivos_de_los_senuelos_se_anotan_como_propios_antes_de_crearlos(self):
+        e = helpers.Env(); self.addCleanup(e.close)
+        vistos = []
+
+        def activar(python, *a, **k):
+            vistos.append(core.read_json(os.path.join(core.state_dir(), "self_changes.json"), {}).get("paths", []))
+            return []
+        with self.mac(), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(cli.pwd, "getpwnam"), \
+             mock.patch.object(servicio, "activar_senuelos", side_effect=activar), mock.patch("builtins.print"):
+            self.assertEqual(cli._senuelos_mac(argparse.Namespace(accion="activar")), 0)
+        self.assertIn(os.path.realpath(servicio.ruta("honeypot")), vistos[0]); self.assertIn(os.path.realpath(servicio.conf_senuelos()), vistos[0])
 
     def test_en_linux_sigue_preguntando_a_systemd(self):
         with self.mac(False):

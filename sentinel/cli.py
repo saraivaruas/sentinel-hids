@@ -729,15 +729,16 @@ def _senuelos_mac(a) -> int:
             pwd.getpwnam(servicio.USUARIO_SENUELOS)
         except KeyError:
             print("Falta el usuario de los señuelos: vuelve a instalar con  sudo ./install-mac.sh"); return 1
-        errores = servicio.activar_senuelos(sys.executable)
-    else:
-        errores = servicio.desactivar_senuelos()
+    # se anotan como propios ANTES de tocarlos: el monitor revisa cada pocos segundos y podría verlos a mitad de camino
+    propios = [os.path.realpath(p) for p in (servicio.ruta("honeypot"), servicio.conf_senuelos())]
+    endurecer._marcar_cambio_propio(propios)
+    errores = servicio.activar_senuelos(sys.executable) if a.accion == "activar" else servicio.desactivar_senuelos()
     if errores:
         print("; ".join(errores)); return 1
     cfg, al, allow, _ = build()
     f = fim.Fim(cfg, al, allow)
     if f.load() is not None:               # los archivos que Sentinel acaba de crear o quitar no son un ataque
-        f.accept([servicio.ruta("honeypot"), servicio.conf_senuelos()])
+        f.accept(propios)
     if a.accion == "activar":
         print("Señuelos activados: abren los puertos " + ", ".join(core.csv(cfg.get("honeypot", "ports", fallback=""))) + " en este equipo.")
     else:
