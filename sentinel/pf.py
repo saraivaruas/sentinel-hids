@@ -20,8 +20,9 @@ def tabla(accion: str, ip: str) -> list[str]:
     return ["pfctl", "-a", ANCLA, "-t", TABLA, "-T", accion, ip]
 
 
-def preparar(run, carpeta: str) -> str:
-    """Deja pf encendido y con las reglas de Sentinel. Devuelve "" si quedó listo, o el motivo si no se pudo."""
+def preparar(run, carpeta: str, ancla: str = ANCLA, reglas: str = REGLAS, marca: str | None = f"<{TABLA}>", archivo: str = "pf-sentinel.conf") -> str:
+    """Deja pf encendido y con las reglas indicadas en su ancla (por defecto, las del bloqueo de IPs). Con `marca=None`
+    las recarga siempre; si no, solo cuando no estén. Devuelve "" si quedó listo, o el motivo si no se pudo."""
     rc, principal = run(["pfctl", "-sr"])
     if rc != 0:
         return f"no pude leer las reglas de pf: {principal.strip()[-160:]}"
@@ -31,17 +32,17 @@ def preparar(run, carpeta: str) -> str:
             run(["pfctl", "-f", SISTEMA])
             rc, principal = run(["pfctl", "-sr"])
         if INCLUYE not in principal:
-            return "las reglas principales de pf no incluyen «com.apple/*»: el bloqueo no tendría efecto"
-    cargar = f"<{TABLA}>" not in run(["pfctl", "-a", ANCLA, "-sr"])[1]
+            return "las reglas principales de pf no incluyen «com.apple/*»: las reglas de Sentinel no tendrían efecto"
+    cargar = marca is None or marca not in run(["pfctl", "-a", ancla, "-sr"])[1]
     if cargar:
-        archivo = os.path.join(carpeta, "pf-sentinel.conf")
+        ruta = os.path.join(carpeta, archivo)
         try:
             os.makedirs(carpeta, exist_ok=True)
-            with open(archivo, "w", encoding="utf-8") as f:
-                f.write(REGLAS)
+            with open(ruta, "w", encoding="utf-8") as f:
+                f.write(reglas)
         except OSError as e:
             return f"no pude escribir las reglas de pf ({e.strerror})"
-        rc, out = run(["pfctl", "-a", ANCLA, "-f", archivo])
+        rc, out = run(["pfctl", "-a", ancla, "-f", ruta])
         if rc != 0:
             return f"pf rechazó las reglas: {out.strip()[-160:]}"
     if cargar or "Status: Enabled" not in run(["pfctl", "-s", "info"])[1]:
