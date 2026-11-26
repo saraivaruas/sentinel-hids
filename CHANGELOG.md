@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Informe del equipo en macOS:** usa `lsof`, `ps` y el registro del sistema para puertos, conexiones, accesos fallidos, shells reversas, túneles, cuentas, dueños y persistencia. Antes inventaba una conexión a partir de un error y daba por revisados paquetes, accesos y actualizaciones que no había mirado: lo que no se revisa en Mac ahora lo dice. 4 pruebas nuevas.
 - **Detener e iniciar en macOS:** `launchd` responde antes de terminar, así que `sentinel iniciar` justo después de `detener` no hacía nada y el desinstalador fallaba al borrar carpetas en uso. Ahora se espera a que el servicio termine. Encontrado con la prueba real. 2 pruebas nuevas.
 - **`sudo sentinel identidad rotar` y `restaurar` (Linux):** MAC aleatoria a través de NetworkManager e IP nueva por DHCP, sin enviar el nombre del equipo. Si no llega una IP o la puerta de salida deja de responder, vuelve sola a lo anterior; `restaurar` regresa a la MAC de fábrica y a los ajustes originales. Piden el PIN. 7 pruebas nuevas (con una red simulada).
 - **`sentinel identidad estado` (Linux):** muestra la MAC en uso y la de fábrica, la IP, si se envía el nombre del equipo a la red y si otros programas ya cambian la MAC o la IP. Solo lee. 5 pruebas nuevas.
