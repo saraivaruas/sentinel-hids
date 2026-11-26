@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [".github/workflows/mac-bloqueo.yml", "sentinel/pf.py", "sentinel/core.py", "tools/prueba-mac-bloqueo.py"]
+    paths: [".github/workflows/mac-bloqueo.yml", "sentinel/pf.py", "sentinel/core.py", "sentinel/firewall/**", "tools/prueba-mac-bloqueo.py", "tools/prueba-mac-cortafuegos.py"]
 
 permissions:
   contents: read
@@ -24,3 +24,5 @@ jobs:
       - uses: actions/checkout@v7
       - name: Bloquear, reponer y liberar de verdad
         run: sudo GITHUB_ACTIONS=true python3 tools/prueba-mac-bloqueo.py
+      - name: Cerrar puertos, revertir y reponer de verdad
+        run: sudo GITHUB_ACTIONS=true python3 tools/prueba-mac-cortafuegos.py
