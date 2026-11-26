@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Prueba real del bloqueo en macOS (`mac-bloqueo`):** conexiones IPv4 e IPv6 de verdad que deben cortarse al bloquear, seguir para las demás direcciones y volver al liberar o caducar.
 - **Los bloqueos sobreviven a un reinicio en macOS:** el sistema olvida las reglas de `pf` al apagarse, así que el monitor repone los bloqueos vigentes (respetando los que liberaste desde la terminal). 2 pruebas nuevas.
 - **Bloqueo de IP en macOS con `pf`:** Sentinel bloquea y libera atacantes en un ancla propia (`com.apple/sentinel`) sin tocar `/etc/pf.conf`, y corta las conexiones que la IP ya tenía abiertas. Si las reglas del equipo no incluyen esa ancla, avisa en lugar de fingir que bloqueó. 4 pruebas nuevas.
 - La hoja de ruta marca como hecha la detección de fuerza bruta en macOS, probada en equipos reales de GitHub.
