@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Auditoría en macOS:** revisa cortafuegos, SIP, FileVault, Gatekeeper, actualizaciones automáticas, SSH, credenciales y Sentinel; antes puntuaba el Mac con comprobaciones de Linux. Lo que no se puede determinar no se da por bueno. 3 pruebas nuevas.
 - Las pruebas del panel de endurecimiento simulan Linux, que es lo que comprueban, también en la CI de Mac.
 - **Endurecimiento en macOS:** las medidas son de Linux, así que ya no se evalúan ni se aplican en un Mac; la línea de comandos y el panel lo dicen y remiten a la auditoría. 1 prueba nueva.
 - **Actualizar en macOS** descarga y verifica el paquete y ejecuta `install-mac.sh` (antes habría ejecutado el instalador de Linux). Las publicaciones anteriores no lo traen: en ese caso lo dice y no instala nada. 2 pruebas nuevas.
