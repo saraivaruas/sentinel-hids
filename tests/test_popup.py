@@ -6,6 +6,7 @@ from helpers import Env, core
 
 class PopupTests(unittest.TestCase):
     def setUp(self):
+        linux = mock.patch.object(core.plataforma, "ES_MAC", False); linux.start(); self.addCleanup(linux.stop)   # avisos de escritorio de Linux
         self.e = Env(extra="")
         self.e.cfg.set("general", "enable_desktop", "yes")
         self.a = core.Alerter(self.e.cfg, quiet=True)
@@ -74,6 +75,24 @@ class PopupTests(unittest.TestCase):
              mock.patch.object(toast, "available", return_value=False), mock.patch.object(core, "is_root", return_value=False), mock.patch.object(core.subprocess, "run", side_effect=lambda c, **k: calls.append(c)):
             self.a.desktop(core.Event("medium", "host", "x", "m"))
         self.assertEqual(calls[0][0], "notify-send")
+
+    def test_aviso_en_macos_en_la_sesion_de_quien_usa_el_equipo(self):
+        calls = []
+        malo = 'x" with title "otro\ndo shell script "rm -rf /"'
+        with mock.patch.object(core.plataforma, "ES_MAC", True), mock.patch.object(core.Alerter, "desktop_target", return_value=("ana", 501)), \
+             mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", side_effect=lambda c, t=20: calls.append(c) or (0, "")):
+            self.a.desktop(core.Event("high", "host", "x", malo))
+        c = calls[0]
+        self.assertEqual(c[:6], ["launchctl", "asuser", "501", "sudo", "-u", "ana"]); self.assertIn("osascript", c)
+        self.assertEqual(c[-2:], ["Sentinel · alta", malo]); self.assertEqual(c[-3], "--")
+        self.assertFalse(any("rm -rf" in x for x in c[:-1]))                     # el texto hostil viaja como dato, no como guion
+
+    def test_en_macos_el_destinatario_es_quien_tiene_la_pantalla(self):
+        yo = core.pwd.getpwuid(core.os.geteuid()).pw_name
+        with mock.patch.object(core.plataforma, "ES_MAC", True), mock.patch.object(core, "is_root", return_value=True):
+            for uid, esperado in ((501, (yo, 501)), (0, None)):                  # 0 = pantalla de inicio de sesión
+                with mock.patch.object(core.os, "stat", return_value=mock.Mock(st_uid=uid)), mock.patch.object(core.pwd, "getpwuid", return_value=mock.Mock(pw_name=yo)):
+                    self.assertEqual(self.a.desktop_target(), esperado)
 
     def test_sin_zenity_o_sin_sesion_no_falla(self):
         with mock.patch.object(core.shutil, "which", return_value=None):

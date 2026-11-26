@@ -571,7 +571,8 @@ def cmd_test(a) -> int:
     if shutil.which("journalctl") and cfg.getboolean("general", "enable_journal", fallback=True):
         time.sleep(1)
         print("Llegó al journal:", ok("Prueba de Sentinel" in core.run(["journalctl", "-t", "sentinel", "-n", "5", "--no-pager"], 8)[1]))
-    print("Escritorio disponible:", ok(al.desktop_target() is not None and shutil.which("notify-send") is not None), "(deberías ver una notificación)")
+    avisador = "osascript" if plataforma.ES_MAC else "notify-send"
+    print("Escritorio disponible:", ok(al.desktop_target() is not None and shutil.which(avisador) is not None), "(deberías ver una notificación)")
     if ev is not None and cfg.get("general", "popup_min", fallback="never") not in ("never", "nunca", "off", "no"):
         ev.msg = "Esta es una alerta de PRUEBA: Sentinel puede avisarte con una ventana. No requiere ninguna acción."
         shown = al.popup(ev, force=True)

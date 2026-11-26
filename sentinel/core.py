@@ -551,6 +551,9 @@ class Alerter:
                 return user, pwd.getpwnam(user).pw_uid
             if not is_root():
                 return pwd.getpwuid(os.geteuid()).pw_name, os.geteuid()
+            if plataforma.ES_MAC:
+                uid = os.stat("/dev/console").st_uid          # quien tiene la pantalla delante (root = nadie ha iniciado sesión)
+                return (pwd.getpwuid(uid).pw_name, uid) if uid >= 500 else None
             for uid in sorted(int(d) for d in os.listdir("/run/user") if d.isdigit()):
                 if uid >= 1000 and os.path.exists(f"/run/user/{uid}/bus"):
                     return pwd.getpwuid(uid).pw_name, uid
@@ -634,11 +637,21 @@ class Alerter:
         env = [f"{k}={v}" for k, v in self.desktop_env(uid).items()]
         return ["runuser", "-u", user, "--", "env", *env, *t] if root else ["env", *env, *t]
 
+    @staticmethod
+    def aviso_mac_cmd(titulo: str, texto: str, user: str, uid: int, root: bool) -> list[str]:
+        """Notificación de macOS. El título y el texto van como argumentos, nunca dentro del guion: el mensaje puede traer
+        texto de un atacante y no debe poder ejecutarse."""
+        cmd = ["osascript", "-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", "--", titulo, texto]
+        return ["launchctl", "asuser", str(uid), "sudo", "-u", user, *cmd] if root else cmd
+
     def desktop(self, ev: Event) -> None:
         tgt = self.desktop_target()
         if not tgt:
             return
         user, uid = tgt
+        if plataforma.ES_MAC:
+            run(self.aviso_mac_cmd(f"Sentinel · {SEV_ES[ev.sev]}", ev.msg[:300], user, uid, is_root()), 10)
+            return
         if self.cfg.get("general", "notify_style", fallback="corner") == "corner" and shutil.which("sentinel"):
             from . import toast                     # aviso propio en la esquina inferior derecha (se cierra solo)
             if toast.available():
