@@ -42,6 +42,8 @@ class CliTests(unittest.TestCase):
             e.close()
 
     def test_auditoria_corre_completa(self):
+        from sentinel import audit as _a
+        linux = unittest.mock.patch.object(_a.plataforma, "ES_MAC", False); linux.start(); self.addCleanup(linux.stop)
         e = Env()
         try:
             from sentinel import audit

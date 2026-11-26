@@ -6,7 +6,7 @@ import os
 import re
 import stat
 
-from . import core, hostcheck
+from . import core, hostcheck, plataforma
 
 OK, WARN, FAIL, INFO = "ok", "aviso", "fallo", "info"
 DB_PORTS = {3306, 3307, 5432, 5433, 6379, 27017, 9200, 9300, 33060, 11211, 1433}
@@ -232,7 +232,10 @@ CHECKS = [("firewall", "Cortafuegos", c_firewall), ("ids", "Bloqueo de atacantes
 def run_audit(cfg=None) -> dict:
     cfg = cfg or core.load_config()
     res = []
-    for cid, title, fn in CHECKS:
+    revisiones = CHECKS
+    if plataforma.ES_MAC:
+        from .audit_mac import CHECKS as revisiones          # importa este módulo: por eso va aquí
+    for cid, title, fn in revisiones:
         try:
             st, detail, fix = fn(cfg)
         except Exception as e:  # una revisión que falla no debe detener a las demás
