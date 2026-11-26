@@ -212,7 +212,10 @@ def restaurar(cfg, alerter, run=core.run) -> dict:
     original = d["originales"].get(uuid)
     if original is None:
         return {"ok": False, "mensaje": "Sentinel no ha cambiado esta conexión: no hay nada que restaurar."}
-    ok, salida = _aplicar(uuid, dev, {**original, prop: original[prop] or "permanent"}, run)
+    valores = {**original, prop: original[prop] or "permanent"}
+    if "nombre" in (core.read_json(os.path.join(core.state_dir(), "discrecion.json"), {}) or {}).get("aplicado", {}):
+        valores.update({"ipv4.dhcp-send-hostname": "no", "ipv6.dhcp-send-hostname": "no"})    # el modo discreto sigue mandando
+    ok, salida = _aplicar(uuid, dev, valores, run)
     if not ok:
         return {"ok": False, "mensaje": f"No pude restaurar {dev}: {salida}"}
     if not original[prop]:
