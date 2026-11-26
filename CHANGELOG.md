@@ -11,6 +11,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- El `.pkg` de macOS incluye Python 3.12 para Apple Silicon e Intel (python-build-standalone, con la huella SHA-256 fijada en el repositorio): instalarlo ya no exige las herramientas de Apple. 1 prueba nueva.
 - El `.pkg` de macOS lleva el icono de la barra de menú ya compilado para Apple Silicon e Intel; quien instala no necesita compilador. 1 prueba nueva.
 - El instalador de macOS usa el Python que venga en el paquete (sin necesitar las herramientas de Apple) y precompila antes de tomar la referencia, para no alertar por sus propios archivos. 2 pruebas nuevas.
 - La hoja de ruta recoge que el endurecimiento y el informe del equipo pasan sus pruebas reales en los cuatro tipos de Mac.
