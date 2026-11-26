@@ -78,7 +78,11 @@ comprobar "quedan escuchando" esperar 30 nc -z 127.0.0.1 2222
 comprobar "corren con el usuario sin privilegios" test "$(ps -o user= -p "$(pgrep -f '/opt/sentinel honeypot' | head -1)" | tr -d ' ')" = _sentinel
 echo hola | nc -w 3 127.0.0.1 2222 >/dev/null
 comprobar "avisa de quien toca un señuelo" esperar 60 evento toque
-comprobar "activarlos no se reporta como ataque" sh -c '! grep -q "sentinel.honeypot.plist" /var/log/sentinel/events.jsonl'
+sleep 25   # dos pasadas del sondeo
+comprobar "activarlos no se reporta como ataque" /usr/bin/python3 -I -c 'import json, sys
+malos = [e["msg"] for e in map(json.loads, open("/var/log/sentinel/events.jsonl"))
+         if e["source"] == "fim" and e["sev"] != "info" and ("sentinel.honeypot.plist" in e["msg"] or "senuelos.conf" in e["msg"])]
+sys.exit(print(malos) or 1 if malos else 0)'
 comprobar "ese usuario no puede leer los registros" sh -c '! sudo -u _sentinel cat /var/log/sentinel/events.jsonl'
 comprobar "los señuelos se apagan" /usr/local/bin/sentinel senuelos desactivar
 comprobar "el puerto queda cerrado" sh -c '! nc -z 127.0.0.1 2222'
