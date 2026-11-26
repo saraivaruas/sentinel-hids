@@ -28,7 +28,7 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 
 | N.º | Estado | Pieza | Detalle |
 |---|---|---|---|
-| 2.1 | ⬜ | Revisión de lo que delata al equipo | Solo lee: nombre por DHCP, LLMNR, mDNS, NetBIOS, SSDP, puertos abiertos, respuesta a ping y anuncios de programas (Syncthing, por ejemplo). |
+| 2.1 | 🟡 | Revisión de lo que delata al equipo | Solo lee: nombre por DHCP, LLMNR, mDNS, NetBIOS, SSDP, puertos abiertos, respuesta a ping y anuncios de programas (Syncthing, por ejemplo). Comando `sentinel discrecion`, probado en un equipo real sin permisos de administrador; falta con ellos y que pase por la CI. |
 | 2.2 | ⬜ | No anunciarse | Apagar LLMNR y mDNS y no enviar el nombre. |
 | 2.3 | ⬜ | No contestar a ping | Solo la petición de eco en IPv4 e IPv6; lo que la red necesita para funcionar (ARP, descubrimiento de vecinos) se mantiene. |
 | 2.4 | ⬜ | Entrada cerrada | Con el módulo cortafuegos: nada abierto desde fuera, sin respuesta a lo no pedido. |
