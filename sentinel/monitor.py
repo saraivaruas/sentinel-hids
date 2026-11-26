@@ -122,7 +122,11 @@ class Monitor:
         """Con PIN configurado, una orden de detener sin autorización no apaga Sentinel: avisa de inmediato y sigue vigilando.
         (El apagado o reinicio del equipo y las paradas autorizadas con el PIN sí lo detienen.)"""
         try:
-            if pin.required() and not pin.stop_authorized() and not pin.shutting_down():
+            if plataforma.ES_MAC:
+                # launchd no deja distinguir un apagado de una orden de detener, y tampoco deja negarse: se avisa y se sale
+                if pin.required() and not pin.stop_authorized():
+                    self.alerter.emit("high", "pin", "detenido_sin_pin", "Sentinel recibió la orden de detenerse sin el PIN: apagado o reinicio del equipo, o alguien lo detuvo. Si no fuiste tú, revísalo.", key=f"pin:term:{int(core.now())}")
+            elif pin.required() and not pin.stop_authorized() and not pin.shutting_down():
                 if not pin.package_update_running():
                     self.alerter.emit("critical", "pin", "intento_detener", "Alguien intentó detener Sentinel sin el PIN (systemctl stop, kill u otra vía). Sigue vigilando; si fuiste tú, usa «sudo sentinel detener».", key=f"pin:term:{int(core.now())}")
                     return

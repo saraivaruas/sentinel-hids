@@ -114,6 +114,7 @@ class MonitorTermTests(unittest.TestCase):
         self.env = mock.patch.dict(os.environ, {"SENTINEL_PIN": os.path.join(self.d, "pin"), "SENTINEL_STATE": self.d, "SENTINEL_LOG": self.d, "SENTINEL_CONF": os.path.join(self.d, "c")})
         self.env.start(); self.root = mock.patch.object(core, "is_root", return_value=True); self.root.start()
         self.it = mock.patch.object(pin, "ITERS", 1000); self.it.start()
+        linux = mock.patch.object(monitor.plataforma, "ES_MAC", False); linux.start(); self.addCleanup(linux.stop)
 
     def tearDown(self):
         self.it.stop(); self.root.stop(); self.env.stop()
@@ -122,6 +123,14 @@ class MonitorTermTests(unittest.TestCase):
         m = monitor.Monitor.__new__(monitor.Monitor)
         m.stop = monitor.threading.Event(); m.alerter = mock.Mock()
         return m
+
+    def test_en_macos_se_detiene_y_avisa_si_fue_sin_pin(self):
+        pin.set_pin("secreto-1")
+        with mock.patch.object(monitor.plataforma, "ES_MAC", True):
+            m = self.mon(); m._on_term()
+            self.assertTrue(m.stop.is_set()); self.assertEqual(m.alerter.emit.call_args[0][:3], ("high", "pin", "detenido_sin_pin"))
+            pin.authorize_stop(); m2 = self.mon(); m2._on_term()
+            self.assertTrue(m2.stop.is_set()); m2.alerter.emit.assert_not_called()
 
     def test_sin_pin_se_detiene_normal(self):
         m = self.mon(); m._on_term(); self.assertTrue(m.stop.is_set())
