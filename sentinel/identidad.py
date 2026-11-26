@@ -266,6 +266,12 @@ def programada(cfg, alerter, run=core.run) -> dict | None:
     return rotar(cfg, alerter, run)
 
 
+def _marcar_cambios(rutas: list[str] | None = None) -> None:
+    """Antes de tocar archivos vigilados: la vigilancia en vivo los ve al instante, antes de que se acepten en la referencia."""
+    from . import endurecer
+    endurecer._marcar_cambio_propio(rutas or [core.conf_path(), ENLACE])
+
+
 def _aceptar_cambios(cfg, alerter, rutas: list[str] | None = None) -> None:
     """Lo que Sentinel cambia por orden del usuario no se reporta como ataque."""
     from . import fim
@@ -283,6 +289,7 @@ def activar(cfg, horas: int, alerter, run=core.run) -> dict:
         return {"ok": False, "mensaje": f"El intervalo va de {HORAS[0]} a {HORAS[1]} horas."}
     if e["otros"]:
         return {"ok": False, "mensaje": "No se activó: otros programas ya cambian la MAC o la IP y se pisarían. Para retirarlos (con copia): sudo sentinel identidad retirar\n- " + "\n- ".join(e["otros"])}
+    _marcar_cambios()
     core.set_setting("identidad", "cada_horas", str(horas))
     core.set_setting("identidad", "activo", "yes")
     d = _guardado()
@@ -300,6 +307,7 @@ def activar(cfg, horas: int, alerter, run=core.run) -> dict:
 
 
 def desactivar(cfg, alerter, run=core.run) -> dict:
+    _marcar_cambios()
     core.set_setting("identidad", "activo", "no")
     rc, out = run(["systemctl", "disable", "--now", TEMPORIZADOR], 30)
     _aceptar_cambios(cfg, alerter)
@@ -415,6 +423,8 @@ def retirar(cfg, alerter, run=core.run) -> dict:
     if plan["servicio"]:
         manifiesto["servicio"] = run(["systemctl", "is-enabled", "macchanger.service"], 5)[1].strip() == "enabled"
     core.atomic_write_json(os.path.join(carpeta, "manifiesto.json"), manifiesto)      # antes de tocar nada
+    tocadas = archivos + [os.path.join(os.path.dirname(UNIDAD_ANTIGUA), "multi-user.target.wants", "macchanger.service")]
+    _marcar_cambios(tocadas)
 
     def fallo(que: str, salida: str) -> dict:
         return {"ok": False, "mensaje": f"No pude {que}: {salida.strip() or 'sin detalle'}. Para dejarlo como estaba: sudo sentinel identidad devolver", "carpeta": carpeta}
@@ -437,7 +447,7 @@ def retirar(cfg, alerter, run=core.run) -> dict:
         run(["systemctl", "daemon-reload"], 30)
     for ruta in plan["scripts"] + plan["registros"]:
         os.remove(ruta)
-    _aceptar_cambios(cfg, alerter, archivos + [os.path.join(os.path.dirname(UNIDAD_ANTIGUA), "multi-user.target.wants", "macchanger.service")])
+    _aceptar_cambios(cfg, alerter, tocadas)
     msg = f"Método antiguo retirado ({len(describir(plan))} elementos). Copia en {carpeta}. Para deshacerlo: sudo sentinel identidad devolver"
     alerter.emit("info", "identidad", "retirado", msg, key=f"identidad:retirado:{int(core.now())}")
     return {"ok": True, "mensaje": msg, "carpeta": carpeta}
@@ -453,6 +463,8 @@ def devolver(cfg, alerter, run=core.run) -> dict:
             break
     else:
         return {"ok": False, "mensaje": "No hay nada que devolver."}
+    tocadas = [a["ruta"] for a in m["archivos"]] + [os.path.join(os.path.dirname(UNIDAD_ANTIGUA), "multi-user.target.wants", "macchanger.service")]
+    _marcar_cambios(tocadas)
     for a in m["archivos"]:
         shutil.copy2(a["copia"], a["ruta"])
         try:
@@ -469,7 +481,7 @@ def devolver(cfg, alerter, run=core.run) -> dict:
         rc, out = run(["systemctl", "enable", "macchanger.service"], 30)
         if rc != 0:
             errores.append(f"macchanger.service: {out.strip()}")
-    _aceptar_cambios(cfg, alerter, [a["ruta"] for a in m["archivos"]] + [os.path.join(os.path.dirname(UNIDAD_ANTIGUA), "multi-user.target.wants", "macchanger.service")])
+    _aceptar_cambios(cfg, alerter, tocadas)
     if errores:
         return {"ok": False, "mensaje": "Se repusieron los archivos, pero falló: " + "; ".join(errores)}
     m["devuelto"] = True

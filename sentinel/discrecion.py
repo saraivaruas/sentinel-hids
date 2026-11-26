@@ -223,16 +223,21 @@ def _elegidas(solo) -> list[str]:
     return [m for m in MEDIDAS if not solo or m in solo]
 
 
+# apagar o encender Avahi cambia estos enlaces de systemd, que Sentinel vigila: es un cambio pedido por el usuario
+ENLACES_AVAHI = ["/etc/systemd/system/multi-user.target.wants/avahi-daemon.service", "/etc/systemd/system/sockets.target.wants/avahi-daemon.socket",
+                 "/etc/systemd/system/dbus-org.freedesktop.Avahi.service"]
+
+
 def _aceptar_cambios(cfg, alerter) -> None:
-    """Apagar Avahi cambia enlaces de systemd que Sentinel vigila: es un cambio pedido por el usuario."""
-    identidad._aceptar_cambios(cfg, alerter, ["/etc/systemd/system/multi-user.target.wants/avahi-daemon.service",
-                                              "/etc/systemd/system/sockets.target.wants/avahi-daemon.socket", "/etc/systemd/system/dbus-org.freedesktop.Avahi.service"])
+    identidad._aceptar_cambios(cfg, alerter, ENLACES_AVAHI)
 
 
 def aplicar(cfg, alerter, solo: list[str] | None = None, run=core.run) -> dict:
     if plataforma.ES_MAC:
         return {"ok": False, "mensaje": "El modo discreto todavía no está disponible en macOS."}
     aplicado, hechas, fallos = _guardado(), [], []
+    if "anuncios" in _elegidas(solo):
+        identidad._marcar_cambios(ENLACES_AVAHI)
     for m in _elegidas(solo):
         if m in aplicado:
             continue                                          # no se pisa lo que había antes de la primera vez
@@ -260,6 +265,8 @@ def aplicar(cfg, alerter, solo: list[str] | None = None, run=core.run) -> dict:
 
 def revertir(cfg, alerter, solo: list[str] | None = None, run=core.run) -> dict:
     aplicado, hechas, fallos = _guardado(), [], []
+    if "anuncios" in _elegidas(solo) and "anuncios" in aplicado:
+        identidad._marcar_cambios(ENLACES_AVAHI)
     for m in _elegidas(solo):
         if m not in aplicado:
             continue

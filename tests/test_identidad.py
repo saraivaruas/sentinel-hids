@@ -223,6 +223,23 @@ class ProgramadaTests(unittest.TestCase):
             self.assertTrue(identidad.programada(self.cfg(), self.env.alerter, self.red)["ok"])
         self.assertNotEqual(self.red.mac, antes)
 
+    def test_avisa_que_el_cambio_es_suyo_antes_de_hacerlo(self):
+        marca = os.path.join(core.state_dir(), "self_changes.json")
+        vistas = []
+        original = core.set_setting
+
+        def guardar(*a, **k):                        # la vigilancia en vivo ve el archivo en cuanto se escribe
+            vistas.append(set((core.read_json(marca, {}) or {}).get("paths", [])))
+            return original(*a, **k)
+
+        for orden in (lambda: identidad.activar(self.cfg(), 2, self.env.alerter, self.red), lambda: identidad.desactivar(self.cfg(), self.env.alerter, self.red)):
+            if os.path.exists(marca):
+                os.remove(marca)
+            vistas.clear()
+            with mock.patch.object(core, "set_setting", guardar):
+                self.assertTrue(orden()["ok"])
+            self.assertTrue({core.conf_path(), identidad.ENLACE} <= vistas[0], vistas)
+
     def test_no_se_activa_si_otro_programa_ya_rota(self):
         self.otros = ["/etc/cron.d/x: change-mac.sh"]
         r = identidad.activar(self.cfg(), 2, self.env.alerter, self.red)
