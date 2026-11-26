@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Reinstalar o actualizar en macOS con PIN** ya no pide el PIN varias veces ni se queda a medias sin terminal: se comprueba una vez, se detiene el servicio y la referencia anterior se conserva con `baseline accept`.
 - La prueba del instalador en macOS abre además cada página del panel, pulsa «Revisar ahora», envía una notificación y comprueba requisitos y alertas de prueba.
 - En macOS el instalador deja **Sentinel** en Aplicaciones (abre el panel) y el desinstalador lo quita. 1 prueba nueva.
 - **Los botones del panel funcionan en macOS:** en vez de `pkexec` (que no existe allí) usan `sudo` con una ventana de contraseña del sistema; el PIN sigue viajando por la entrada estándar. 4 pruebas nuevas.
