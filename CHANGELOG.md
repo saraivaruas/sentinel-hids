@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- **Icono en la barra de menú de macOS:** un escudo del color del estado, con «Abrir panel». El instalador lo compila y lo arranca; el desinstalador lo quita. 1 prueba nueva.
 - **PIN sin terminal en macOS:** se pide con una ventana del sistema (antes dependía de `zenity`, que no existe en Mac). 2 pruebas nuevas.
 - **Ventana grande de alerta en macOS** (si activas `popup_min`), con el botón «Abrir panel»; el texto de la alerta viaja como dato. 2 pruebas nuevas.
 - **Panel, Ajustes → «Modo discreto en la red»:** muestra qué delata al equipo y deja elegir qué activar (nombre, anuncios, ping) o deshacerlo, con confirmación, PIN y clave de administrador. 3 pruebas nuevas.
