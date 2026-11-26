@@ -11,6 +11,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`identidad rotar` y `restaurar` ya no dan por buena una vuelta atrás sin mirar la MAC:** si la tarjeta queda con una MAC distinta de la esperada, lo dicen (con la que se pidió y la que tiene) y la alerta sube a gravedad alta. Detectado en la primera prueba en un equipo real. 1 prueba nueva.
 
 ### Agregado
+- El README explica cómo instalar, comprobar, actualizar y desinstalar la versión para macOS (en pruebas) y en qué se diferencia de la de Linux.
 - La prueba del instalador en macOS desinstala con la copia que queda en `/opt/sentinel`.
 - **El desinstalador de Mac queda instalado** en `/opt/sentinel/uninstall-mac.sh`: ya no hace falta conservar la carpeta descargada (ni tenerla, si se instaló con el `.pkg`). 1 prueba nueva.
 - La hoja de ruta recoge que el `.pkg` autónomo de macOS pasa su prueba real; falta firmarlo y publicarlo.
