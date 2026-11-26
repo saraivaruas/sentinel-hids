@@ -10,7 +10,7 @@ import shutil
 import time
 
 from .. import core, plataforma
-from . import exposure, iptables, ufw
+from . import exposure, iptables, pf_mac, ufw
 
 BACKENDS = {"ufw": ufw, "iptables": iptables}
 
@@ -125,7 +125,7 @@ def state(cfg=None) -> dict:
     """Foto completa (la toma root; el panel la lee): backend, reglas, plan y puertos escuchando."""
     conf = settings(cfg)
     if plataforma.ES_MAC:
-        return {"ok": False, "error": "En macOS Sentinel todavía no administra el cortafuegos. El bloqueo de atacantes sí funciona (con pf).", "conf": conf, "time": core.iso()}
+        return pf_mac.state(conf)
     be = pick(conf["backend"])
     if be is None:
         return {"ok": False, "error": "No hay ufw ni iptables instalado", "conf": conf, "time": core.iso()}
@@ -172,6 +172,8 @@ def _sentinel_bin() -> str:
 
 def confirm() -> list[str]:
     """Los cambios probados se aceptan: se cancela la reversión automática."""
+    if plataforma.ES_MAC:
+        return pf_mac.confirm()
     p = core.read_json(pending_path(), None)
     core.run(["systemctl", "stop", UNIT + ".timer"])
     try:
@@ -185,6 +187,8 @@ def restore(d: str | None = None, use_pending: bool = False, cfg=None) -> list[s
     """Vuelve a las reglas de una copia (la pendiente, la que se indique o la más reciente)."""
     if not core.is_root():
         return ["Necesita administrador: ejecuta  sudo sentinel firewall restaurar"]
+    if plataforma.ES_MAC:
+        return pf_mac.restore(d, use_pending)
     p = core.read_json(pending_path(), None)
     if use_pending:
         d = (p or {}).get("copy")
@@ -234,6 +238,8 @@ def diff_snapshots(old: dict, new: dict) -> dict:
 
 def watch(cfg, alerter) -> dict | None:
     """Toma la foto del firewall y avisa si alguien cambió las reglas por fuera de Sentinel (programa, otro administrador, un atacante)."""
+    if plataforma.ES_MAC:
+        pf_mac.reafirmar()          # macOS olvida las reglas al reiniciar; y lo que quedó «a prueba» sin confirmar se revierte
     prev = core.read_json(snapshot_path(), None)
     s = save_snapshot(cfg)
     if not prev or not prev.get("ok") or not s.get("ok"):
@@ -261,6 +267,8 @@ def apply(cfg=None, harden: bool = False, state_dir: str | None = None, conf_dir
     if not core.is_root():
         return ["Necesita administrador: ejecuta  sudo sentinel firewall aplicar"]
     conf = settings(cfg)
+    if plataforma.ES_MAC:
+        return pf_mac.apply(conf, probar)
     be = pick(conf["backend"])
     if be is None:
         return ["No hay ufw ni iptables instalado."]

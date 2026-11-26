@@ -232,6 +232,11 @@ excludes = */node_modules/*,*/.git/*,*/cache/*,*/storage/logs/*,*/storage/framew
 [weblog]
 paths = /private/var/log/apache2/*access*log,/opt/homebrew/var/log/nginx/*access*.log,/usr/local/var/log/nginx/*access*.log
 
+[firewall]
+; un Mac de escritorio no ofrece servicios: no se abre ningún puerto salvo SSH si está encendido
+profile = estacion
+allow_tcp =
+
 [honeypot]
 ; el 5900 no: en macOS es «Compartir pantalla»
 ports = 2222,2323,3390,60009

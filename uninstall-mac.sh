@@ -22,4 +22,5 @@ rm -rf "$DEST" /Applications/Sentinel.app
 dscl . -delete /Users/_sentinel >/dev/null 2>&1 || true
 dscl . -delete /Groups/_sentinel >/dev/null 2>&1 || true
 pfctl -a com.apple/sentinel -F all >/dev/null 2>&1 || true      # quita los bloqueos
+pfctl -a com.apple/sentinel-fw -F all >/dev/null 2>&1 || true   # y las reglas de puertos
 if [ "${1:-}" = "--todo" ]; then rm -rf /var/lib/sentinel /var/log/sentinel /etc/sentinel; echo "Todo eliminado."; else echo "Programa eliminado. Se conservan /var/lib/sentinel, /var/log/sentinel y /etc/sentinel (usa --todo para borrarlos)."; fi

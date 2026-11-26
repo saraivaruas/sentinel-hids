@@ -14,6 +14,7 @@ def setUpModule():
     """Hermético: estas pruebas no deben leer el /etc/sentinel/sentinel.conf real del equipo (los valores por defecto son los que se prueban)."""
     _ENV_ANTES["c"] = os.environ.get("SENTINEL_CONF")
     os.environ["SENTINEL_CONF"] = os.path.join(tempfile.gettempdir(), "sentinel-no-existe.conf")
+    p = mock.patch.object(firewall.plataforma, "ES_MAC", False); p.start(); unittest.addModuleCleanup(p.stop)      # ufw e iptables, también en la CI de Mac
 
 
 def tearDownModule():
@@ -141,11 +142,6 @@ udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*
         ss = 'udp UNCONN 0 0 0.0.0.0:41641 0.0.0.0:* users:(("tailscaled",pid=1,fd=3))\nudp UNCONN 0 0 0.0.0.0:5353 0.0.0.0:* users:(("avahi-daemon",pid=2,fd=3))\n'
         r = {i["port"]: i for i in exposure.analyze(ss, set(), [])}
         self.assertEqual(r[41641]["status"], "privada"); self.assertIn("Tailscale", r[41641]["advice"]); self.assertEqual(r[5353]["status"], "bloqueado")
-
-    def test_en_macos_dice_que_aun_no_administra_el_cortafuegos(self):
-        with mock.patch.object(firewall.plataforma, "ES_MAC", True), mock.patch.object(firewall, "pick") as pick:
-            s = firewall.state(core.load_config())
-        self.assertFalse(s["ok"]); self.assertIn("macOS", s["error"]); self.assertIn("pf", s["error"]); pick.assert_not_called()
 
     def test_docker_publicado(self):
         d = exposure.parse_docker(self.DOCKER)
