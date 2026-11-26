@@ -161,8 +161,9 @@ def _responde(ip: str, run, intentos: int = 4, espera: float = 2.0) -> bool:
 
 def _fallo(e: dict, mac: str, ping_antes: bool, run) -> str:
     """¿Qué quedó mal tras el cambio? Vacío = todo bien."""
-    if macs(e["interfaz"], run)[0] != mac:
-        return "la interfaz no tomó la MAC nueva"
+    actual = macs(e["interfaz"], run)[0]
+    if actual != mac:
+        return f"la interfaz no tomó la MAC nueva (se pidió {mac} y tiene {actual or 'ninguna'})"
     if not direccion(e["interfaz"], run):
         return "la red no entregó una dirección IP"
     if ping_antes and not _responde(puerta(e["interfaz"], run), run):
@@ -193,8 +194,15 @@ def rotar(cfg, alerter, run=core.run) -> dict:
         vuelta, _ = _aplicar(uuid, dev, {**previo, prop: previo[prop] or e["mac"]}, run)
         if not previo[prop]:
             run(["nmcli", "connection", "modify", uuid, prop, ""], 20)
-        msg = f"No se cambió la identidad de {dev}: {motivo}. " + ("Se volvió a la anterior." if vuelta else "TAMPOCO pude volver atrás: revisa la red (sudo sentinel identidad restaurar).")
-        alerter.emit("medium" if vuelta else "high", "identidad", "rotacion_fallida", msg, key=f"identidad:fallo:{int(core.now())}")
+        quedo = macs(dev, run)[0]                             # que NetworkManager reconecte no prueba que la MAC sea la de antes
+        if not vuelta:
+            final = "TAMPOCO pude volver atrás: revisa la red (sudo sentinel identidad restaurar)."
+        elif quedo != e["mac"]:
+            final = f"La conexión volvió con sus ajustes anteriores, pero la MAC quedó en {quedo or 'ninguna'} y no en {e['mac']}. Revísalo con: sudo sentinel identidad estado"
+        else:
+            final = "Se volvió a la anterior."
+        msg = f"No se cambió la identidad de {dev}: {motivo}. {final}"
+        alerter.emit("medium" if vuelta and quedo == e["mac"] else "high", "identidad", "rotacion_fallida", msg, key=f"identidad:fallo:{int(core.now())}")
         return {"ok": False, "mensaje": msg}
     ip = direccion(dev, run)
     msg = f"Identidad cambiada en {dev}: MAC {e['mac']} → {mac} · IP {e['ip'] or 'ninguna'} → {ip}"
@@ -220,6 +228,9 @@ def restaurar(cfg, alerter, run=core.run) -> dict:
         return {"ok": False, "mensaje": f"No pude restaurar {dev}: {salida}"}
     if not original[prop]:
         run(["nmcli", "connection", "modify", uuid, prop, ""], 20)
+        actual, fabrica = macs(dev, run)
+        if actual != fabrica:                                 # se conserva lo guardado para poder reintentar
+            return {"ok": False, "mensaje": f"La conexión se restauró, pero la MAC de {dev} quedó en {actual or 'ninguna'} y no en la de fábrica ({fabrica or 'desconocida'})."}
     del d["originales"][uuid]
     core.atomic_write_json(_archivo(), d, share=True)
     msg = f"Identidad restaurada en {dev}: MAC {macs(dev, run)[0]} · IP {direccion(dev, run) or 'ninguna'}"

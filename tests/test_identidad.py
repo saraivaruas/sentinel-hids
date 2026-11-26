@@ -132,6 +132,23 @@ class RotarTests(unittest.TestCase):
         r = identidad.rotar(self.env.cfg, self.env.alerter, run)
         self.assertFalse(r["ok"]); self.assertIn("puerta", r["mensaje"]); self.assertEqual(self.red.mac, antes)
 
+    def test_no_dice_que_volvio_si_la_mac_quedo_en_otra(self):
+        extrana = "c0:9b:60:05:2d:16"
+
+        def run(c, t=20):                            # una tarjeta que no obedece: tras activar queda con otra MAC
+            r = Red.__call__(self.red, c, t)
+            if c[:2] == ["nmcli", "--wait"]:
+                self.red.mac = extrana
+            return r
+
+        r = identidad.rotar(self.env.cfg, self.env.alerter, run)
+        self.assertFalse(r["ok"])
+        self.assertNotIn("Se volvió a la anterior", r["mensaje"]); self.assertIn(f"la MAC quedó en {extrana}", r["mensaje"]); self.assertIn("se pidió", r["mensaje"])
+        self.assertEqual([e["sev"] for e in self.env.events() if e["source"] == "identidad"], ["high"])
+        r = identidad.restaurar(self.env.cfg, self.env.alerter, run)
+        self.assertFalse(r["ok"]); self.assertIn("no en la de fábrica", r["mensaje"])
+        self.assertTrue(identidad.restaurar(self.env.cfg, self.env.alerter, self.red)["ok"])   # lo guardado no se perdió
+
     def test_una_puerta_que_nunca_contesta_no_impide_rotar(self):
         self.red.contesta = False
         self.assertTrue(identidad.rotar(self.env.cfg, self.env.alerter, self.red)["ok"])
