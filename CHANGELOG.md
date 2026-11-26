@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- La tarea `mac-registro` ya no se corta en el primer acceso fallido (era justo lo que debía provocar) y comprueba la clave del usuario de prueba.
 - **Muestras reales del registro de macOS:** una tarea aparte de la CI (`mac-registro`) provoca accesos fallidos de SSH, sudo y su en macOS 26 y 15 y muestra lo que anota el sistema, para escribir el detector de fuerza bruta sobre datos reales.
 - **Hoja de ruta (`ROADMAP.md`):** estado del porte a macOS, lo que falta por orden de importancia y cómo se prueba.
 - **Inicio del porte a macOS:** la CI corre ahora las pruebas también en macOS (macOS 26 Tahoe y macOS 15 Sequoia, cada uno en Apple Silicon e Intel; Python 3.12, y 3.10 en Tahoe). macOS 14 y 13 ya no existen en GitHub Actions. Es informativo (`continue-on-error`) y no bloquea el resto: sirve para ver qué módulos dependen de Linux antes de reescribirlos.
