@@ -58,7 +58,7 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | ✅ | Archivos SUID |
 | ✅ | Puertos y conexiones con `lsof` |
 | ✅ | Cuentas del sistema |
-| 🟡 | USB y extensiones del núcleo y del sistema (falta la prueba real) |
+| ✅ | USB y extensiones del núcleo y del sistema |
 
 ## Paridad con Linux
 
@@ -68,14 +68,14 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 2 | ✅ | Fuerza bruta | Lee el registro unificado: SSH, `sudo` y `su` (`mac-registro`). |
 | 3 | ✅ | Bloqueo de IP | Con `pf`, repuesto tras reiniciar (`mac-bloqueo`). |
 | 3b | 🟡 | Administrar puertos del cortafuegos | Con `pf`: plan, aplicar a prueba, confirmar y restaurar. Falta su prueba real. |
-| 4a | ✅ | Servicio e instalador | `install-mac.sh` y `launchd`: instalar, detener, iniciar y desinstalar (`mac-instalar`). PIN: falta la prueba real. |
+| 4a | ✅ | Servicio e instalador | `install-mac.sh` y `launchd`: instalar, detener, iniciar, desinstalar y protección con PIN (`mac-instalar`). |
 | 4b | 🟡 | Instalador `.pkg` | Escrito, sin firmar; falta su prueba real. Firmarlo y notarizarlo requiere la cuenta de Apple Developer. |
 | 4c | 🟡 | Icono en la barra de menú | Escrito; falta su prueba real y verlo en un Mac con pantalla. |
 | 5 | ✅ | Captura de paquetes | Con BPF; detecta un escaneo real (`mac-captura`). |
 | 6 | ✅ | Configuración, `status` y requisitos propios de macOS | Probados con el servicio instalado. |
 | 7 | ✅ | Panel | Páginas, acciones, avisos y aplicación en Aplicaciones probados (`mac-instalar`). Falta ver la ventana de contraseña en un Mac con pantalla. |
 | 8 | 🟡 | Informe del equipo y auditoría | Todas las secciones propias de macOS; falta la prueba real de las nuevas. |
-| 9 | 🟡 | Señuelos | Con usuario propio sin privilegios; falta la prueba real. |
+| 9 | ✅ | Señuelos | Con usuario propio sin privilegios; probados (`mac-instalar`). |
 | 10 | 🟡 | Actualizaciones | Usan el instalador de Mac; hace falta publicar una versión que lo incluya. |
 | 11 | 🟡 | Endurecimiento guiado | Medidas propias de macOS con comprobación y reversión; falta la prueba real. |
 | 12 | 🟡 | Ventana grande de alerta y PIN sin terminal | Con ventanas del sistema; falta verlas en un Mac con pantalla. |
