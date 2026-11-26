@@ -107,6 +107,17 @@ class PfTests(unittest.TestCase):
         self.b.ban("203.0.113.10", "prueba", 3600)
         self.assertNotIn(["pfctl", "-E"], self.calls); self.assertFalse([c for c in self.calls if "-f" in c])
 
+    def test_repone_los_bloqueos_tras_reiniciar(self):
+        self.b.ban("203.0.113.9", "prueba", 3600)
+        self.cargado, self.encendido, self.tabla = False, False, set()
+        self.assertEqual(self.b.reafirmar(), ["203.0.113.9"])
+        self.assertTrue(self.cargado and self.encendido); self.assertEqual(self.tabla, {"203.0.113.9"})
+
+    def test_no_repone_lo_liberado_desde_otro_proceso(self):
+        self.b.ban("203.0.113.9", "prueba", 3600)
+        core.Banner(self.e.cfg, self.e.alerter, self.e.allow).unban("203.0.113.9")
+        self.assertEqual(self.b.reafirmar(), []); self.assertEqual(self.tabla, set())
+
     def test_si_pf_no_incluye_el_ancla_avisa_y_no_finge(self):
         self.principal = "block drop all\n"
         self.assertFalse(self.b.ban("203.0.113.9", "prueba", 3600))

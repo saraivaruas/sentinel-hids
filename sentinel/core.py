@@ -724,6 +724,19 @@ class Banner:
         self.alerter.emit("high", "ban", "bloqueada", f"IP {ip}{f' ({where})' if where else ''} bloqueada por {ttl // 3600} h con {be}: {reason}", key=f"ban:{ip}:{int(now() // 60)}", ip=ip, ttl=ttl)
         return True
 
+    def reafirmar(self) -> list[str]:
+        """Vuelve a poner en pf los bloqueos vigentes: macOS los olvida al reiniciar. En Linux no hace nada."""
+        guardados = read_json(self.path, {}) or {}  # del disco: «sentinel» pudo bloquear o liberar desde la terminal
+        activos = [ip for ip, b in guardados.items() if b.get("backend") == "pf" and b["until"] > now()]
+        if not activos or not is_root():
+            return []
+        self.bans = guardados
+        error = pf.preparar(run, state_dir())
+        if error:
+            self.alerter.emit("high", "ban", "fallo", f"No pude reponer los bloqueos: {error}", key="banfail:pf")
+            return []
+        return [ip for ip in activos if run(pf.tabla("add", ip), 20)[0] == 0]
+
     def _release(self, ip: str, be: str) -> None:
         if not is_root() or be in ("crowdsec", "firewalld", "none"):
             return  # CrowdSec y firewalld caducan solos (--duration / --timeout)

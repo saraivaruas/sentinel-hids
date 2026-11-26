@@ -175,6 +175,7 @@ class Monitor:
             if t - last_fw >= self.cfg.getint("firewall", "refresh_seconds", fallback=60):
                 last_fw = t
                 try:
+                    self.banner.reafirmar()                      # macOS olvida los bloqueos al reiniciar
                     firewall.watch(self.cfg, self.alerter)       # foto para el panel (nunca con información vieja) y aviso si alguien cambia las reglas por fuera
                 except Exception as e:
                     self.alerter.emit("low", "monitor", "error", f"No pude leer el firewall ({type(e).__name__})", key="mon:err:fw")
