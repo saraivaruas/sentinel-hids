@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, identidad, incidents, mailer, pin, plataforma, report, requisitos, servicio, update
+from . import audit, core, discrecion, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, identidad, incidents, mailer, pin, plataforma, report, requisitos, servicio, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -430,6 +430,22 @@ def cmd_identidad(a) -> int:
             print(f"   - {x}")
     if not e["cron_revisado"]:
         print("\n No pude revisar las tareas programadas de root: ejecuta  sudo sentinel identidad estado")
+    return 0
+
+
+def cmd_discrecion(a) -> int:
+    """Qué delata a este equipo en la red (solo lectura)."""
+    r = discrecion.revisar(core.load_config())
+    if a.json:
+        print(json.dumps(r, ensure_ascii=False, indent=1)); return 1 if r["error"] else 0
+    if r["error"]:
+        print(r["error"], file=sys.stderr); return 1
+    marca = {discrecion.EXPUESTO: col("✖", "fallo"), discrecion.DUDA: col("?", "aviso"), discrecion.DISCRETO: col("✔", "ok")}
+    print("DISCRECIÓN EN LA RED\n")
+    for h in r["hallazgos"]:
+        print(f" {marca[h['estado']]} {h['titulo']}  [{h['estado'].upper()}]\n     {h['detalle']}")
+    n = sum(1 for h in r["hallazgos"] if h["estado"] == discrecion.EXPUESTO)
+    print(f"\n{n} punto{'s' if n != 1 else ''} a la vista. No se cambió nada. Ningún equipo conectado es invisible: el router y quien comparta la red pueden encontrarlo.")
     return 0
 
 
@@ -859,6 +875,7 @@ def main(argv=None) -> int:
     s.add_argument("--perfil", default="recomendado", choices=list(endurecer.PERFILES), help="basico (sin efectos visibles), recomendado (CIS nivel 1) o estricto (servidores)"); s.add_argument("--solo", help="solo estas medidas, separadas por coma")
     s.add_argument("--si", action="store_true", help="no preguntar antes de aplicar"); s.add_argument("--tanda", help="revertir: carpeta de la tanda (por defecto la última)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_endurecer)
     s = sub.add_parser("identidad", help="MAC e IP del equipo en la red: estado, rotar (MAC e IP nuevas), restaurar, activar o desactivar el cambio programado"); s.add_argument("accion", nargs="?", default="estado", choices=["estado", "rotar", "restaurar", "activar", "desactivar"]); s.add_argument("--cada", type=int, help="activar: cada cuántas horas (1 a 168)"); s.add_argument("--programado", action="store_true", help="rotar: modo del temporizador (solo si está activado y toca)"); s.add_argument("--json", action="store_true"); s.add_argument("--si", action="store_true", help="no preguntar antes de cortar la red"); s.set_defaults(fn=cmd_identidad)
+    s = sub.add_parser("discrecion", help="qué delata a este equipo en la red (solo lectura)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_discrecion)
     s = sub.add_parser("requisitos", help="qué necesita Sentinel y qué tiene tu equipo (✔/✖); ofrece instalar lo que falta"); s.add_argument("--instalar", action="store_true", help="instala lo que falta (pregunta antes y pide tu contraseña de administrador)")
     s.add_argument("--si", action="store_true", help="instala sin preguntar (lo usa el panel)"); s.add_argument("--json", action="store_true"); s.set_defaults(fn=cmd_requisitos)
     s = sub.add_parser("smtp", help="correo por SMTP: estado, configurar, importar, probar, quitar"); s.add_argument("accion", choices=["estado", "configurar", "importar", "probar", "quitar"])
