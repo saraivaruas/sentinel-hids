@@ -74,10 +74,10 @@ La IP se obtiene por DHCP: no se inventa una al azar, porque puede chocar con la
 | 5 | ✅ | Captura de paquetes | Con BPF; detecta un escaneo real (`mac-captura`). |
 | 6 | ✅ | Configuración, `status` y requisitos propios de macOS | Probados con el servicio instalado. |
 | 7 | ✅ | Panel | Páginas, acciones, avisos y aplicación en Aplicaciones probados (`mac-instalar`). Falta ver la ventana de contraseña en un Mac con pantalla. |
-| 8 | 🟡 | Informe del equipo y auditoría | Todas las secciones propias de macOS; falta la prueba real de las nuevas. |
+| 8 | ✅ | Informe del equipo y auditoría | Todas las secciones propias de macOS, probadas (`mac-instalar`). |
 | 9 | ✅ | Señuelos | Con usuario propio sin privilegios; probados (`mac-instalar`). |
 | 10 | 🟡 | Actualizaciones | Usan el instalador de Mac; hace falta publicar una versión que lo incluya. |
-| 11 | 🟡 | Endurecimiento guiado | Medidas propias de macOS con comprobación y reversión; falta la prueba real. |
+| 11 | ✅ | Endurecimiento guiado | Aplicar y revertir probado en los cuatro tipos de Mac (`mac-instalar`). FileVault solo se revisa. |
 | 12 | 🟡 | Ventana grande de alerta y PIN sin terminal | Con ventanas del sistema; falta verlas en un Mac con pantalla. |
 | 13 | ⬜ | API y app de iOS | La app solo acompaña: alertas, estado de los equipos y bloquear o liberar IPs. iOS no permite que una app vigile el sistema. |
 
