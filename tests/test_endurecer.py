@@ -164,6 +164,17 @@ class SshTests(Base):
 
 
 class VigilanteTests(unittest.TestCase):
+    def test_la_marca_incluye_la_ruta_real_de_los_enlaces(self):
+        """En macOS /etc es un enlace a /private/etc y el vigilante mira la ruta real."""
+        e = Env()
+        try:
+            real = e.write("private/etc/x.conf", "x"); enlace = os.path.join(e.tree, "etc")
+            os.symlink(os.path.join(e.tree, "private", "etc"), enlace)
+            en._marcar_cambio_propio([os.path.join(enlace, "x.conf")])
+            self.assertIn(os.path.realpath(real), core.read_json(os.path.join(core.state_dir(), "self_changes.json"))["paths"])
+        finally:
+            e.close()
+
     def test_los_cambios_que_hace_el_endurecimiento_no_se_reportan_como_ataque(self):
         e = Env()
         try:

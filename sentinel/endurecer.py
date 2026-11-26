@@ -309,6 +309,7 @@ def _guardar_json(path: str, obj) -> None:
 
 def _marcar_cambio_propio(rutas: list[str]) -> None:
     """Avisa al vigilante de archivos de que estos cambios los hizo Sentinel (para que no los reporte como un ataque)."""
+    rutas = sorted(set(rutas) | {os.path.realpath(r) for r in rutas})      # en macOS /etc es un enlace a /private/etc, que es lo que se vigila
     try:
         core.atomic_write_json(os.path.join(core.state_dir(), "self_changes.json"), {"at": core.now(), "paths": rutas}, 0o640, share=True)
     except OSError:

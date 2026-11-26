@@ -293,7 +293,7 @@ class Fim:
             pristine = f["kind"] in ("modified", "added") and not sigs and pkgcheck.is_pristine(f["path"])
             sev, detail = reclassify(f["path"], f["kind"], sev, detail, pkg, sigs, pristine)
             if f["path"] in mios and not sigs:
-                sev, detail = "info", detail + " (cambio hecho por Sentinel al endurecer el equipo)"
+                sev, detail = "info", detail + " (cambio hecho por Sentinel)"
             f2 = dict(f, sev=sev, detail=detail)
             results.append(f2)
             self.alerter.emit(sev, "fim", f["kind"], f"{f['path']}: {detail}", key=f"fim:{f['kind']}:{f['path']}:{f.get('sha', '')}", path=f["path"], detail=detail, signatures=sigs)
