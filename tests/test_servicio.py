@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 import helpers  # noqa: F401  (pone el proyecto en sys.path)
-from sentinel import plataforma, servicio
+from sentinel import cli, core, equipo, plataforma, servicio
 
 
 class ServicioTests(unittest.TestCase):
@@ -59,6 +59,28 @@ class ServicioTests(unittest.TestCase):
         with self.mac():
             self.assertEqual(len(servicio.iniciar(self.launchctl)), 4)
             self.assertEqual(servicio.estado("sentinel-monitor", self.launchctl), "not-found")
+
+    def test_detener_e_iniciar_desde_la_linea_de_comandos(self):
+        e = helpers.Env(); self.addCleanup(e.close)
+        for n in servicio.TAREAS:
+            servicio.escribir(n, "/usr/bin/python3")
+        self.cargadas.update(servicio.TAREAS)
+        with self.mac(), mock.patch.object(core, "is_root", return_value=True), mock.patch.object(core, "run", side_effect=self.launchctl), \
+             mock.patch.object(cli.pin, "authorize_stop"), mock.patch.object(cli.pin, "revoke_stop"), mock.patch("builtins.print"):
+            self.assertEqual(cli.cmd_detener(None), 0); self.assertEqual(self.cargadas, set())
+            self.assertEqual(cli.cmd_iniciar(None), 0); self.assertEqual(self.cargadas, set(servicio.TAREAS))
+        self.assertFalse([c for c in self.calls if c[0] == "systemctl"])
+
+    def test_cambiar_el_horario_del_informe_en_macos(self):
+        e = helpers.Env(); self.addCleanup(e.close)
+        servicio.escribir("equipo", "/usr/bin/python3"); self.cargadas.add("equipo")
+        with self.mac():
+            ok, msg = equipo.aplicar_horario("07:30,19:00", self.launchctl)
+        self.assertTrue(ok, msg)
+        with open(servicio.ruta("equipo"), "rb") as f:
+            self.assertEqual(plistlib.load(f)["StartCalendarInterval"], [{"Hour": 7, "Minute": 30}, {"Hour": 19, "Minute": 0}])
+        self.assertIn("equipo", self.cargadas)
+        self.assertFalse([c for c in self.calls if c[0] == "systemctl"])
 
     def test_en_linux_sigue_preguntando_a_systemd(self):
         with self.mac(False):

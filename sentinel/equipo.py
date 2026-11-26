@@ -17,10 +17,11 @@ import re
 import shutil
 import socket
 import stat
+import sys
 import time
 from dataclasses import dataclass
 
-from . import core, firewall, hostcheck, mailer, report
+from . import core, firewall, hostcheck, mailer, plataforma, report, servicio
 from .firewall import exposure
 
 NIVELES = ("ALTO", "MEDIO", "BAJO")
@@ -129,7 +130,7 @@ class Revision:
         self.inf = Informe()
         self.allow = core.Allow(cfg)
         self.root = core.is_root()
-        self.sentinel_activo = core.run(["systemctl", "is-active", "sentinel-monitor"], 5)[1].strip().split("\n")[-1] == "active"
+        self.sentinel_activo = servicio.estado("sentinel-monitor") == "active"
 
     # ---- referencias (líneas base) propias de esta revisión
     def _ref(self, nombre: str) -> str:
@@ -626,6 +627,14 @@ def aplicar_horario(txt: str, ejecutar=None) -> tuple[bool, str]:
         return False, "Horario no válido: usa de 1 a 6 horas HH:MM separadas por coma, por ejemplo 08:00,16:00,23:00."
     try:
         core.set_setting("equipo", "horas", ",".join(horas))
+        if plataforma.ES_MAC:
+            if os.path.exists(servicio.ruta("equipo")):             # instalado: se reescribe la tarea y launchd la relee
+                servicio.detener(ejecutar, ["equipo"])
+                servicio.escribir("equipo", sys.executable, horas=horas)
+                errores = servicio.iniciar(ejecutar, ["equipo"])
+                if errores:
+                    return False, "No se pudo guardar el horario: " + "; ".join(errores)
+            return True, "Horario guardado: el informe se generará a las " + ", ".join(horas) + "."
         d = os.path.join(carpeta_systemd(), "sentinel-equipo.timer.d")
         arch = os.path.join(d, "horario.conf")
         if ",".join(horas) == HORAS_POR_DEFECTO:

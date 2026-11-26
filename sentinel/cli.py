@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, incidents, mailer, pin, report, requisitos, update
+from . import audit, core, endurecer, equipo, explain, fim, geoip, honeypot, hostcheck, ia, incidents, mailer, pin, plataforma, report, requisitos, servicio, update
 from .monitor import Monitor
 
 C = {"critical": "\033[1;41;97m", "high": "\033[1;31m", "medium": "\033[33m", "low": "\033[36m", "info": "\033[2m", "ok": "\033[32m", "aviso": "\033[33m", "fallo": "\033[1;31m"}
@@ -36,7 +36,9 @@ def cmd_status(a) -> int:
     veredicto = {"protegido": col("PROTEGIDO", "ok"), "atencion": col("REQUIERE ATENCIÓN", "high")}.get(ov["level"], col(str(ov["level"]).upper(), "aviso"))
     print(f"Sentinel {core.VERSION} — {veredicto}: {ov['why']}")
     for n in ("sentinel-monitor", "sentinel-honeypot", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"):
-        st = core.run(["systemctl", "is-active", n], 5)[1].strip().split("\n")[-1]
+        if plataforma.ES_MAC and n == "sentinel-honeypot":
+            continue                                   # los señuelos todavía no existen en macOS
+        st = servicio.estado(n)
         print(f"  {n:<24} {col(st, 'ok' if st == 'active' else 'fallo')}")
     hb = core.read_json(os.path.join(core.state_dir(), "heartbeat.json"))
     if hb:
@@ -382,11 +384,15 @@ def cmd_endurecer(a) -> int:
     return 0 if not r["revertidas"] else 1
 
 
+def _hay_servicios() -> bool:
+    return plataforma.ES_MAC or bool(shutil.which("systemctl"))
+
+
 def _smtp_reiniciar_monitor() -> None:
     """El monitor lee la configuración al arrancar: lo reinicia (ya se demostró el PIN, así que no es un «intento de detener»)."""
-    if core.is_root() and shutil.which("systemctl") and core.conf_path() == "/etc/sentinel/sentinel.conf":
+    if core.is_root() and _hay_servicios() and core.conf_path() == "/etc/sentinel/sentinel.conf":
         pin.authorize_stop()
-        core.run(["systemctl", "try-restart", "sentinel-monitor.service"], 20)
+        servicio.reiniciar_monitor()
 
 
 def cmd_smtp(a) -> int:
@@ -589,13 +595,15 @@ def cmd_config(a) -> int:
         except (ValueError, OSError) as e:
             print("No se cambió:", e); return 1
         changed += 1
-    print(f"Guardado ({changed} ajuste{'s' if changed != 1 else ''}). Los avisos nuevos usan los valores de inmediato; el monitor los lee al reiniciar: sudo systemctl restart sentinel-monitor")
-    if core.is_root() and shutil.which("systemctl") and core.conf_path() == "/etc/sentinel/sentinel.conf":      # solo con la configuración real del sistema
-        core.run(["systemctl", "try-restart", "sentinel-monitor.service"], 20)
+    print(f"Guardado ({changed} ajuste{'s' if changed != 1 else ''}). Los avisos nuevos usan los valores de inmediato; el monitor los lee al reiniciar: " + ("sudo sentinel detener && sudo sentinel iniciar" if plataforma.ES_MAC else "sudo systemctl restart sentinel-monitor"))
+    if core.is_root() and _hay_servicios() and core.conf_path() == "/etc/sentinel/sentinel.conf":      # solo con la configuración real del sistema
+        servicio.reiniciar_monitor()
     return 0
 
 
 def cmd_senuelos(a) -> int:
+    if plataforma.ES_MAC:
+        print("Los señuelos todavía no están disponibles en macOS: están apagados."); return 0 if a.accion == "estado" else 1
     if a.accion == "estado":
         on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 5)[1].strip() == "active"
         print("Señuelos:", "activos" if on else "apagados"); return 0
@@ -684,14 +692,24 @@ def cmd_detener(a) -> int:
         print("Necesita administrador: ejecuta  sudo sentinel detener", file=sys.stderr); return 1
     pin.authorize_stop()
     units = ["sentinel-monitor.service", "sentinel-honeypot.service", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"]
-    rc, out = core.run(["systemctl", "stop", *units], 60)
+    if plataforma.ES_MAC:
+        errores = servicio.detener()
+        rc, out = (1 if errores else 0), "\n".join(errores)
+    else:
+        rc, out = core.run(["systemctl", "stop", *units], 60)
     core.Alerter(core.load_config()).emit("low", "pin", "detenido", "Sentinel fue detenido de forma autorizada (con el PIN)", key=f"stop:{int(core.now())}")
     pin.revoke_stop()
     print("Sentinel detenido. Para volver a encenderlo:  sudo sentinel iniciar" if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 
 
 def cmd_iniciar(a) -> int:
-    rc, out = core.run(["systemctl", "start", "sentinel-monitor.service", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"], 60)
+    if plataforma.ES_MAC:
+        if not core.is_root():
+            print("Necesita administrador: ejecuta  sudo sentinel iniciar", file=sys.stderr); return 1
+        errores = servicio.iniciar()
+        rc, out = (1 if errores else 0), "\n".join(errores)
+    else:
+        rc, out = core.run(["systemctl", "start", "sentinel-monitor.service", "sentinel-scan.timer", "sentinel-report.timer", "sentinel-equipo.timer"], 60)
     print("Sentinel iniciado." if rc == 0 else out.strip()); return 0 if rc == 0 else 1
 
 

@@ -23,6 +23,7 @@ import urllib.parse
 import webbrowser
 
 from . import pin
+from . import plataforma, servicio
 from . import audit, core, endurecer, equipo, explain, geoip, ia, incidents, requisitos, update
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
@@ -68,7 +69,9 @@ class Data:
             return self._svc[1]
         res = {}
         for u in UNITS:
-            res[u] = core.run(["systemctl", "is-active", u], 4)[1].strip().split("\n")[-1] or "desconocido"
+            if plataforma.ES_MAC and u == "sentinel-honeypot":
+                continue                               # los señuelos todavía no existen en macOS
+            res[u] = servicio.estado(u) or "desconocido"
         self._svc = (time.time(), res)
         return res
 
@@ -76,7 +79,7 @@ class Data:
         cfg = core.load_config()
         vals = {f"{s}.{k}": cfg.get(s, k, fallback="") for (s, k) in core.EDITABLE}
         from . import toast
-        on = core.run(["systemctl", "is-active", "sentinel-honeypot"], 4)[1].strip().split("\n")[-1] == "active"
+        on = servicio.estado("sentinel-honeypot") == "active"
         st = core.read_json(os.path.join(core.state_dir(), "pin_state.json"), {}) or {}
         from . import hostcheck
         return {"learning": int(hostcheck.learning_until()), "values": vals, "pin": {"enabled": bool(st.get("enabled")), "locked": pin.locked_for()}, "honeypot": {"active": on, "ports": core.csv(cfg.get("honeypot", "ports", fallback=""))}, "toast_available": toast.available()}
@@ -174,8 +177,8 @@ class Data:
         from . import mailer
         cfg = core.load_config()
         e = mailer.estado(cfg)
-        sig = core.run(["systemctl", "show", "sentinel-equipo.timer", "-p", "NextElapseUSecRealtime", "--value"], 5)[1].strip()
-        activo = core.run(["systemctl", "is-active", "sentinel-equipo.timer"], 5)[1].strip().split("\n")[-1] == "active"
+        sig = "" if plataforma.ES_MAC else core.run(["systemctl", "show", "sentinel-equipo.timer", "-p", "NextElapseUSecRealtime", "--value"], 5)[1].strip()  # launchd no dice cuándo toca
+        activo = servicio.estado("sentinel-equipo.timer") == "active"
         try:
             informes = sorted(glob.glob(os.path.join(core.state_dir(), "informes", "equipo-*.html")))
             ultimo = os.path.getmtime(informes[-1]) if informes else None
