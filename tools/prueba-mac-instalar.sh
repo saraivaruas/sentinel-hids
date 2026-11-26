@@ -28,6 +28,11 @@ for i in 1 2 3 4 5 6; do ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o Use
 comprobar "avisa de la fuerza bruta (el servicio lee el registro)" esperar 60 evento fuerza_bruta
 comprobar "el panel de otro equipo puede leer los registros (grupo admin)" test "$(stat -f %Sg /var/log/sentinel/events.jsonl)" = admin
 
+echo "== panel (como $SUDO_USER)"
+sudo -u "$SUDO_USER" -H /usr/bin/python3 -I "$AQUI/tools/prueba-mac-panel.py"; comprobar "el panel funciona" test $? = 0
+/usr/local/bin/sentinel requisitos > /tmp/req.txt; comprobar "no falta ningún requisito" grep -q "Todo lo necesario ya está instalado" /tmp/req.txt
+/usr/local/bin/sentinel test; comprobar "la prueba de alertas funciona" test $? = 0
+
 ANTES="$(pid)"; kill -9 "$ANTES"
 comprobar "si matan el monitor, launchd lo vuelve a levantar" esperar 60 sh -c "p=\$(pgrep -f '/opt/sentinel monitor' | head -1); [ -n \"\$p\" ] && [ \"\$p\" != '$ANTES' ]"
 comprobar "detener funciona" /usr/local/bin/sentinel detener
