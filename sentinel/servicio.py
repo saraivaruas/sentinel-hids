@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import plistlib
+import time
 
 from . import core, plataforma
 
@@ -94,17 +95,26 @@ def iniciar(run=None, nombres=TAREAS) -> list[str]:
     return errores
 
 
-def detener(run=None, nombres=TAREAS) -> list[str]:
-    """macOS: descarga las tareas (siguen instaladas y vuelven al reiniciar el equipo o con iniciar())."""
+def detener(run=None, nombres=TAREAS, espera: float = 45.0, dormir=time.sleep) -> list[str]:
+    """macOS: descarga las tareas (siguen instaladas y vuelven al reiniciar el equipo o con iniciar()).
+
+    launchd responde antes de que el programa termine: se espera a que cada tarea desaparezca. Sin eso, un
+    iniciar() inmediato no haría nada y el desinstalador borraría carpetas todavía en uso."""
     run = run or core.run
-    errores = []
+    pendientes = {}
     for n in nombres:
         if run(["launchctl", "print", f"system/{PREFIJO}{n}"], 5)[0] != 0:
             continue
-        rc, out = run(["launchctl", "bootout", f"system/{PREFIJO}{n}"], 60)
-        if rc != 0:
-            errores.append(f"{n}: {out.strip()[:160]}")
-    return errores
+        pendientes[n] = run(["launchctl", "bootout", f"system/{PREFIJO}{n}"], 60)[1].strip()[:160]
+    limite = time.monotonic() + espera
+    while pendientes:
+        for n in list(pendientes):
+            if run(["launchctl", "print", f"system/{PREFIJO}{n}"], 5)[0] != 0:
+                del pendientes[n]
+        if not pendientes or time.monotonic() >= limite:
+            break
+        dormir(0.5)
+    return [f"{n}: no se pudo detener {motivo}".rstrip() for n, motivo in pendientes.items()]
 
 
 def reiniciar_monitor(run=None) -> None:

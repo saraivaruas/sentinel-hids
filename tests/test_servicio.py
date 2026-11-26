@@ -82,6 +82,29 @@ class ServicioTests(unittest.TestCase):
         self.assertIn("equipo", self.cargadas)
         self.assertFalse([c for c in self.calls if c[0] == "systemctl"])
 
+    def test_detener_espera_a_que_launchd_termine(self):
+        quedan = {"n": 3}                       # tras «bootout» la tarea sigue visible unas consultas más
+
+        def lento(c, t=20):
+            if c[1] == "bootout":
+                return 36, "Operation now in progress"
+            if not any(x[1] == "bootout" for x in self.calls):
+                self.calls.append(c); return 0, ""
+            quedan["n"] -= 1
+            return (0 if quedan["n"] > 0 else 113), ""
+
+        def run(c, t=20):
+            r = lento(c, t)
+            if c[1] == "bootout":
+                self.calls.append(c)
+            return r
+        self.assertEqual(servicio.detener(run, ["monitor"], dormir=lambda s: None), [])
+        self.assertEqual(quedan["n"], 0)
+
+    def test_detener_avisa_si_no_termina(self):
+        errores = servicio.detener(lambda c, t=20: (0, ""), ["monitor"], espera=0, dormir=lambda s: None)
+        self.assertEqual(len(errores), 1); self.assertIn("monitor", errores[0])
+
     def test_en_linux_sigue_preguntando_a_systemd(self):
         with self.mac(False):
             self.assertEqual(servicio.estado("sentinel-monitor", lambda c, t=20: (self.calls.append(c) or (0, "active\n"))), "active")
