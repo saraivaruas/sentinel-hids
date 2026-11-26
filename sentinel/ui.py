@@ -197,7 +197,7 @@ class Data:
         """Lo que muestra la página «Endurecimiento»: cada medida con su estado (solo lectura; no cambia nada)."""
         perfil = perfil if perfil in endurecer.PERFILES else "recomendado"
         items = endurecer.plan(perfil)
-        return {"perfil": perfil, "perfiles": list(endurecer.PERFILES), "historial": endurecer.historial()[-5:],
+        return {"perfil": perfil, "perfiles": list(endurecer.PERFILES), "historial": endurecer.historial()[-5:], "aviso": "" if endurecer.disponible() else endurecer.AVISO_MAC,
                 "medidas": [{"id": i.medida.id, "titulo": i.medida.titulo, "estado": i.codigo, "detalle": i.detalle, "que_hace": i.medida.que_hace, "por_que": i.medida.por_que,
                              "riesgo": i.medida.riesgo, "perfil": i.medida.perfil, "nota": i.medida.nota} for i in items]}
 
@@ -216,6 +216,8 @@ class Data:
             {"id": "endurecer", "titulo": "Endurecer el equipo (opcional, reversible)", "ok": pend == 0, "detalle": "Sin medidas pendientes." if pend == 0 else f"{pend} medida(s) recomendada(s) sin aplicar.", "vista": "endurecer", "obligatorio": False},
             {"id": "ia", "titulo": "Asistente de IA que explica las detecciones (opcional)", "ok": bool(iae["ok"]), "detalle": "Activo." if iae["ok"] else "Apagado; no hace falta para que Sentinel funcione.", "vista": "ia", "obligatorio": False},
         ]
+        if not endurecer.disponible():
+            pasos = [x for x in pasos if x["id"] != "endurecer"]
         return {"pasos": pasos, "listos": sum(1 for x in pasos if x["ok"]), "total": len(pasos)}
 
     def ia(self) -> dict:

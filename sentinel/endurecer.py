@@ -18,7 +18,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from . import core
+from . import core, plataforma
 
 PERFILES = ("basico", "recomendado", "estricto")
 PERFIL_ES = {"basico": "básico", "recomendado": "recomendado", "estricto": "estricto"}
@@ -279,10 +279,19 @@ def indice_perfil(p: str) -> int:
     return PERFILES.index(p)
 
 
+AVISO_MAC = "El endurecimiento guiado todavía no está disponible en macOS: sus medidas son de Linux. La auditoría («sentinel audit») dice qué conviene activar en tu Mac."
+
+
+def disponible() -> bool:
+    return not plataforma.ES_MAC
+
+
 def plan(perfil: str = "recomendado", solo: list[str] | None = None, ctx: Contexto | None = None) -> list[Item]:
-    ctx = ctx or Contexto()
     if perfil not in PERFILES:
         raise ValueError(f"perfil desconocido: {perfil}")
+    if ctx is None and not disponible():          # sobre el equipo real: las medidas de Linux no se evalúan ni se aplican en un Mac
+        return []
+    ctx = ctx or Contexto()
     out = []
     for m in MEDIDAS:
         if solo and m.id not in solo:

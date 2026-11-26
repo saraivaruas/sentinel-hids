@@ -461,7 +461,8 @@
       row.appendChild(d); box.appendChild(row);
     });
     $("#en-apl").hidden = !pe.length; $("#en-rev").hidden = !r.historial.length;
-    $("#en-note").textContent = pe.length ? "" : "No hay nada pendiente en este perfil.";
+    if (r.aviso) { b.textContent = "No disponible"; b.className = "badge"; }
+    $("#en-note").textContent = r.aviso || (pe.length ? "" : "No hay nada pendiente en este perfil.");
   }
   $("#en-perfil").addEventListener("change", loadEndurecer);
   $("#en-apl").addEventListener("click", async (e) => {
