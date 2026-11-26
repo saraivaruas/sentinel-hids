@@ -5,6 +5,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ## [Sin publicar]
 
 ### Agregado
+- La hoja de ruta marca los requisitos de macOS como pendientes de su prueba real.
 - La hoja de ruta muestra pieza por pieza qué tiene macOS igual que Linux, qué espera su prueba real y qué falta.
 - La prueba del instalador en macOS activa los señuelos, los toca, comprueba su usuario sin privilegios y muestra los USB y extensiones que lee.
 - **Señuelos en macOS:** `sentinel senuelos activar` abre los puertos falsos con el usuario `_sentinel`, que solo puede escribir su registro y recibe una copia de su configuración. El instalador crea ese usuario y el desinstalador lo borra. 1 prueba nueva.
