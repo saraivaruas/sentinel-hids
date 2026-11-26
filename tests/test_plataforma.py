@@ -42,6 +42,12 @@ class PlataformaTests(unittest.TestCase):
         self.assertEqual(propia.get("fim", "www"), "/mi/web")                         # lo que escribe la persona manda
         self.assertIn("/etc/ufw", linux.get("fim", "paths")); self.assertIn("5900", linux.get("honeypot", "ports"))
 
+    def test_grupo_que_puede_leer_los_registros(self):
+        with mock.patch.object(plataforma, "ES_MAC", True):
+            self.assertEqual(core.grupo_lector(), "admin")
+        with mock.patch.object(plataforma, "ES_MAC", False):
+            self.assertEqual(core.grupo_lector(), "adm")
+
 
 if __name__ == "__main__":
     unittest.main()

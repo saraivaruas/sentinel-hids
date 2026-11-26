@@ -349,13 +349,17 @@ def ensure_dir(path: str, mode: int = 0o750) -> None:
     os.makedirs(path, mode=mode, exist_ok=True)
 
 
+def grupo_lector() -> str:
+    return "admin" if plataforma.ES_MAC else "adm"
+
+
 def share_with_adm(path: str) -> None:
-    """Si corre como administrador, deja el archivo legible por el grupo «adm» (así el panel gráfico, que corre con tu usuario, puede leerlo)."""
+    """Si corre como administrador, deja el archivo legible por el grupo de administradores («adm»; «admin» en macOS), así el panel gráfico, que corre con tu usuario, puede leerlo."""
     if not is_root():
         return
     try:
         import grp
-        os.chown(path, -1, grp.getgrnam("adm").gr_gid)
+        os.chown(path, -1, grp.getgrnam(grupo_lector()).gr_gid)
     except (OSError, KeyError, ImportError):
         pass
 
